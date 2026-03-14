@@ -1,4 +1,4 @@
-php
+@php
     $locale = app()->getLocale();
     $isRtl  = in_array(substr($locale, 0, 2), ['ar','fa','ur','he']);
     $dir    = $isRtl ? 'rtl' : 'ltr';
