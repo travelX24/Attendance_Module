@@ -3,8 +3,8 @@
 namespace Athka\Attendance\Http\Controllers\Api;
 
 use Illuminate\Routing\Controller;
-use Athka\\Attendance\Models\AttendanceDailyLog;
-use Athka\\Attendance\Models\OfflineAttendanceQueue;
+use Athka\Attendance\Models\AttendanceDailyLog;
+use Athka\Attendance\Models\OfflineAttendanceQueue;
 use Athka\Employees\Models\Employee;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
@@ -94,7 +94,7 @@ class OfflineAttendanceController extends Controller
         $date      = now();
 
         // 1. Get Schedule
-        $assignment = \Athka\\Attendance\Models\EmployeeWorkSchedule::where('saas_company_id', $companyId)
+        $assignment = \Athka\Attendance\Models\EmployeeWorkSchedule::where('saas_company_id', $companyId)
             ->where('employee_id', $employee->id)
             ->where('is_active', true)
             ->where('start_date', '<=', $date)
