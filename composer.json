@@ -1,0 +1,28 @@
+{
+    "name": "athka/attendance",
+    "description": "Athka HR Attendance Module",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Athka Team"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "laravel/framework": "^11.0|^12.0",
+        "livewire/livewire": "^3.0"
+    },
+    "autoload": {
+        "psr-4": {
+            "Athka\\Attendance\\": "src/"
+        }
+    },
+    "extra": {
+        "laravel": {
+            "providers": [
+                "Athka\\Attendance\\AttendanceServiceProvider"
+            ]
+        }
+    }
+}

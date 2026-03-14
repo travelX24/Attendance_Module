@@ -1,0 +1,457 @@
+<?php
+
+namespace Athka\Attendance\Models;
+
+use App\Models\Concerns\AppliesCompanyAndBranchScopeThroughEmployee;
+use App\Models\User;
+use Athka\Employees\Models\Employee;
+use Athka\SystemSettings\Models\AttendanceGraceSetting;
+use Athka\SystemSettings\Models\WorkSchedule;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+
+class AttendanceDailyLog extends Model
+{
+    use AppliesCompanyAndBranchScopeThroughEmployee;
+
+    protected $fillable = [
+        'saas_company_id',
+        'employee_id',
+        'attendance_date',
+        'work_schedule_id',
+        'scheduled_hours',
+        'check_in_time',
+        'check_out_time',
+        'actual_hours',
+        'scheduled_check_in',
+        'scheduled_check_out',
+        'attendance_status',
+        'approval_status',
+        'compliance_percentage',
+        'is_edited',
+        'edited_by',
+        'edited_at',
+        'edit_reason',
+        'edit_notes',
+        'approved_by',
+        'approved_at',
+        'approval_notes',
+
+        'rejected_by',
+        'rejected_at',
+        'rejection_notes',
+
+        'revoked_by',
+        'revoked_at',
+        'revoke_reason',
+
+        'source',
+        'check_attempts',
+        'meta_data',
+    ];
+
+    protected $casts = [
+        'attendance_date' => 'date',
+        'check_in_time' => 'datetime:H:i',
+        'check_out_time' => 'datetime:H:i',
+        'scheduled_check_in' => 'datetime:H:i',
+        'scheduled_check_out' => 'datetime:H:i',
+        'scheduled_hours' => 'decimal:2',
+        'actual_hours' => 'decimal:2',
+        'compliance_percentage' => 'decimal:2',
+        'is_edited' => 'boolean',
+        'edited_at' => 'datetime',
+        'approved_at' => 'datetime',
+        'rejected_at' => 'datetime',
+        'revoked_at' => 'datetime',
+        'check_attempts' => 'array',
+        'meta_data' => 'array',
+    ];
+
+    // Relationships
+    public function employee(): BelongsTo
+    {
+        return $this->belongsTo(Employee::class);
+    }
+
+    public function workSchedule(): BelongsTo
+    {
+        return $this->belongsTo(WorkSchedule::class);
+    }
+
+    public function editor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'edited_by');
+    }
+
+    public function approver(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'approved_by');
+    }
+
+    public function rejector(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'rejected_by');
+    }
+
+    public function revoker(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'revoked_by');
+    }
+
+    public function auditLogs(): HasMany
+    {
+        return $this->hasMany(AttendanceAuditLog::class, 'entity_id', 'id')
+            ->where('entity_type', 'attendance_daily_log');
+    }
+
+    public function details(): HasMany
+    {
+        return $this->hasMany(AttendanceDailyDetail::class, 'daily_log_id');
+    }
+
+    // Scopes
+    public function scopeForCompany($query, $companyId)
+    {
+        return $query->where('saas_company_id', $companyId);
+    }
+
+    public function scopeForDate($query, $date)
+    {
+        return $query->where('attendance_date', $date);
+    }
+
+    public function scopeForEmployee($query, $employeeId)
+    {
+        return $query->where('employee_id', $employeeId);
+    }
+
+    public function scopePending($query)
+    {
+        return $query->where('approval_status', 'pending');
+    }
+
+    public function scopeApproved($query)
+    {
+        return $query->where('approval_status', 'approved');
+    }
+
+    // âœ… Ø§Ù„Ø­ÙØ§Ø¸ Ø¹Ù„Ù‰ Ø§Ø³ØªÙ…Ø±Ø§Ø±ÙŠØ© Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø¹Ù†Ø¯ Ø§Ù„Ø­ÙØ¸
+    protected static function booted()
+    {
+        static::saving(function ($log) {
+            $log->syncWithSchedule();
+            $log->calculateActualHours();
+            $log->calculateStatus();
+            $log->calculateCompliance();
+
+            // âœ… Freelancer specific logic
+            if ($log->employee && $log->employee->contract_type === 'freelancer') {
+                 // Prevent auto-approval of freelancer logs
+                 if ($log->check_in_time && $log->attendance_status !== 'absent' && $log->approval_status !== 'approved' && $log->approval_status !== 'rejected') {
+                     $log->approval_status = 'pending';
+                 }
+            } else {
+                 // For non-freelancers, auto-approve if they are present and it's not manual input
+                 // or you can leave it as pending based on existing logic.
+                 // Currently, it seems logs are created as pending. We will keep it pending for all
+                 // and the manager will approve.
+            }
+        });
+    }
+
+    public function syncWithSchedule(): void
+    {
+        // Ø¥Ø°Ø§ ÙƒØ§Ù† Ø§Ù„Ø¬Ø¯ÙˆÙ„ Ù…ÙˆØ¬ÙˆØ¯Ø§Ù‹ Ø¨Ø§Ù„ÙØ¹Ù„ ÙˆØ³Ø§Ø¹Ø§Øª Ø§Ù„Ø¬Ø¯ÙˆÙ„Ø© Ø£ÙƒØ¨Ø± Ù…Ù† 0ØŒ ÙÙ‚Ø¯ Ù„Ø§ Ù†Ø­ØªØ§Ø¬ Ù„ØªØ­Ø¯ÙŠØ«Ù‡ Ø¥Ù„Ø§ Ø¥Ø°Ø§ ÙƒØ§Ù† ÙØ§Ø±ØºØ§Ù‹
+        // Ù„ÙƒÙ† Ø§Ù„Ø£ÙØ¶Ù„ Ù‡Ùˆ Ø§Ù„ØªØ£ÙƒØ¯ Ù…Ù† ØµØ­Ø© Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø¨Ù†Ø§Ø¡Ù‹ Ø¹Ù„Ù‰ ØªØ§Ø±ÙŠØ® Ø§Ù„Ø­Ø¶ÙˆØ±
+        $companyId = $this->saas_company_id;
+        $date = $this->attendance_date;
+        if (! $date) {
+            return;
+        }
+
+        $dayName = strtolower($date->format('l'));
+
+        $assignment = EmployeeWorkSchedule::where('saas_company_id', $companyId)
+            ->where('employee_id', $this->employee_id)
+            ->where('is_active', true)
+            ->where('start_date', '<=', $date)
+            ->where(function ($q) use ($date) {
+                $q->whereNull('end_date')->orWhere('end_date', '>=', $date);
+            })
+            ->with(['workSchedule.periods'])
+            ->first();
+
+        if ($assignment && $assignment->workSchedule) {
+            $ws = $assignment->workSchedule;
+            $workDays = is_array($ws->work_days) ? $ws->work_days : [];
+
+            if (in_array($dayName, $workDays)) {
+                $this->work_schedule_id = $ws->id;
+
+                $firstPeriod = $ws->periods->first();
+                $lastPeriod = $ws->periods->last();
+
+                if ($firstPeriod) {
+                    $this->scheduled_check_in = $firstPeriod->start_time;
+                    $this->scheduled_check_out = $lastPeriod->end_time;
+
+                    // Ø­Ø³Ø§Ø¨ Ù…Ø¬Ù…ÙˆØ¹ Ø§Ù„Ø³Ø§Ø¹Ø§Øª Ø§Ù„Ù…Ø¬Ø¯ÙˆÙ„Ø© Ù…Ù† ÙƒØ§ÙØ© Ø§Ù„ÙØªØ±Ø§Øª
+                    $totalMinutes = 0;
+                    foreach ($ws->periods as $p) {
+                        try {
+                            $s = Carbon::parse($p->start_time);
+                            $e = Carbon::parse($p->end_time);
+                            $totalMinutes += $e->diffInMinutes($s);
+                        } catch (\Exception $e) {
+                        }
+                    }
+                    $this->scheduled_hours = round($totalMinutes / 60, 2);
+
+                    // âœ… Ù…Ù†Ø·Ù‚ Ø§Ù„ØªØªØ¨Ø¹ Ø§Ù„ØªÙ„Ù‚Ø§Ø¦ÙŠ: Ø¥Ø°Ø§ ÙƒØ§Ù†Øª Ø§Ù„Ø³ÙŠØ§Ø³Ø© "ØªÙ„Ù‚Ø§Ø¦ÙŠ"ØŒ Ù‚Ù… Ø¨ØªØ¹Ø¨Ø¦Ø© Ø£ÙˆÙ‚Ø§Øª Ø§Ù„Ø¯Ø®ÙˆÙ„ ÙˆØ§Ù„Ø®Ø±ÙˆØ¬ ÙØ¹Ù„ÙŠØ§Ù‹
+                    if ($this->getEffectiveTrackingMode() === 'automatic') {
+                        if (! $this->check_in_time) {
+                            $this->check_in_time = $this->scheduled_check_in;
+                        }
+                        if (! $this->check_out_time) {
+                            $this->check_out_time = $this->scheduled_check_out;
+                        }
+                        if ($this->source !== 'manual') {
+                            $this->source = 'automatic';
+                        }
+                    }
+                }
+            } else {
+                // ÙŠÙˆÙ… Ø¥Ø¬Ø§Ø²Ø© (Day Off)
+                $this->scheduled_hours = 0;
+                $this->work_schedule_id = $ws->id;
+                if (! $this->check_in_time) {
+                    $this->attendance_status = 'day_off';
+                }
+            }
+        }
+    }
+
+    /**
+     * ØªØ­Ø¯ÙŠØ¯ Ø³ÙŠØ§Ø³Ø© Ø§Ù„ØªØªØ¨Ø¹ Ø§Ù„Ù…Ø·Ø¨Ù‚Ø© Ø¹Ù„Ù‰ Ø§Ù„Ù…ÙˆØ¸Ù
+     */
+    public function getEffectiveTrackingMode(): string
+    {
+        // 1. Ø§Ù„Ø¨Ø­Ø« ÙÙŠ Ø§Ù„Ù…Ø¬Ù…ÙˆØ¹Ø§Øª Ø§Ù„ØªÙŠ ÙŠÙ†ØªÙ…ÙŠ Ù„Ù‡Ø§ Ø§Ù„Ù…ÙˆØ¸Ù
+        $group = \Athka\SystemSettings\Models\EmployeeGroup::whereHas('employees', function ($q) {
+            $q->where('employees.id', $this->employee_id);
+        })->where('is_active', true)->first();
+
+        if ($group && $group->appliedPolicy) {
+            return $group->appliedPolicy->tracking_mode ?? 'check_in_out';
+        }
+
+        // 2. Ø§Ù„Ø¹ÙˆØ¯Ø© Ù„Ù„Ø³ÙŠØ§Ø³Ø© Ø§Ù„Ø¹Ø§Ù…Ø© Ù„Ù„Ø´Ø±ÙƒØ©
+        $defaultPolicy = \Athka\SystemSettings\Models\AttendancePolicy::where('saas_company_id', $this->saas_company_id)
+            ->where('is_default', true)
+            ->first();
+
+        return $defaultPolicy->tracking_mode ?? 'check_in_out';
+    }
+
+    // Helper Methods
+    public function getStatusColorAttribute(): string
+    {
+        return match ($this->attendance_status) {
+            'present' => 'green',
+            'late' => 'yellow',
+            'early_departure' => 'yellow',
+            'absent' => 'red',
+            'on_leave' => 'gray',
+            'auto_checkout' => 'red',
+            'day_off' => 'gray',
+            default => 'gray',
+        };
+    }
+
+    public function getApprovalColorAttribute(): string
+    {
+        return match ($this->approval_status) {
+            'approved' => 'green',
+            'rejected' => 'red',
+            'pending' => 'gray',
+            default => 'gray',
+        };
+    }
+
+    // âœ… Safe H:i accessors (works whether cast is Carbon or string)
+    public function getCheckInHmAttribute(): ?string
+    {
+        return $this->formatTimeHm($this->check_in_time);
+    }
+
+    public function getCheckOutHmAttribute(): ?string
+    {
+        return $this->formatTimeHm($this->check_out_time);
+    }
+
+    public function getScheduledCheckInHmAttribute(): ?string
+    {
+        return $this->formatTimeHm($this->scheduled_check_in);
+    }
+
+    public function getScheduledCheckOutHmAttribute(): ?string
+    {
+        return $this->formatTimeHm($this->scheduled_check_out);
+    }
+
+    private function formatTimeHm($value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        if ($value instanceof \DateTimeInterface) {
+            return Carbon::instance($value)->format('H:i');
+        }
+
+        $str = (string) $value;
+
+        return strlen($str) >= 5 ? substr($str, 0, 5) : $str;
+    }
+
+    public function calculateCompliance(): void
+    {
+        if (! $this->scheduled_hours || $this->scheduled_hours <= 0) {
+            $this->compliance_percentage = 100;
+
+            return;
+        }
+
+        if (! $this->check_in_time) {
+            $this->compliance_percentage = 0;
+
+            return;
+        }
+
+        $totalScheduledMinutes = $this->scheduled_hours * 60;
+        $lateMinutes = 0;
+        $earlyMinutes = 0;
+
+        // Ø­Ø³Ø§Ø¨ Ø§Ù„ØªØ£Ø®ÙŠØ± Ø¨Ø§Ù„Ø¯Ù‚Ø§Ø¦Ù‚
+        if ($this->scheduled_check_in && $this->check_in_time) {
+            $sIn = Carbon::parse($this->attendance_date->format('Y-m-d').' '.$this->formatTimeHm($this->scheduled_check_in));
+            $aIn = Carbon::parse($this->attendance_date->format('Y-m-d').' '.$this->formatTimeHm($this->check_in_time));
+            if ($aIn->gt($sIn)) {
+                $lateMinutes = $aIn->diffInMinutes($sIn);
+            }
+        }
+
+        // Ø­Ø³Ø§Ø¨ Ø§Ù„Ù…ØºØ§Ø¯Ø±Ø© Ø§Ù„Ù…Ø¨ÙƒØ±Ø© Ø¨Ø§Ù„Ø¯Ù‚Ø§Ø¦Ù‚
+        if ($this->scheduled_check_out && $this->check_out_time) {
+            $sOut = Carbon::parse($this->attendance_date->format('Y-m-d').' '.$this->formatTimeHm($this->scheduled_check_out));
+            $aOut = Carbon::parse($this->attendance_date->format('Y-m-d').' '.$this->formatTimeHm($this->check_out_time));
+            if ($aOut->lt($sOut)) {
+                $earlyMinutes = $sOut->diffInMinutes($aOut);
+            }
+        }
+
+        $missedMinutes = $lateMinutes + $earlyMinutes;
+        $effectiveMinutes = max(0, $totalScheduledMinutes - $missedMinutes);
+
+        $this->compliance_percentage = round(($effectiveMinutes / $totalScheduledMinutes) * 100, 2);
+    }
+
+    public function calculateActualHours(): void
+    {
+        // Ø¥Ø°Ø§ ÙƒØ§Ù† Ù‡Ù†Ø§Ùƒ ØªÙØ§ØµÙŠÙ„ ÙØªØ±Ø§Øª (Ø¬Ø¯ÙˆÙ„ attendance_daily_details)ØŒ Ù†Ø¹ØªÙ…Ø¯ Ø¹Ù„ÙŠÙ‡Ø§ Ù„Ø­Ø³Ø§Ø¨ Ù…Ø¬Ù…ÙˆØ¹ Ø§Ù„Ø³Ø§Ø¹Ø§Øª Ø§Ù„Ø­Ù‚ÙŠÙ‚ÙŠ
+        // Ù‡Ø°Ø§ ÙŠØ¶Ù…Ù† Ø­Ø³Ø§Ø¨ ÙØªØ±Ø§Øª Ø§Ù„Ø±Ø§Ø­Ø© Ø£Ùˆ Ø§Ù„Ø§Ù†Ù‚Ø·Ø§Ø¹ Ø¨ÙŠÙ† Ø§Ù„ÙØªØ±Ø§Øª Ø¨Ø´ÙƒÙ„ ØµØ­ÙŠØ­ (Ù…Ø«Ù„Ø§Ù‹ Ù„Ù„Ù…ÙˆØ¸ÙÙŠÙ† Ø°ÙˆÙŠ Ø§Ù„ÙØªØ±ØªÙŠÙ†)
+        $details = $this->details;
+
+        if ($details && $details->isNotEmpty()) {
+            $totalMinutes = 0;
+            foreach ($details as $detail) {
+                if ($detail->check_in_time && $detail->check_out_time) {
+                    try {
+                        $in = Carbon::parse($detail->check_in_time);
+                        $out = Carbon::parse($detail->check_out_time);
+                        $totalMinutes += $out->diffInMinutes($in);
+                    } catch (\Exception $e) {
+                    }
+                }
+            }
+            $this->actual_hours = round($totalMinutes / 60, 2);
+
+            return;
+        }
+
+        // fallback logic for legacy or single-punch records
+        if (! $this->check_in_time || ! $this->check_out_time) {
+            $this->actual_hours = 0;
+
+            return;
+        }
+
+        $checkIn = Carbon::parse($this->check_in_time);
+        $checkOut = Carbon::parse($this->check_out_time);
+
+        $this->actual_hours = round($checkOut->diffInMinutes($checkIn) / 60, 2);
+    }
+
+    public function calculateStatus(): void
+    {
+        // 1. Ø¥Ø°Ø§ ÙƒØ§Ù† ØºÙŠØ§Ø¨ ÙˆÙ„Ù… ÙŠØªÙ… ØªØ³Ø¬ÙŠÙ„ ÙˆÙ‚Øª Ø¯Ø®ÙˆÙ„ Ø¨Ø¹Ø¯
+        if (! $this->check_in_time) {
+            // Ù†ØªØ­Ù‚Ù‚ Ø¥Ø°Ø§ ÙƒØ§Ù† ÙŠÙˆÙ… Ø¥Ø¬Ø§Ø²Ø© Ø£Ùˆ Ø¥Ø¬Ø§Ø²Ø© Ø±Ø³Ù…ÙŠØ© (On Leave ØªÙ… Ù…Ø¹Ø§Ù„Ø¬ØªÙ‡Ø§ Ù…Ø³Ø¨Ù‚Ø§Ù‹)
+            if ($this->attendance_status === 'on_leave') {
+                return;
+            }
+
+            // ÙŠÙˆÙ… Ø¹Ù…Ù„ ÙˆÙ„Ù… ÙŠØ­Ø¶Ø± = ØºÙŠØ§Ø¨
+            if ($this->scheduled_hours > 0) {
+                $this->attendance_status = 'absent';
+            } else {
+                $this->attendance_status = 'day_off';
+            }
+
+            return;
+        }
+
+        // 2. Ø¥Ø°Ø§ Ø­Ø¶Ø± Ø§Ù„Ù…ÙˆØ¸ÙØŒ Ø§Ù„Ø¨Ø¯Ø§ÙŠØ© 'present'
+        $newStatus = 'present';
+
+        // Get Grace Settings
+        $grace = AttendanceGraceSetting::where('saas_company_id', $this->saas_company_id)->first()
+                 ?? AttendanceGraceSetting::getGlobalDefault();
+
+        $lateGrace = $grace->late_grace_minutes ?? 15;
+        $earlyGrace = $grace->early_leave_grace_minutes ?? 15;
+
+        // 1. Check Late
+        if ($this->scheduled_check_in && $this->check_in_time) {
+            $sTime = $this->scheduled_check_in instanceof \DateTimeInterface ? $this->scheduled_check_in->format('H:i') : substr($this->scheduled_check_in, 0, 5);
+            $aTime = $this->check_in_time instanceof \DateTimeInterface ? $this->check_in_time->format('H:i') : substr($this->check_in_time, 0, 5);
+
+            $scheduledIn = Carbon::parse($this->attendance_date->format('Y-m-d').' '.$sTime);
+            $actualIn = Carbon::parse($this->attendance_date->format('Y-m-d').' '.$aTime);
+
+            if ($actualIn->greaterThan($scheduledIn->addMinutes($lateGrace))) {
+                $newStatus = 'late';
+            }
+        }
+
+        // 2. Check Early Departure
+        if ($newStatus === 'present' && $this->scheduled_check_out && $this->check_out_time) {
+            $sTimeOut = $this->scheduled_check_out instanceof \DateTimeInterface ? $this->scheduled_check_out->format('H:i') : substr($this->scheduled_check_out, 0, 5);
+            $aTimeOut = $this->check_out_time instanceof \DateTimeInterface ? $this->check_out_time->format('H:i') : substr($this->check_out_time, 0, 5);
+
+            $scheduledOut = Carbon::parse($this->attendance_date->format('Y-m-d').' '.$sTimeOut);
+            $actualOut = Carbon::parse($this->attendance_date->format('Y-m-d').' '.$aTimeOut);
+
+            if ($actualOut->lessThan($scheduledOut->subMinutes($earlyGrace))) {
+                $newStatus = 'early_departure';
+            }
+        }
+
+        $this->attendance_status = $newStatus;
+    }
+}
+
+
