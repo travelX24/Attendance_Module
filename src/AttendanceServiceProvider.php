@@ -16,8 +16,15 @@ class AttendanceServiceProvider extends ServiceProvider
         // 2. Load Migrations
         $this->loadMigrationsFrom(__DIR__ . '/Database/Migrations');
 
+        // 3. Load Routes
         $this->registerWebRoutes();
         $this->registerApiRoutes();
+
+        // 4. Register Livewire Components
+        $this->registerLivewireComponents();
+
+        // 5. Register Observers
+        $this->registerObservers();
     }
 
     protected function registerWebRoutes(): void
@@ -44,13 +51,16 @@ class AttendanceServiceProvider extends ServiceProvider
         }
     }
 
-        // 3. Register Livewire Components
+    protected function registerLivewireComponents(): void
+    {
         Livewire::component('attendance.work-schedules.index', \Athka\Attendance\Http\Livewire\WorkSchedules\Index::class);
         Livewire::component('attendance.daily-attendance.index', \Athka\Attendance\Http\Livewire\DailyAttendance\Index::class);
         Livewire::component('attendance.daily-penalties.index', \Athka\Attendance\Http\Livewire\DailyPenalties\Index::class);
         Livewire::component('attendance.leaves-permissions.index', \Athka\Attendance\Http\Livewire\LeavesPermissions\Index::class);
+    }
 
-        // 4. Register Observers
+    protected function registerObservers(): void
+    {
         if (class_exists(\Athka\Employees\Models\Employee::class)) {
             \Athka\Employees\Models\Employee::observe(\Athka\Attendance\Observers\EmployeeObserver::class);
         }
@@ -65,5 +75,3 @@ class AttendanceServiceProvider extends ServiceProvider
         //
     }
 }
-
-
