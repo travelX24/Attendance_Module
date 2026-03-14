@@ -1,4 +1,4 @@
-{-- app/Modules/Attendance/Resources/views/livewire/work-schedules/modals/schedule-edit-modal.blade.php --}}
+{{-- app/Modules/Attendance/Resources/views/livewire/work-schedules/modals/schedule-edit-modal.blade.php --}}
 
 <x-ui.modal wire:model="showScheduleEditModal" max-width="lg">
     <x-slot name="title">

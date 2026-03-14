@@ -1,4 +1,4 @@
-{-- app/Modules/Attendance/Resources/views/livewire/leaves-permissions/index.blade.php --}}
+{{-- app/Modules/Attendance/Resources/views/livewire/leaves-permissions/index.blade.php --}}
 
 @php
     $locale = app()->getLocale();

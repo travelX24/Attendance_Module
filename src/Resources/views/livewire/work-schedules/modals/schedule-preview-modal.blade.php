@@ -1,4 +1,4 @@
-{-- resources/views/livewire/work-schedules/modals/schedule-preview-modal.blade.php --}}
+{{-- resources/views/livewire/work-schedules/modals/schedule-preview-modal.blade.php --}}
 
 <x-ui.modal
     wire:model="showSchedulePreviewModal"

@@ -1,4 +1,4 @@
-php
+@php
     // DEBUG: Verifying template file
     $locale = app()->getLocale();
     $isRtl  = in_array(substr($locale, 0, 2), ['ar','fa','ur','he']);

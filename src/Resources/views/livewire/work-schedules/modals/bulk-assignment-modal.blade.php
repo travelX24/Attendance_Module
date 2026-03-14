@@ -1,4 +1,4 @@
-{-- Athka\Attendance\Resources\views\livewire\work-schedules\modals\bulk-assignment-modal.blade.php --}}
+{{-- Athka\Attendance\Resources\views\livewire\work-schedules\modals\bulk-assignment-modal.blade.php --}}
 {{-- Bulk Assignment Modal --}}
 <x-ui.modal
     wire:model="showBulkModal"

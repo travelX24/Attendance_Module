@@ -1,4 +1,4 @@
-x-ui.modal wire:model="showMonthlyEditModal" maxWidth="5xl">
+<x-ui.modal wire:model="showMonthlyEditModal" maxWidth="5xl">
     <x-slot:title>
         <div class="flex items-center gap-3">
             <div class="w-10 h-10 bg-[color:var(--brand-via)]/10 text-[color:var(--brand-via)] rounded-xl flex items-center justify-center text-lg border border-[color:var(--brand-via)]/20 shadow-sm">

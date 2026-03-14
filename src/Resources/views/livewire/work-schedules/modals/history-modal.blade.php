@@ -1,4 +1,4 @@
-{-- History Modal --}}
+{{-- History Modal --}}
 <x-ui.modal
     wire:model="showHistoryModal"
     max-width="3xl"

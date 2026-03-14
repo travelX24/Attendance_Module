@@ -1,4 +1,4 @@
-{-- Bulk by Criteria + Preview Modal --}}
+{{-- Bulk by Criteria + Preview Modal --}}
 <x-ui.modal
     wire:model="showCriteriaModal"
     max-width="5xl"
