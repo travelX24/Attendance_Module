@@ -164,72 +164,39 @@ class AttendanceDailyLog extends Model
 
     public function syncWithSchedule(): void
     {
-        // Ø¥Ø°Ø§ ÙƒØ§Ù† Ø§Ù„Ø¬Ø¯ÙˆÙ„ Ù…ÙˆØ¬ÙˆØ¯Ø§Ù‹ Ø¨Ø§Ù„ÙØ¹Ù„ ÙˆØ³Ø§Ø¹Ø§Øª Ø§Ù„Ø¬Ø¯ÙˆÙ„Ø© Ø£ÙƒØ¨Ø± Ù…Ù† 0ØŒ ÙÙ‚Ø¯ Ù„Ø§ Ù†Ø­ØªØ§Ø¬ Ù„ØªØ­Ø¯ÙŠØ«Ù‡ Ø¥Ù„Ø§ Ø¥Ø°Ø§ ÙƒØ§Ù† ÙØ§Ø±ØºØ§Ù‹
-        // Ù„ÙƒÙ† Ø§Ù„Ø£ÙØ¶Ù„ Ù‡Ùˆ Ø§Ù„ØªØ£ÙƒØ¯ Ù…Ù† ØµØ­Ø© Ø§Ù„Ø¨ÙŠØ§Ù†Ø§Øª Ø¨Ù†Ø§Ø¡Ù‹ Ø¹Ù„Ù‰ ØªØ§Ø±ÙŠØ® Ø§Ù„Ø­Ø¶ÙˆØ±
         $companyId = $this->saas_company_id;
         $date = $this->attendance_date;
-        if (! $date) {
+        if (!$date || !$companyId) {
             return;
         }
 
-        $dayName = strtolower($date->format('l'));
+        $service = app(\Athka\SystemSettings\Services\WorkScheduleService::class);
+        $schedule = $service->getEffectiveSchedule((int)$companyId, $this->employee, $date->toDateString());
+        
+        $dateStr = $date->toDateString();
+        $holidays = $service->getHolidays((int)$companyId, $dateStr, $dateStr);
+        $metrics = $service->getMetricsForDate($dateStr, $schedule, $holidays);
 
-        $assignment = EmployeeWorkSchedule::where('saas_company_id', $companyId)
-            ->where('employee_id', $this->employee_id)
-            ->where('is_active', true)
-            ->where('start_date', '<=', $date)
-            ->where(function ($q) use ($date) {
-                $q->whereNull('end_date')->orWhere('end_date', '>=', $date);
-            })
-            ->with(['workSchedule.periods'])
-            ->first();
+        $this->work_schedule_id = $schedule ? $schedule->id : null;
+        $this->scheduled_hours = $metrics['hours'] ?? 0;
+        $this->scheduled_check_in = $metrics['check_in'];
+        $this->scheduled_check_out = $metrics['check_out'];
 
-        if ($assignment && $assignment->workSchedule) {
-            $ws = $assignment->workSchedule;
-            $workDays = is_array($ws->work_days) ? $ws->work_days : [];
+        if ($metrics['status'] === 'holiday' || $metrics['status'] === 'off') {
+            if (!$this->check_in_time && $this->attendance_status !== 'on_leave') {
+                $this->attendance_status = 'day_off';
+            }
+        }
 
-            if (in_array($dayName, $workDays)) {
-                $this->work_schedule_id = $ws->id;
-
-                $firstPeriod = $ws->periods->first();
-                $lastPeriod = $ws->periods->last();
-
-                if ($firstPeriod) {
-                    $this->scheduled_check_in = $firstPeriod->start_time;
-                    $this->scheduled_check_out = $lastPeriod->end_time;
-
-                    // Ø­Ø³Ø§Ø¨ Ù…Ø¬Ù…ÙˆØ¹ Ø§Ù„Ø³Ø§Ø¹Ø§Øª Ø§Ù„Ù…Ø¬Ø¯ÙˆÙ„Ø© Ù…Ù† ÙƒØ§ÙØ© Ø§Ù„ÙØªØ±Ø§Øª
-                    $totalMinutes = 0;
-                    foreach ($ws->periods as $p) {
-                        try {
-                            $s = Carbon::parse($p->start_time);
-                            $e = Carbon::parse($p->end_time);
-                            $totalMinutes += $e->diffInMinutes($s);
-                        } catch (\Exception $e) {
-                        }
-                    }
-                    $this->scheduled_hours = round($totalMinutes / 60, 2);
-
-                    // âœ… Ù…Ù†Ø·Ù‚ Ø§Ù„ØªØªØ¨Ø¹ Ø§Ù„ØªÙ„Ù‚Ø§Ø¦ÙŠ: Ø¥Ø°Ø§ ÙƒØ§Ù†Øª Ø§Ù„Ø³ÙŠØ§Ø³Ø© "ØªÙ„Ù‚Ø§Ø¦ÙŠ"ØŒ Ù‚Ù… Ø¨ØªØ¹Ø¨Ø¦Ø© Ø£ÙˆÙ‚Ø§Øª Ø§Ù„Ø¯Ø®ÙˆÙ„ ÙˆØ§Ù„Ø®Ø±ÙˆØ¬ ÙØ¹Ù„ÙŠØ§Ù‹
-                    if ($this->getEffectiveTrackingMode() === 'automatic') {
-                        if (! $this->check_in_time) {
-                            $this->check_in_time = $this->scheduled_check_in;
-                        }
-                        if (! $this->check_out_time) {
-                            $this->check_out_time = $this->scheduled_check_out;
-                        }
-                        if ($this->source !== 'manual') {
-                            $this->source = 'automatic';
-                        }
-                    }
-                }
-            } else {
-                // ÙŠÙˆÙ… Ø¥Ø¬Ø§Ø²Ø© (Day Off)
-                $this->scheduled_hours = 0;
-                $this->work_schedule_id = $ws->id;
-                if (! $this->check_in_time) {
-                    $this->attendance_status = 'day_off';
-                }
+        if ($this->getEffectiveTrackingMode() === 'automatic' && $metrics['status'] === 'workday') {
+            if (!$this->check_in_time && $this->scheduled_check_in) {
+                $this->check_in_time = $this->scheduled_check_in;
+            }
+            if (!$this->check_out_time && $this->scheduled_check_out) {
+                $this->check_out_time = $this->scheduled_check_out;
+            }
+            if ($this->source !== 'manual') {
+                $this->source = 'automatic';
             }
         }
     }
