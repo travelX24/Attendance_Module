@@ -174,7 +174,7 @@ private function normalizeCompanyDateToGregorian(?string $value, int $companyId)
     }
 }
 
-private function formatCompanyDate(?string $gregorianYmd, int $companyId): string
+public function formatCompanyDate(?string $gregorianYmd, int $companyId): string
 {
     if (!$gregorianYmd) return '-';
 
@@ -195,10 +195,32 @@ private function formatCompanyDate(?string $gregorianYmd, int $companyId): strin
         \IntlDateFormatter::NONE,
         'UTC',
         \IntlDateFormatter::TRADITIONAL,
-        'yyyy/MM/dd'
+        'yyyy-MM-dd'
     );
 
     return (string) $fmt->format($d->getTimestamp());
+}
+
+public function formatCompanyMonthYear(Carbon $date, int $companyId): string
+{
+    $type = $this->companyCalendarType($companyId);
+    if ($type !== 'hijri') {
+        return $date->translatedFormat('F Y');
+    }
+
+    if (!class_exists(\IntlDateFormatter::class)) {
+        return $date->translatedFormat('F Y');
+    }
+
+    $fmt = new \IntlDateFormatter(
+        'en_US@calendar=islamic-umalqura',
+        \IntlDateFormatter::NONE,
+        \IntlDateFormatter::NONE,
+        'UTC',
+        \IntlDateFormatter::TRADITIONAL,
+        'MMMM yyyy'
+    );
+    return (string) $fmt->format($date->getTimestamp());
 }
 protected function resolveCurrentUserLocationId(int $companyId): ?int
 {

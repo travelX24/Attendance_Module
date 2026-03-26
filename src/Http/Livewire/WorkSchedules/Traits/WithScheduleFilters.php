@@ -64,6 +64,13 @@ trait WithScheduleFilters
             $this->filterWarning = $type;
         }
         $this->resetPage();
+        $this->loadStats();
+    }
+
+    public function updatedFilterWarning()
+    {
+        $this->resetPage();
+        $this->loadStats();
     }
 
     public function updatedSearch()
@@ -89,6 +96,12 @@ trait WithScheduleFilters
     }
 
     public function updatedWorkScheduleId()
+    {
+        $this->resetPage();
+        $this->loadStats();
+    }
+
+    public function updatedScheduleType()
     {
         $this->resetPage();
         $this->loadStats();

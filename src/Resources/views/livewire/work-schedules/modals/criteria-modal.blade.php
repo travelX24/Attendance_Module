@@ -124,41 +124,34 @@
                             {{ tr('Click Preview to load employees matching your criteria.') }}
                         </div>
                     @else
-                        <div class="overflow-x-auto">
-                            <table class="w-full text-start divide-y divide-gray-100">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th class="px-4 py-3 w-4"></th>
-                                        <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">{{ tr('Employee') }}</th>
-                                        <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">{{ tr('Department') }}</th>
-                                        <th class="px-4 py-3 text-xs font-bold text-gray-500 uppercase">{{ tr('Job Title') }}</th>
-                                    </tr>
-                                </thead>
-                                <tbody class="divide-y divide-gray-50">
-                                    @foreach($criteriaPreviewEmployees as $row)
-                                        <tr class="hover:bg-gray-50/50">
-                                            <td class="px-4 py-3">
-                                                <input
-                                                    type="checkbox"
-                                                    wire:model.live="criteriaPreviewSelected"
-                                                    value="{{ $row['id'] }}"
-                                                    class="w-4 h-4 text-[color:var(--brand-via)] border-gray-300 rounded"
-                                                    @cannot('attendance.manage') disabled @endcannot
-                                                >
-                                            </td>
-                                            <td class="px-4 py-3">
-                                                <div class="text-sm font-semibold text-gray-900">{{ $row['name'] }}</div>
-                                                <div class="text-xs text-gray-500">#{{ $row['employee_no'] }}</div>
-                                            </td>
-                                            <td class="px-4 py-3 text-sm text-gray-700">{{ $row['department'] }}</td>
-                                            <td class="px-4 py-3 text-sm text-gray-700">{{ $row['job_title'] }}</td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
+                        <x-ui.table
+                            :headers="['', tr('Employee'), tr('Department'), tr('Job Title')]"
+                            :enablePagination="false"
+                            :headerAlign="['start','start','start','start']"
+                        >
+                            @foreach($criteriaPreviewEmployees as $row)
+                                <tr class="hover:bg-gray-50/50 border-b border-gray-50 last:border-0 transition-colors">
+                                    <td class="px-6 py-4 w-4">
+                                        <input
+                                            type="checkbox"
+                                            wire:model.live="criteriaPreviewSelected"
+                                            value="{{ $row['id'] }}"
+                                            class="w-4 h-4 text-[color:var(--brand-via)] border-gray-300 rounded focus:ring-[color:var(--brand-via)]"
+                                            @cannot('attendance.manage') disabled @endcannot
+                                        >
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="text-sm font-semibold text-gray-900">{{ $row['name'] }}</div>
+                                        <div class="text-[11px] text-gray-500 font-mono">#{{ $row['employee_no'] }}</div>
+                                    </td>
+                                    <td class="px-6 py-4 text-sm text-gray-700">{{ $row['department'] }}</td>
+                                    <td class="px-6 py-4 text-sm text-gray-700">{{ $row['job_title'] }}</td>
+                                </tr>
+                            @endforeach
+                        </x-ui.table>
 
-                        <div class="text-xs text-gray-500 mt-3">
+                        <div class="text-[11px] text-gray-400 mt-3 flex items-center gap-2">
+                            <i class="fas fa-info-circle"></i>
                             {{ tr('Preview is limited to first 200 employees for performance.') }}
                         </div>
                     @endif

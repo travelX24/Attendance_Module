@@ -4,6 +4,18 @@
     $dir    = $isRtl ? 'rtl' : 'ltr';
 @endphp
 <div class="w-full">
+    {{-- Top Fixed Loading Bar --}}
+    <div wire:loading class="fixed top-0 left-0 right-0 h-[3px] z-[9999] overflow-hidden pointer-events-none">
+        <div class="h-full w-full bg-gradient-to-r from-[color:var(--brand-from)] via-[color:var(--brand-via)] to-[color:var(--brand-to)]">
+            <div class="h-full w-full bg-white/30 animate-[loading-sweep_1.5s_infinite]"></div>
+        </div>
+    </div>
+    <style>
+        @keyframes loading-sweep {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(100%); }
+        }
+    </style>
     @section('topbar-left-content')
         <div x-data="{ selectionCount: {{ count($selectedEmployees) }} }"
              x-on:selected-employees-count-updated.window="selectionCount = $event.detail[0].count">
@@ -16,13 +28,13 @@
                    @can('attendance.manage')
                    <template x-if="selectionCount > 0">
                         <div class="flex flex-col sm:flex-row gap-2">
-                            <x-ui.secondary-button x-on:click="$dispatch('triggerOpenBulkModal')" class="gap-2">
+                            <x-ui.secondary-button x-on:click="$dispatch('triggerOpenBulkModal')" size="sm" :fullWidth="false" class="gap-2">
                                 <i class="fas fa-calendar-plus"></i>
                                 <span>{{ tr('Add Schedule') }}</span>
                                 (<span x-text="selectionCount"></span>)
                             </x-ui.secondary-button>
 
-                            <x-ui.primary-button x-on:click="$dispatch('triggerOpenRotationModal')" class="gap-2">
+                            <x-ui.primary-button x-on:click="$dispatch('triggerOpenRotationModal')" size="sm" :fullWidth="false" :arrow="false" class="gap-2">
                                 <i class="fas fa-sync-alt"></i>
                                 <span>{{ tr('Add Rotation Schedule') }}</span>
                                 (<span x-text="selectionCount"></span>)
@@ -265,9 +277,10 @@
     </div>
 
     {{-- Filters & Content --}}
-    <x-ui.card padding="false" class="!overflow-visible">
+    <x-ui.card padding="false" class="!overflow-visible" wire:poll.60s>
         {{-- Toolbar / Filters --}}
-        <div class="p-4 border-b border-gray-100 bg-gray-50/30">
+        <div class="p-4 border-b border-gray-100 bg-gray-50/30 relative">
+            {{-- Loading State --}}
             {{-- ✅ Flex wrap instead of horizontal scroll to ensure dropdowns are never clipped --}}
             <div class="flex flex-wrap items-end gap-4 p-1">
 
@@ -275,6 +288,7 @@
                     <div class="shrink-0 w-[300px] min-w-[300px]">
                         <x-ui.search-box
                             model="search"
+                            wire:model.live.debounce.300ms="search"
                             :placeholder="tr('Search by name or employee ID...')"
                             class="w-full"
                             :disabled="!auth()->user()->can('attendance.manage')"
@@ -379,10 +393,15 @@
 
                         <div class="flex items-center gap-2 px-4 h-10 bg-gray-50 rounded-lg border border-gray-200 font-bold text-gray-700 min-w-[200px] justify-center text-sm">
                             <i class="far fa-calendar-alt text-[color:var(--brand-via)]"></i>
+                            @php
+                                $cId = $this->getCompanyId();
+                                $currentCarbon = \Carbon\Carbon::parse($summaryDate);
+                            @endphp
                             @if($summaryPeriod === 'weekly')
-                                {{ \Carbon\Carbon::parse($summaryDate)->startOfWeek(\Carbon\Carbon::SATURDAY)->format('Y/m/d') }} - {{ \Carbon\Carbon::parse($summaryDate)->startOfWeek(\Carbon\Carbon::SATURDAY)->addDays(6)->format('Y/m/d') }}
+                                {{ $this->formatCompanyDate($currentCarbon->copy()->startOfWeek(\Carbon\Carbon::SATURDAY)->toDateString(), $cId) }} - 
+                                {{ $this->formatCompanyDate($currentCarbon->copy()->startOfWeek(\Carbon\Carbon::SATURDAY)->addDays(6)->toDateString(), $cId) }}
                             @else
-                                {{ \Carbon\Carbon::parse($summaryDate)->translatedFormat('F Y') }}
+                                {{ $this->formatCompanyMonthYear($currentCarbon, $cId) }}
                             @endif
                         </div>
 
@@ -468,15 +487,17 @@
                             $extraCount = $employee->current_schedule_name ? max(0, $allCount - 1) : max(0, $allCount);
                         @endphp
 
-                        @if($extraCount > 0)
+                        @if($allCount >= 1)
                             <button
                                 type="button"
                                 wire:click="openScheduleEyeModal({{ $employee->id }})"
-                                class="inline-flex items-center gap-2 text-xs font-bold text-gray-600 hover:text-[color:var(--brand-via)]"
+                                class="inline-flex items-center gap-1 text-xs font-bold text-gray-400 hover:text-[color:var(--brand-via)] transition-colors"
                                 title="{{ tr('View all schedules') }}"
                             >
-                                <i class="fas fa-eye"></i>
-                                <span>+{{ $extraCount }}</span>
+                                <i class="fas fa-eye shadow-sm"></i>
+                                @if($extraCount > 0)
+                                    <span>+{{ $extraCount }}</span>
+                                @endif
                             </button>
                         @endif
 
@@ -486,11 +507,11 @@
 
 
                     <td class="px-6 py-4 text-sm text-gray-600 font-mono">
-                        {{ $employee->current_schedule_start ? \Carbon\Carbon::parse($employee->current_schedule_start)->format('Y/m/d') : '-' }}
+                        {{ $this->formatCompanyDate($employee->current_schedule_start, $this->getCompanyId()) }}
                     </td>
 
                     <td class="px-6 py-4 text-sm text-gray-600 font-mono">
-                        {{ $employee->current_schedule_end ? \Carbon\Carbon::parse($employee->current_schedule_end)->format('Y/m/d') : tr('Permanent') }}
+                        {{ $employee->current_schedule_end ? $this->formatCompanyDate($employee->current_schedule_end, $this->getCompanyId()) : tr('Permanent') }}
                     </td>
 
                     <td class="px-6 py-4">
@@ -632,13 +653,21 @@
                                     @endphp
                                     <td class="px-1 py-2 text-center border-r border-gray-50 {{ $day['is_today'] ? 'bg-[color:var(--brand-via)]/[0.02]' : '' }}">
                                         @if($dayData && $dayData['type'] !== 'none')
+                                            @php
+                                                $isHoliday = $dayData['type'] === 'holiday';
+                                                $bgClass = $dayData['disabled'] 
+                                                    ? 'bg-gray-100 text-gray-400' 
+                                                    : ($isHoliday 
+                                                        ? 'bg-slate-50 text-slate-400 border-slate-100' 
+                                                        : 'bg-[color:var(--brand-via)]/10 text-[color:var(--brand-via)] border-[color:var(--brand-via)]/20');
+                                            @endphp
                                             <div
-                                                class="mx-auto px-2 py-1.5 rounded-md text-[9px] leading-tight font-bold {{ $dayData['disabled'] ? 'bg-gray-100 text-gray-400' : 'bg-[color:var(--brand-via)]/10 text-[color:var(--brand-via)] border border-[color:var(--brand-via)]/20' }} shadow-sm"
+                                                class="mx-auto px-2 py-1.5 rounded-md text-[9px] leading-tight font-bold {{ $bgClass }} border shadow-sm"
                                                 title="{{ $dayData['schedule'] }} {{ !empty($dayData['periods']) ? '(' . implode(', ', $dayData['periods']) . ')' : '' }}"
                                             >
                                                 <div class="truncate">{{ $dayData['schedule'] }}</div>
                                                 @if(!empty($dayData['periods']))
-                                                    <div class="text-[8px] opacity-70 mt-0.5">{{ $dayData['periods'][0] }}</div>
+                                                    <div class="text-[8px] opacity-70 mt-0.5">{{ implode(' | ', $dayData['periods']) }}</div>
                                                 @endif
                                             </div>
                                         @else
@@ -674,5 +703,15 @@
         @include('attendance::livewire.work-schedules.modals.schedules-eye-modal')
         @include('attendance::livewire.work-schedules.modals.schedule-edit-modal')
     </div>
+
+    {{-- Global Confirmation Dialogs --}}
+    <x-ui.confirm-dialog
+        id="assignment-delete"
+        confirm-action="wire:deleteAssignment"
+        :title="tr('Delete Schedule Assignment')"
+        :message="tr('Are you sure you want to delete this schedule assignment? This action cannot be undone and may affect attendance calculations.')"
+        type="danger"
+        confirm-text="{{ tr('Delete') }}"
+    />
 </div>
 </div>

@@ -47,6 +47,8 @@ class Index extends Component
             'end_date' => '',
         ];
 
+        public $deleteAssignmentId = null;
+
        protected $queryString = [
             'search' => ['except' => ''],
             'department_id' => ['except' => ''],
@@ -315,11 +317,31 @@ class Index extends Component
                 $end = $date->copy()->endOfMonth();
             }
 
+            $type = $this->companyCalendarType($companyId);
+            $fmt = null;
+            if ($type === 'hijri' && class_exists(\IntlDateFormatter::class)) {
+                $fmt = new \IntlDateFormatter(
+                    'en_US@calendar=islamic-umalqura',
+                    \IntlDateFormatter::NONE,
+                    \IntlDateFormatter::NONE,
+                    'UTC',
+                    \IntlDateFormatter::TRADITIONAL,
+                    'MM/dd'
+                );
+            }
+
             $current = $start->copy();
             while ($current->lte($end)) {
+                $dayLabel = $current->translatedFormat('D d/m');
+                if ($fmt) {
+                    $dayNameShort = $current->translatedFormat('D');
+                    $hijriPart = $fmt->format($current->getTimestamp());
+                    $dayLabel = $dayNameShort . ' ' . $hijriPart;
+                }
+
                 $summaryDays[] = [
                     'date' => $current->toDateString(),
-                    'label' => $current->translatedFormat('D d/m'),
+                    'label' => $dayLabel,
                     'day_name' => strtolower($current->format('l')),
                     'is_today' => $current->isToday(),
                 ];
@@ -346,6 +368,7 @@ class Index extends Component
     }
     public function openScheduleEyeModal(int $employeeId): void
     {
+        $this->resetModalFlags();
         $companyId = $this->getCompanyId();
 
         $empQ = Employee::forCompany($companyId)->whereKey($employeeId);
@@ -384,7 +407,13 @@ class Index extends Component
                 DB::raw('work_schedules.name as schedule_name'),
             ]);
 
-        $this->scheduleEyeRows = $rows->map(function ($r) use ($today) {
+        $oldestId = EmployeeWorkSchedule::where('employee_id', $employeeId)
+            ->where('saas_company_id', $companyId)
+            ->orderBy('start_date', 'asc')
+            ->orderBy('id', 'asc')
+            ->value('id');
+
+        $this->scheduleEyeRows = $rows->map(function ($r) use ($today, $oldestId, $companyId) {
             $start = $r->start_date ? Carbon::parse($r->start_date)->startOfDay() : null;
             $end   = $r->end_date ? Carbon::parse($r->end_date)->startOfDay() : null;
 
@@ -404,12 +433,13 @@ class Index extends Component
             return [
                 'id' => (int) $r->id,
                 'schedule_name' => (string) ($r->schedule_name ?: ('#' . $r->work_schedule_id)),
-                'start_date' => (string) ($r->start_date ?: '-'),
-                'end_date' => (string) ($r->end_date ?: ''),
+                'start_date' => $this->formatCompanyDate((string)$r->start_date, $companyId),
+                'end_date' => $this->formatCompanyDate((string)$r->end_date, $companyId),
                 'is_active' => (int) $r->is_active,
                 'assignment_type' => $type,
                 'status' => $status,
                 'can_edit' => ($type !== 'rotation') || ($status === 'future'),
+                'can_delete' => ((int) $r->id !== (int) $oldestId),
 
                         ];
         })->toArray();
@@ -443,8 +473,8 @@ class Index extends Component
 
         $this->editScheduleForm = [
             'work_schedule_id' => (string) $row->work_schedule_id,
-            'start_date'       => (string) $row->start_date,
-            'end_date'         => (string) ($row->end_date ?? ''),
+            'start_date'       => (string) ($row->start_date ? Carbon::parse($row->start_date)->format('Y-m-d') : ''),
+            'end_date'         => (string) ($row->end_date ? Carbon::parse($row->end_date)->format('Y-m-d') : ''),
         ];
 
         $this->showScheduleEditModal = true;
@@ -481,6 +511,9 @@ class Index extends Component
                 ]);
             }
         }
+
+        $newStart = Carbon::parse($startYmd)->startOfDay();
+        $newEnd   = $endYmd ? Carbon::parse($endYmd)->startOfDay() : null;
 
         if ((string) ($row->assignment_type ?? '') === 'rotation') {
             if ($newStart->lte(Carbon::today())) {
@@ -539,6 +572,56 @@ class Index extends Component
             'type' => 'success',
             'message' => tr('Schedule updated successfully'),
         ]);
+    }
+
+    public function confirmDeleteAssignment(int $id): void
+    {
+        $this->deleteAssignmentId = $id;
+        $this->dispatch('open-confirm-assignment-delete');
+    }
+
+    public function deleteAssignment(): void
+    {
+        if (!$this->deleteAssignmentId) return;
+
+        $companyId = $this->getCompanyId();
+        $row = EmployeeWorkSchedule::where('saas_company_id', $companyId)
+            ->whereKey($this->deleteAssignmentId)
+            ->first();
+
+        if ($row) {
+            $employeeId = $row->employee_id;
+            $before = $row->toArray();
+            
+            // Log before deleting
+            $this->auditLog(
+                'work_schedule.deleted',
+                (int) $employeeId,
+                'employee_work_schedule',
+                (int) $row->id,
+                $before,
+                null,
+                ['source' => 'eye-modal-delete']
+            );
+
+            // Force delete to avoid keeping ghost records if the user wants it gone
+            $row->forceDelete();
+
+            $this->dispatch('toast', [
+                'type' => 'success',
+                'message' => tr('Schedule assignment deleted successfully'),
+            ]);
+        }
+
+        $this->deleteAssignmentId = null;
+
+        // Refresh eye modal if open
+        if ($this->scheduleEyeEmployeeId) {
+            $this->openScheduleEyeModal((int) $this->scheduleEyeEmployeeId);
+        }
+
+        $this->loadStats();
+        $this->dispatch('refreshWorkSchedules');
     }
 
 }

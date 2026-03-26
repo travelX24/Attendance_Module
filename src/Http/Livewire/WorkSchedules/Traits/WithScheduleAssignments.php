@@ -690,9 +690,12 @@ trait WithScheduleAssignments
             return null;
         }
 
+        $tz = class_exists(\IntlTimeZone::class) ? \IntlTimeZone::createTimeZone('UTC') : null;
+
         foreach (['en_US@calendar=islamic-umalqura', 'en_US@calendar=islamic'] as $locale) {
             try {
-                $cal = \IntlCalendar::createInstance('UTC', $locale);
+                $cal = \IntlCalendar::createInstance($tz, $locale);
+                if (!$cal) continue;
                 $cal->clear();
                 $cal->set($hy, $hm - 1, $hd, 0, 0, 0);
                 $ms = $cal->getTime();
@@ -823,8 +826,10 @@ private function buildSchedulePreview(int $employeeId, int $companyId, Carbon $f
         ->keyBy('id');
 
     $periodsBySchedule = [];
+    $exceptionsBySchedule = [];
 
     if (!empty($scheduleIds)) {
+        // Standard periods
         $rows = DB::table('work_schedule_periods')
             ->whereIn('work_schedule_id', $scheduleIds)
             ->orderBy('sort_order')
@@ -832,11 +837,29 @@ private function buildSchedulePreview(int $employeeId, int $companyId, Carbon $f
             ->get(['work_schedule_id', 'start_time', 'end_time']);
 
         foreach ($rows as $row) {
-            $s = substr((string) $row->start_time, 0, 5);
-            $e = substr((string) $row->end_time, 0, 5);
+            $s = $row->start_time ? Carbon::parse($row->start_time)->format('g:i A') : '';
+            $e = $row->end_time ? Carbon::parse($row->end_time)->format('g:i A') : '';
+            if (!$s || !$e) continue;
+            $periodsBySchedule[(int) $row->work_schedule_id][] = $s . ' - ' . $e;
+        }
+
+        // Daily/Day-of-week exceptions
+        $exceptionRows = DB::table('work_schedule_exceptions')
+            ->whereIn('work_schedule_id', $scheduleIds)
+            ->where('is_active', true)
+            ->get(['work_schedule_id', 'day_of_week', 'specific_date', 'start_time', 'end_time']);
+
+        foreach ($exceptionRows as $er) {
+            $s = $er->start_time ? Carbon::parse($er->start_time)->format('g:i A') : '';
+            $e = $er->end_time ? Carbon::parse($er->end_time)->format('g:i A') : '';
             if (!$s || !$e) continue;
 
-            $periodsBySchedule[(int) $row->work_schedule_id][] = $s . ' - ' . $e;
+            $key = (int) $er->work_schedule_id;
+            if ($er->specific_date) {
+                $exceptionsBySchedule[$key]['dates'][$er->specific_date] = "$s - $e";
+            } else {
+                $exceptionsBySchedule[$key]['days'][strtolower((string)$er->day_of_week)] = "$s - $e";
+            }
         }
     }
 
@@ -904,9 +927,29 @@ private function buildSchedulePreview(int $employeeId, int $companyId, Carbon $f
 
         if ($scheduleId) {
             $sch = $schedules[$scheduleId] ?? null;
-            $scheduleName = $sch?->name ?? ('#' . $scheduleId);
-            $scheduleDisabled = (bool) ($sch?->is_active === false);
-            $periods = $periodsBySchedule[$scheduleId] ?? [];
+            $dayNameFull = strtolower($day->format('l'));
+            $workDays = $sch?->work_days ?? [];
+            
+            if ($sch && !in_array($dayNameFull, $workDays)) {
+                $type = 'holiday';
+                $scheduleName = tr('Holiday');
+                $periods = [];
+            } else {
+                $scheduleName = $sch?->name ?? ('#' . $scheduleId);
+                $scheduleDisabled = (bool) ($sch?->is_active === false);
+                
+                // Check exceptions
+                $dayIso = $day->toDateString();
+                $exs = $exceptionsBySchedule[$scheduleId] ?? [];
+                
+                if (isset($exs['dates'][$dayIso])) {
+                    $periods = [$exs['dates'][$dayIso]];
+                } elseif (isset($exs['days'][$dayNameFull])) {
+                    $periods = [$exs['days'][$dayNameFull]];
+                } else {
+                    $periods = $periodsBySchedule[$scheduleId] ?? [];
+                }
+            }
         }
 
         $rowsOut[] = [

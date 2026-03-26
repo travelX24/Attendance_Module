@@ -4,93 +4,87 @@
     wire:model="showSchedulePreviewModal"
     maxWidth="5xl"
 >
+    <x-slot name="title">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-[color:var(--brand-via)]/10 text-[color:var(--brand-via)] rounded-xl flex items-center justify-center text-lg border border-[color:var(--brand-via)]/20 shadow-sm">
+                <i class="fas fa-calendar-alt"></i>
+            </div>
+            <div>
+                <h3 class="font-bold text-gray-900 text-lg leading-tight">{{ tr('Schedule Preview') }}</h3>
+                @if(!empty($previewEmployee))
+                    <p class="text-xs text-gray-500">
+                        {{ app()->isLocale('ar')
+                            ? ($previewEmployee['name_ar'] ?? $previewEmployee['name_en'] ?? '-')
+                            : ($previewEmployee['name_en'] ?? $previewEmployee['name_ar'] ?? '-') }}
+                        <span class="font-mono text-gray-400">#{{ $previewEmployee['employee_no'] ?? '' }}</span>
+                    </p>
+                @endif
+            </div>
+        </div>
+    </x-slot>
+
     <x-slot name="content">
         <div dir="{{ $dir ?? 'rtl' }}" class="space-y-4">
 
-            {{-- Header --}}
-            <x-ui.card padding="false" class="border border-gray-100">
-                <div class="px-5 py-4 border-b flex items-center justify-between">
-                    <div class="space-y-0.5">
-                        <div class="flex items-center gap-2">
-                            <p class="text-sm font-bold text-gray-900">{{ tr('Schedule Preview') }}</p>
+            {{-- Summary Badges Card --}}
+            @if(!empty($previewMeta))
+                <div class="flex flex-wrap gap-2 mb-2">
+                    <x-ui.badge type="info" size="xs">
+                        {{ tr('Days') }}: {{ (int) ($previewMeta['days'] ?? 0) }}
+                    </x-ui.badge>
 
-                            @if(!empty($previewMeta))
-                                <x-ui.badge type="info" size="xs">
-                                    {{ tr('Days') }}: {{ (int) ($previewMeta['days'] ?? 0) }}
-                                </x-ui.badge>
+                    <x-ui.badge type="warning" size="xs">
+                        {{ tr('Assignments') }}: {{ (int) ($previewMeta['assignments_count'] ?? 0) }}
+                    </x-ui.badge>
 
-                                <x-ui.badge type="warning" size="xs">
-                                    {{ tr('Assignments') }}: {{ (int) ($previewMeta['assignments_count'] ?? 0) }}
-                                </x-ui.badge>
+                    <x-ui.badge type="orange" size="xs">
+                        {{ tr('Rotations') }}: {{ (int) ($previewMeta['rotations_count'] ?? 0) }}
+                    </x-ui.badge>
 
-                                <x-ui.badge type="orange" size="xs">
-                                    {{ tr('Rotations') }}: {{ (int) ($previewMeta['rotations_count'] ?? 0) }}
-                                </x-ui.badge>
-                            @endif
-                        </div>
-
-                        @if(!empty($previewEmployee))
-                            <p class="text-xs text-gray-500">
-                                {{ app()->isLocale('ar')
-                                    ? ($previewEmployee['name_ar'] ?? $previewEmployee['name_en'] ?? '-')
-                                    : ($previewEmployee['name_en'] ?? $previewEmployee['name_ar'] ?? '-') }}
-                                <span class="font-mono text-gray-400">#{{ $previewEmployee['employee_no'] ?? '' }}</span>
-                            </p>
-                        @endif
+                    <div class="text-[11px] text-gray-400 ms-auto font-mono">
+                        {{ $previewMeta['from'] ?? '' }} → {{ $previewMeta['to'] ?? '' }}
                     </div>
-
-                    <x-ui.secondary-button type="button" wire:click="closeSchedulePreviewModal" class="gap-2">
-                        <i class="fas fa-times"></i>
-                        <span>{{ tr('Close') }}</span>
-                    </x-ui.secondary-button>
                 </div>
+            @endif
 
-                {{-- Filters --}}
-                <div class="p-5 space-y-3">
-                    <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
-                        <div class="sm:col-span-1">
-                            <x-ui.input
-                                type="date"
-                                model="previewForm.from"
-                                :label="tr('From')"
-                                :defer="true"
-                                :disabled="!auth()->user()->can('attendance.manage')"
-                            />
-                            @error('previewForm.from')
-                                <p class="text-xs text-red-600 mt-1">{{ $message }}</p>
-                            @enderror
-                        </div>
-
-                        <div class="sm:col-span-1">
-                            <x-ui.input
-                                type="date"
-                                model="previewForm.to"
-                                :label="tr('To')"
-                                :defer="true"
-                                :disabled="!auth()->user()->can('attendance.manage')"
-                            />
-                            @error('previewForm.to')
-                                <p class="text-xs text-red-600 mt-1">{{ $message }}</p>
-                            @enderror
-                        </div>
-
-                        @can('attendance.manage')
-                        <div class="sm:col-span-2 flex justify-end gap-2">
-                            <x-ui.primary-button type="button" wire:click="generateSchedulePreview" class="gap-2">
-                                <i class="fas fa-sync"></i>
-                                <span>{{ tr('Refresh') }}</span>
-                            </x-ui.primary-button>
-                        </div>
-                        @endcan
+            {{-- Filters Card --}}
+            <x-ui.card class="bg-gray-50/50 border-gray-100">
+                <div class="grid grid-cols-1 sm:grid-cols-4 gap-3 items-end">
+                    <div class="sm:col-span-1">
+                        <x-ui.company-date-picker
+                            model="previewForm.from"
+                            :label="tr('From')"
+                            :disabled="!auth()->user()->can('attendance.manage')"
+                        />
+                        @error('previewForm.from')
+                            <p class="text-xs text-red-600 mt-1">{{ $message }}</p>
+                        @enderror
                     </div>
 
-                    @if(!empty($previewMeta))
-                        <div class="text-xs text-gray-500">
-                            <span class="font-mono">{{ $previewMeta['from'] ?? '' }}</span>
-                            <span class="mx-1">→</span>
-                            <span class="font-mono">{{ $previewMeta['to'] ?? '' }}</span>
-                        </div>
-                    @endif
+                    <div class="sm:col-span-1">
+                        <x-ui.company-date-picker
+                            model="previewForm.to"
+                            :label="tr('To')"
+                            :disabled="!auth()->user()->can('attendance.manage')"
+                        />
+                        @error('previewForm.to')
+                            <p class="text-xs text-red-600 mt-1">{{ $message }}</p>
+                        @enderror
+                    </div>
+
+                    @can('attendance.manage')
+                    <div class="sm:col-span-2 flex justify-end">
+                        <x-ui.primary-button
+                            type="button"
+                            wire:click="generateSchedulePreview"
+                            loading="generateSchedulePreview"
+                            :fullWidth="false"
+                            class="!px-10"
+                        >
+                            <span>{{ tr('Update Preview') }}</span>
+                        </x-ui.primary-button>
+                    </div>
+                    @endcan
                 </div>
             </x-ui.card>
 
@@ -99,15 +93,14 @@
                 $headers = [
                     tr('Date'),
                     tr('Day'),
-                    tr('Type'),
                     tr('Schedule'),
                     tr('Periods'),
                 ];
-                $headerAlign = ['start','start','start','start','start'];
+                $headerAlign = ['start','start','start','start'];
             @endphp
 
             <x-ui.card padding="false" class="border border-gray-100 !overflow-hidden">
-                <div class="max-h-[60vh] overflow-auto">
+                <div class="max-h-[50vh] overflow-auto">
                     <x-ui.table :headers="$headers" :headerAlign="$headerAlign" :enablePagination="false">
                         @forelse(($previewRows ?? []) as $row)
                             @php
@@ -116,29 +109,13 @@
                                 $periods = $row['periods'] ?? [];
                             @endphp
 
-                            <tr class="hover:bg-gray-50/50 transition-colors">
+                            <tr class="hover:bg-gray-50/50 transition-colors border-b border-gray-50 last:border-0">
                                 <td class="px-6 py-4 font-mono text-sm text-gray-700">
-                                    {{ $row['date'] ?? '-' }}
+                                    {{ $this->formatCompanyDate($row['date'] ?? null, $this->getCompanyId()) }}
                                 </td>
 
                                 <td class="px-6 py-4 text-sm text-gray-700">
                                     {{ $row['day'] ?? '-' }}
-                                </td>
-
-                                <td class="px-6 py-4">
-                                    @if($t === 'rotation')
-                                        <x-ui.badge type="info" size="xs">
-                                            {{ tr('Rotation') }}{{ $src ? ' (' . $src . ')' : '' }}
-                                        </x-ui.badge>
-                                    @elseif($t === 'none')
-                                        <x-ui.badge type="danger" size="xs">
-                                            {{ tr('No schedule') }}
-                                        </x-ui.badge>
-                                    @else
-                                        <x-ui.badge type="warning" size="xs">
-                                            {{ tr('Single') }}
-                                        </x-ui.badge>
-                                    @endif
                                 </td>
 
                                 <td class="px-6 py-4">
@@ -181,11 +158,20 @@
                     </x-ui.table>
                 </div>
 
-                <div class="px-5 py-3 border-t text-xs text-gray-400">
-                    {{ tr('Note: Preview is limited to 31 days to avoid heavy queries.') }}
+                <div class="px-5 py-3 border-t bg-gray-50/50 text-[11px] text-gray-500 flex items-center justify-between">
+                    <span><i class="fas fa-info-circle me-1 text-gray-400"></i> {{ tr('Note: Preview is limited to 31 days to avoid heavy queries.') }}</span>
                 </div>
             </x-ui.card>
 
+        </div>
+    </x-slot>
+
+    <x-slot name="footer">
+        <div class="flex items-center justify-end w-full">
+            <x-ui.secondary-button type="button" wire:click="closeSchedulePreviewModal" class="gap-2">
+                <i class="fas fa-times"></i>
+                <span>{{ tr('Close') }}</span>
+            </x-ui.secondary-button>
         </div>
     </x-slot>
 </x-ui.modal>
