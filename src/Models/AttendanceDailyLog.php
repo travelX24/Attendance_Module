@@ -143,8 +143,8 @@ class AttendanceDailyLog extends Model
     {
         static::saving(function ($log) {
             $log->syncWithSchedule();
-            $log->calculateActualHours();
             $log->calculateStatus();
+            $log->calculateActualHours();
             $log->calculateCompliance();
 
             if ($log->employee && $log->employee->contract_type === 'freelancer') {
@@ -312,6 +312,35 @@ class AttendanceDailyLog extends Model
         $lateGrace = $grace->late_grace_minutes ?? 15;
         $earlyGrace = $grace->early_leave_grace_minutes ?? 15;
         $dateStr = Carbon::parse($this->attendance_date)->toDateString();
+
+        // --- Start: Auto-Checkout Logic ---
+        $effectiveCheckOut = $this->check_out_time;
+        if (!$effectiveCheckOut) {
+            $lastDetail = $this->details()->whereNotNull('check_out_time')->orderBy('check_out_time', 'desc')->first();
+            $effectiveCheckOut = $lastDetail?->check_out_time;
+        }
+
+        if (!$effectiveCheckOut && $this->check_in_time && $this->scheduled_check_out) {
+            $autoCheckoutMins = (int)($grace->auto_checkout_after_minutes ?? 0);
+            if ($autoCheckoutMins > 0) {
+                 $scheduledOut = Carbon::parse($dateStr . " " . $this->formatTimeHm($this->scheduled_check_out));
+                 $limit = $scheduledOut->copy()->addMinutes($autoCheckoutMins);
+                 
+                 if (now()->greaterThan($limit)) {
+                     // Perform auto-checkout: set time to scheduled out and update status
+                     $this->check_out_time = $this->scheduled_check_out;
+                     $this->attendance_status = 'auto_checkout';
+                     
+                     // Close open sessions in secondary details table
+                     $this->details()->whereNull('check_out_time')->update([
+                         'check_out_time' => $this->formatTimeHm($this->scheduled_check_out)
+                     ]);
+                     
+                     return; // Skip remaining status calculations
+                 }
+            }
+        }
+        // --- End: Auto-Checkout Logic ---
 
         if ($this->scheduled_check_in && $effectiveCheckIn) {
             $scheduledIn = Carbon::parse($dateStr . " " . $this->formatTimeHm($this->scheduled_check_in));
