@@ -54,10 +54,10 @@ class AttendanceDailyLog extends Model
 
     protected $casts = [
         'attendance_date' => 'date',
-        'check_in_time' => 'string',
-        'check_out_time' => 'string',
-        'scheduled_check_in' => 'string',
-        'scheduled_check_out' => 'string',
+        'check_in_time' => 'datetime',
+        'check_out_time' => 'datetime',
+        'scheduled_check_in' => 'datetime',
+        'scheduled_check_out' => 'datetime',
         'scheduled_hours' => 'decimal:2',
         'actual_hours' => 'decimal:2',
         'compliance_percentage' => 'decimal:2',
