@@ -41,52 +41,89 @@
 
 
 @section('topbar-left-content')
-    <x-ui.page-header
-        :title="tr('Leaves & Permissions')"
-        :subtitle="tr('Manage requests, approvals, and balances')"
-    />
+    <x-ui.page-header title="{{ tr('Leaves & Permissions') }}" subtitle="{{ tr('Manage requests, approvals, and balances') }}" />
 @endsection
 
-<div class="p-6 space-y-6" dir="{{ $dir }}">
+<div class="p-6 space-y-6" dir="{{ $dir }}" wire:poll.15s>
+    <x-ui.loading-bar />
 
     {{-- Flash --}}
     <x-ui.flash-toast />
-    {{-- Actions --}}
-    @can('attendance.manage')
-    <div class="flex flex-wrap items-center gap-2 justify-end">
-        <x-ui.secondary-button type="button" wire:click="openCreateLeave">
-            <i class="fas fa-plus me-1"></i> {{ tr('New Leave Request') }}
-        </x-ui.secondary-button>
 
-        <x-ui.secondary-button type="button" wire:click="openCreateGroupLeave">
-            <i class="fas fa-users me-1"></i> {{ tr('New Group Leave') }}
-        </x-ui.secondary-button>
+    {{-- Tabs & Actions Row --}}
+    <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-4">
+        <div class="flex items-center gap-1 bg-gray-100/50 p-1 rounded-xl border border-gray-200 shadow-sm w-fit">
+            <button wire:click="$set('tab', 'pending')"
+                class="px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300 min-w-[100px] {{ $tab === 'pending' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-transparent text-gray-400 hover:text-gray-700 hover:bg-gray-200/50' }}">
+                <i class="fas fa-clock-rotate-left me-1 opacity-70"></i>
+                {{ tr('Pending') }}
+            </button>
 
-        <x-ui.secondary-button type="button" wire:click="openCutLeave">
-            <i class="fas fa-cut me-1"></i> {{ tr('Cut Leave') }}
-        </x-ui.secondary-button>
+            <button wire:click="$set('tab', 'balances')"
+                class="px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300 min-w-[100px] {{ $tab === 'balances' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-transparent text-gray-400 hover:text-gray-700 hover:bg-gray-200/50' }}">
+                <i class="fas fa-wallet me-1 opacity-70"></i>
+                {{ tr('Balances') }}
+            </button>
 
-        <x-ui.secondary-button type="button" wire:click="openCreatePermission">
-            <i class="fas fa-plus me-1"></i> {{ tr('New Permission') }}
-        </x-ui.secondary-button>
+            <button wire:click="$set('tab', 'history')"
+                class="px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300 min-w-[100px] {{ $tab === 'history' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-transparent text-gray-400 hover:text-gray-700 hover:bg-gray-200/50' }}">
+                <i class="fas fa-history me-1 opacity-70"></i>
+                {{ tr('History') }}
+            </button>
+        </div>
 
-        <x-ui.secondary-button type="button" wire:click="openCreateGroupPermission">
-            <i class="fas fa-users me-1"></i> {{ tr('New Group Permission') }}
-        </x-ui.secondary-button>
+        {{-- Action Button --}}
+        @can('attendance.manage')
+        <div class="shrink-0">
+            <x-ui.dropdown-menu>
+                <x-slot name="trigger">
+                    <div class="flex items-center gap-2 px-5 py-2.5 bg-indigo-600 text-white rounded-xl font-bold shadow-lg hover:bg-indigo-700 transition-all cursor-pointer group text-xs">
+                        <i class="fas fa-plus"></i>
+                        <span>{{ tr('New Request') }}</span>
+                        <i class="fas fa-chevron-down text-[8px] opacity-70 group-hover:translate-y-0.5 transition-transform"></i>
+                    </div>
+                </x-slot>
 
-        <x-ui.secondary-button type="button" wire:click="openCreateMission" class="!bg-indigo-600 !text-white !border-indigo-600 hover:!bg-indigo-700">
-            <i class="fas fa-plus me-1"></i> {{ tr('New Mission Request') }}
-        </x-ui.secondary-button>
+                <x-ui.dropdown-item wire:click="openCreateLeave">
+                    <i class="fas fa-calendar-plus me-2 text-indigo-500"></i> {{ tr('New Leave Request') }}
+                </x-ui.dropdown-item>
+                
+                <x-ui.dropdown-item wire:click="openCreatePermission">
+                    <i class="fas fa-clock me-2 text-indigo-500"></i> {{ tr('New Permission') }}
+                </x-ui.dropdown-item>
+
+                <x-ui.dropdown-item wire:click="openCreateMission">
+                    <i class="fas fa-briefcase me-2 text-indigo-500"></i> {{ tr('New Mission Request') }}
+                </x-ui.dropdown-item>
+                
+                <div class="border-t border-gray-100 my-1"></div>
+
+                <x-ui.dropdown-item wire:click="openCreateGroupLeave">
+                    <i class="fas fa-users me-2 text-gray-500"></i> {{ tr('New Group Leave') }}
+                </x-ui.dropdown-item>
+
+                <x-ui.dropdown-item wire:click="openCreateGroupPermission">
+                    <i class="fas fa-users-cog me-2 text-gray-500"></i> {{ tr('New Group Permission') }}
+                </x-ui.dropdown-item>
+
+                <div class="border-t border-gray-100 my-1"></div>
+
+                <x-ui.dropdown-item wire:click="openCutLeave">
+                    <i class="fas fa-cut me-2 text-red-500"></i> {{ tr('Cut Leave') }}
+                </x-ui.dropdown-item>
+            </x-ui.dropdown-menu>
+        </div>
+        @endcan
     </div>
-    @endcan
 
-    {{-- Filters + Tabs --}}
+    {{-- Filters --}}
     <x-ui.card class="bg-white rounded-2xl border border-gray-200 p-4">
 
         <div class="flex flex-col lg:flex-row gap-3 lg:items-center lg:justify-between">
 
-            <div class="flex flex-col md:flex-row flex-wrap gap-3 md:items-center w-full">
-                <div class="w-full md:w-80">
+            <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 w-full">
+                <div>
+                    <div class="text-[11px] text-gray-500 mb-1 font-bold uppercase tracking-wider">{{ tr('Employee') }}</div>
                     <x-ui.input
                         type="text"
                         wire:model.live="search"
@@ -96,26 +133,29 @@
                     />
                 </div>
 
-                <div class="w-full md:w-52">
-                  <x-ui.select wire:model.live="selectedYearId" class="w-full" disabled>
+                <div>
+                    <div class="text-[11px] text-gray-500 mb-1 font-bold uppercase tracking-wider">{{ tr('Year') }}</div>
+                    <x-ui.select wire:model.live="selectedYearId" class="w-full" disabled>
                         @foreach($years as $y)
                             <option value="{{ $y->id }}">{{ $y->year }}</option>
                         @endforeach
                     </x-ui.select>
-
                 </div>
-                    <div class="w-full md:w-52">
-                        <x-ui.select wire:model.live="branchId" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
-                            <option value="">{{ tr('All Branches') }}</option>
 
-                            @foreach(($branches ?? []) as $br)
-                                <option value="{{ $br->id }}">
-                                    {{ ($br->name ?? ('#'.$br->id)) }}{{ !empty($br->code) ? ' - '.$br->code : '' }}
-                                </option>
-                            @endforeach
-                        </x-ui.select>
-                    </div>
-                <div class="w-full md:w-52">
+                <div>
+                    <div class="text-[11px] text-gray-500 mb-1 font-bold uppercase tracking-wider">{{ tr('Branch') }}</div>
+                    <x-ui.select wire:model.live="branchId" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
+                        <option value="">{{ tr('All Branches') }}</option>
+                        @foreach(($branches ?? []) as $br)
+                            <option value="{{ $br->id }}">
+                                {{ ($br->name ?? ('#'.$br->id)) }}{{ !empty($br->code) ? ' - '.$br->code : '' }}
+                            </option>
+                        @endforeach
+                    </x-ui.select>
+                </div>
+
+                <div>
+                    <div class="text-[11px] text-gray-500 mb-1 font-bold uppercase tracking-wider">{{ tr('Department') }}</div>
                     <x-ui.select wire:model.live="departmentId" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
                         <option value="">{{ tr('All Departments') }}</option>
                         @foreach(($departments ?? []) as $d)
@@ -124,7 +164,8 @@
                     </x-ui.select>
                 </div>
 
-                <div class="w-full md:w-52">
+                <div>
+                    <div class="text-[11px] text-gray-500 mb-1 font-bold uppercase tracking-wider">{{ tr('Job Title') }}</div>
                     <x-ui.select wire:model.live="jobTitleId" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
                         <option value="">{{ tr('All Job Titles') }}</option>
                         @foreach(($jobTitles ?? []) as $jt)
@@ -133,8 +174,8 @@
                     </x-ui.select>
                 </div>
 
-                <div class="w-full md:w-60">
-                    {{-- ✅ matched to Livewire: filterLeavePolicyId --}}
+                <div>
+                    <div class="text-[11px] text-gray-500 mb-1 font-bold uppercase tracking-wider">{{ tr('Leave Type') }}</div>
                     <x-ui.select wire:model.live="filterLeavePolicyId" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
                         <option value="">{{ tr('All Leave Types') }}</option>
                         @foreach(($policies ?? []) as $p)
@@ -144,69 +185,78 @@
                 </div>
 
                 @if($tab !== 'balances')
-                    <div class="w-full md:w-44">
+                    <div>
+                        <div class="text-[11px] text-gray-500 mb-1 font-bold uppercase tracking-wider">{{ tr('From Date') }}</div>
                         <x-ui.company-date-picker model="fromDate" :disabled="!auth()->user()->can('attendance.manage')" />
                     </div>
-                    <div class="w-full md:w-44">
+                    <div>
+                        <div class="text-[11px] text-gray-500 mb-1 font-bold uppercase tracking-wider">{{ tr('To Date') }}</div>
                         <x-ui.company-date-picker model="toDate" :disabled="!auth()->user()->can('attendance.manage')" />
                     </div>
                 @endif
 
-
                 @if($tab === 'history')
-                    <div class="w-full md:w-52">
+                    <div>
+                        <div class="text-[11px] text-gray-500 mb-1 font-bold uppercase tracking-wider">{{ tr('Status') }}</div>
                         <x-ui.select wire:model.live="historyStatus" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
                             <option value="">{{ tr('All Statuses') }}</option>
                             <option value="approved">{{ tr('Approved') }}</option>
                             <option value="rejected">{{ tr('Rejected') }}</option>
                             <option value="cancelled">{{ tr('Cancelled') }}</option>
-
                         </x-ui.select>
                     </div>
                 @endif
             </div>
-
-            <div class="flex items-center gap-2">
-                <x-ui.secondary-button
-                    type="button"
-                    wire:click="setTab('pending')"
-                    class="{{ $tab === 'pending'
-                        ? '!bg-[color:var(--brand-via)] !text-white !border-[color:var(--brand-via)] hover:opacity-95'
-                        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50' }}"
-                >
-                    {{ tr('Pending') }}
-                </x-ui.secondary-button>
-
-                <x-ui.secondary-button
-                    type="button"
-                    wire:click="setTab('balances')"
-                    class="{{ $tab === 'balances'
-                        ? '!bg-[color:var(--brand-via)] !text-white !border-[color:var(--brand-via)] hover:opacity-95'
-                        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50' }}"
-                >
-                    {{ tr('Balances') }}
-                </x-ui.secondary-button>
-
-                <x-ui.secondary-button
-                    type="button"
-                    wire:click="setTab('history')"
-                    class="{{ $tab === 'history'
-                        ? '!bg-[color:var(--brand-via)] !text-white !border-[color:var(--brand-via)] hover:opacity-95'
-                        : 'bg-white text-gray-700 border-gray-200 hover:bg-gray-50' }}"
-                >
-                    {{ tr('History') }}
-                </x-ui.secondary-button>
-            </div>
-
         </div>
     </x-ui.card>
 
-    {{-- Pending --}}
+    {{-- Pending Section --}}
     @if($tab === 'pending')
-        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div class="space-y-6">
+            {{-- Sub Tabs --}}
+            <div class="flex items-center gap-6 border-b border-gray-200">
+                <button wire:click="setPendingSubTab('leaves')" 
+                    class="pb-3 text-sm font-bold transition-all relative {{ $pendingSubTab === 'leaves' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600' }}">
+                    <span>{{ tr('Leave Requests') }}</span>
+                    @if($pendingLeaveRequests->total() > 0)
+                        <span class="ms-2 px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[10px]">{{ $pendingLeaveRequests->total() }}</span>
+                    @endif
+                    @if($pendingSubTab === 'leaves') <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full"></div> @endif
+                </button>
+
+                <button wire:click="setPendingSubTab('permissions')" 
+                    class="pb-3 text-sm font-bold transition-all relative {{ $pendingSubTab === 'permissions' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600' }}">
+                    <span>{{ tr('Permission Requests') }}</span>
+                    @if($pendingPermissionRequests->total() > 0)
+                        <span class="ms-2 px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[10px]">{{ $pendingPermissionRequests->total() }}</span>
+                    @endif
+                    @if($pendingSubTab === 'permissions') <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full"></div> @endif
+                </button>
+
+                <button wire:click="setPendingSubTab('cuts')" 
+                    class="pb-3 text-sm font-bold transition-all relative {{ $pendingSubTab === 'cuts' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600' }}">
+                    <span>{{ tr('Cut Requests') }}</span>
+                    @if($pendingCutLeaveRequests->total() > 0)
+                        <span class="ms-2 px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[10px]">{{ $pendingCutLeaveRequests->total() }}</span>
+                    @endif
+                    @if($pendingSubTab === 'cuts') <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full"></div> @endif
+                </button>
+
+                <button wire:click="setPendingSubTab('missions')" 
+                    class="pb-3 text-sm font-bold transition-all relative {{ $pendingSubTab === 'missions' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600' }}">
+                    <span>{{ tr('Mission Requests') }}</span>
+                    @if($pendingMissionRequests->total() > 0)
+                        <span class="ms-2 px-1.5 py-0.5 rounded-full bg-indigo-50 text-indigo-600 text-[10px]">{{ $pendingMissionRequests->total() }}</span>
+                    @endif
+                    @if($pendingSubTab === 'missions') <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full"></div> @endif
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 gap-6">
 
             {{-- Leave Requests --}}
-            <x-ui.card class="overflow-hidden border border-gray-200 rounded-2xl bg-white">
+            @if($pendingSubTab === 'leaves')
+            <x-ui.card class="overflow-hidden border border-gray-200 rounded-2xl bg-white shadow-sm">
                 <div class="p-4 border-b border-gray-100 flex items-center justify-between">
                     <div class="font-extrabold text-gray-900">{{ tr('Pending Leave Requests') }}</div>
                     <x-ui.badge class="text-xs">{{ $pendingLeaveRequests->total() }}</x-ui.badge>
@@ -349,8 +399,11 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="p-4 text-center text-gray-500">
-                                    {{ tr('No pending requests') }}
+                                <td colspan="7" class="p-12 text-center text-gray-400">
+                                    <div class="flex flex-col items-center gap-3">
+                                        <i class="fas fa-file-signature text-3xl opacity-20"></i>
+                                        <span class="italic">{{ tr('No pending requests found') }}</span>
+                                    </div>
                                 </td>
                             </tr>
                         @endforelse
@@ -362,9 +415,11 @@
                     {{ $pendingLeaveRequests->links() }}
                 </div>
             </x-ui.card>
+            @endif
 
             {{-- Permission Requests --}}
-            <x-ui.card class="overflow-hidden border border-gray-200 rounded-2xl bg-white">
+            @if($pendingSubTab === 'permissions')
+            <x-ui.card class="overflow-hidden border border-gray-200 rounded-2xl bg-white shadow-sm">
                 <div class="p-4 border-b border-gray-100 flex items-center justify-between">
                     <div class="font-extrabold text-gray-900">{{ tr('Pending Permissions') }}</div>
                     <x-ui.badge class="text-xs">{{ $pendingPermissionRequests->total() }}</x-ui.badge>
@@ -446,8 +501,11 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="p-4 text-center text-gray-500">
-                                    {{ tr('No pending requests') }}
+                                <td colspan="5" class="p-12 text-center text-gray-400">
+                                    <div class="flex flex-col items-center gap-3">
+                                        <i class="fas fa-user-clock text-3xl opacity-20"></i>
+                                        <span class="italic">{{ tr('No pending permissions found') }}</span>
+                                    </div>
                                 </td>
                             </tr>
                         @endforelse
@@ -459,10 +517,11 @@
                     {{ $pendingPermissionRequests->links() }}
                 </div>
             </x-ui.card>
-
+            @endif
 
             {{-- Pending Cut Leave Requests --}}
-            <x-ui.card class="overflow-hidden border border-gray-200 rounded-2xl bg-white">
+            @if($pendingSubTab === 'cuts')
+            <x-ui.card class="overflow-hidden border border-gray-200 rounded-2xl bg-white shadow-sm">
                 <div class="p-4 border-b border-gray-100 flex items-center justify-between">
                     <div class="font-extrabold text-gray-900">{{ tr('Pending Leave Cut Requests') }}</div>
                     <x-ui.badge class="text-xs">{{ $pendingCutLeaveRequests->total() }}</x-ui.badge>
@@ -525,8 +584,11 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="4" class="p-4 text-center text-gray-500">
-                                    {{ tr('No pending requests') }}
+                                <td colspan="4" class="p-12 text-center text-gray-400">
+                                    <div class="flex flex-col items-center gap-3">
+                                        <i class="fas fa-cut text-3xl opacity-20"></i>
+                                        <span class="italic">{{ tr('No pending cut requests found') }}</span>
+                                    </div>
                                 </td>
                             </tr>
                         @endforelse
@@ -538,9 +600,11 @@
                     {{ $pendingCutLeaveRequests->links() }}
                 </div>
             </x-ui.card>
+            @endif
 
             {{-- Pending Mission Requests --}}
-            <x-ui.card class="overflow-hidden border border-gray-200 rounded-2xl bg-white xl:col-span-2">
+            @if($pendingSubTab === 'missions')
+            <x-ui.card class="overflow-hidden border border-gray-200 rounded-2xl bg-white xl:col-span-2 shadow-sm">
                 <div class="p-4 border-b border-gray-100 flex items-center justify-between">
                     <div class="font-extrabold text-gray-900">{{ tr('Pending Mission Requests') }}</div>
                     <x-ui.badge class="text-xs">{{ $pendingMissionRequests->total() }}</x-ui.badge>
@@ -634,8 +698,11 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="p-4 text-center text-gray-500">
-                                    {{ tr('No pending requests') }}
+                                <td colspan="7" class="p-12 text-center text-gray-400">
+                                    <div class="flex flex-col items-center gap-3">
+                                        <i class="fas fa-plane-departure text-3xl opacity-20"></i>
+                                        <span class="italic">{{ tr('No pending mission requests found') }}</span>
+                                    </div>
                                 </td>
                             </tr>
                         @endforelse
@@ -647,6 +714,7 @@
                     {{ $pendingMissionRequests->links() }}
                 </div>
             </x-ui.card>
+            @endif
 
         </div>
     @endif
@@ -1059,7 +1127,17 @@
 
     {{-- Create Leave Modal --}}
     <x-ui.modal wire:model="createLeaveOpen" max-width="lg">
-        <x-slot name="title">{{ tr('New Leave Request') }}</x-slot>
+        <x-slot name="title">
+            <div class="flex items-center gap-3">
+                <div class="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                    <i class="fas fa-calendar-plus text-lg"></i>
+                </div>
+                <div>
+                    <div class="font-black text-gray-900">{{ tr('New Leave Request') }}</div>
+                    <div class="text-[10px] text-gray-500 font-medium">{{ tr('Submit a new absence request') }}</div>
+                </div>
+            </div>
+        </x-slot>
 
         <x-slot name="content">
             <div class="space-y-4">
@@ -1262,16 +1340,28 @@
         </x-slot>
 
         <x-slot name="footer">
-            <x-ui.secondary-button type="button" wire:click="closeCreateLeave">{{ tr('Cancel') }}</x-ui.secondary-button>
-            @can('attendance.manage')
-            <x-ui.primary-button type="button" wire:click="saveLeave">{{ tr('Save') }}</x-ui.primary-button>
-            @endcan
+            <div class="flex items-center justify-end gap-3">
+                <x-ui.secondary-button type="button" wire:click="closeCreateLeave">{{ tr('Cancel') }}</x-ui.secondary-button>
+                @can('attendance.manage')
+                <x-ui.primary-button type="button" wire:click="saveLeave" class="!px-8">{{ tr('Save') }}</x-ui.primary-button>
+                @endcan
+            </div>
         </x-slot>
     </x-ui.modal>
 
     {{-- Create Permission Modal --}}
     <x-ui.modal wire:model="createPermissionOpen" max-width="lg">
-        <x-slot name="title">{{ tr('New Permission') }}</x-slot>
+        <x-slot name="title">
+            <div class="flex items-center gap-3">
+                <div class="p-2 bg-amber-50 text-amber-600 rounded-lg">
+                    <i class="fas fa-clock text-lg"></i>
+                </div>
+                <div>
+                    <div class="font-black text-gray-900">{{ tr('New Permission') }}</div>
+                    <div class="text-[10px] text-gray-500 font-medium">{{ tr('Request short time-off signature') }}</div>
+                </div>
+            </div>
+        </x-slot>
 
         <x-slot name="content">
             <div class="space-y-4">
@@ -1331,13 +1421,15 @@
                         @error('permission_reason') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
                     </div>
                 </div>
+            </div>
+        </x-slot>
 
-                <div class="flex justify-end gap-2 pt-3 border-t border-gray-100">
-                    <x-ui.secondary-button type="button" wire:click="closeCreatePermission">{{ tr('Cancel') }}</x-ui.secondary-button>
-                    @can('attendance.manage')
-                    <x-ui.primary-button type="button" wire:click="savePermission">{{ tr('Save') }}</x-ui.primary-button>
-                    @endcan
-                </div>
+        <x-slot name="footer">
+            <div class="flex items-center justify-end gap-3">
+                <x-ui.secondary-button type="button" wire:click="closeCreatePermission">{{ tr('Cancel') }}</x-ui.secondary-button>
+                @can('attendance.manage')
+                <x-ui.primary-button type="button" wire:click="savePermission" class="!px-8">{{ tr('Save') }}</x-ui.primary-button>
+                @endcan
             </div>
         </x-slot>
     </x-ui.modal>
@@ -1354,26 +1446,38 @@
         </x-slot>
 
         <x-slot name="footer">
-            <x-ui.secondary-button type="button" wire:click="closeReject">{{ tr('Cancel') }}</x-ui.secondary-button>
-            <x-ui.primary-button type="button" wire:click="confirmReject">{{ tr('Confirm') }}</x-ui.primary-button>
+            <div class="flex items-center justify-end gap-3">
+                <x-ui.secondary-button type="button" wire:click="closeReject">{{ tr('Cancel') }}</x-ui.secondary-button>
+                <x-ui.primary-button type="button" wire:click="confirmReject" class="!px-8">{{ tr('Confirm') }}</x-ui.primary-button>
+            </div>
         </x-slot>
     </x-ui.modal>
 
     {{-- Create Group Leave Modal --}}
-    <x-ui.modal wire:model="createGroupLeaveOpen" max-width="2xl">
-        <x-slot name="title">{{ tr('New Group Leave') }}</x-slot>
+    <x-ui.modal wire:model="createGroupLeaveOpen" max-width="4xl">
+        <x-slot name="title">
+             <div class="flex items-center gap-3">
+                <div class="p-2 bg-indigo-50 text-indigo-600 rounded-lg">
+                    <i class="fas fa-users text-lg"></i>
+                </div>
+                <div>
+                    <div class="font-black text-gray-900">{{ tr('New Group Leave') }}</div>
+                    <div class="text-[10px] text-gray-500 font-medium">{{ tr('Apply absence with mass selection') }}</div>
+                </div>
+            </div>
+        </x-slot>
 
         <x-slot name="content">
          <div class="space-y-4">
 
             <div class="text-xs text-gray-500 mb-1 font-bold">{{ tr('Reason') }}</div>
-                <textarea
-                        wire:model.defer="group_reason"
-                        rows="4"
-                        class="w-full rounded-xl border border-gray-300 bg-white px-3 py-2 text-sm text-gray-900 placeholder:text-gray-400 focus:border-primary-500 focus:ring-2 focus:ring-primary-500/20 resize-y min-h-[96px]"
-                        placeholder="{{ tr('Type the reason for the leave...') }}"
-                        :disabled="!auth()->user()->can('attendance.manage')"
-                    ></textarea>
+            <x-ui.textarea
+                wire:model.defer="group_reason"
+                rows="3"
+                class="w-full"
+                placeholder="{{ tr('Type the reason for the leave...') }}"
+                :disabled="!auth()->user()->can('attendance.manage')"
+            />
 
                 <label class="flex items-center gap-2 text-sm text-gray-700">
                     <input
@@ -1391,7 +1495,9 @@
                         <x-ui.select wire:model.live="group_leave_policy_id" class="w-full">
                             <option value="0">--</option>
                             @foreach(($policies ?? []) as $p)
-                                <option value="{{ $p->id }}">{{ $p->name ?? $p->label ?? ('#'.$p->id) }}</option>
+                                @if($p)
+                                    <option value="{{ $p->id }}">{{ $p->name ?? $p->label ?? ('#'.$p->id) }}</option>
+                                @endif
                             @endforeach
                         </x-ui.select>
                         @error('group_leave_policy_id') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
@@ -1532,27 +1638,35 @@
 </div>
 </div>
 
-                    <div class="max-h-56 overflow-auto bg-white rounded-xl border border-gray-200 p-2 space-y-1">
-                        @foreach($groupEmployeesForSelect as $e)
-                            <label class="flex items-center gap-2 text-sm text-gray-800">
-                                <input type="checkbox" value="{{ $e->id }}" wire:model="groupEmployeeIds" @cannot('attendance.manage') disabled @endcannot />
-                                <span class="font-semibold">
-                                    {{ $e->name_ar ?? $e->name_en ?? $e->name ?? $e->full_name ?? ('#'.$e->id) }}
-                                </span>
-                                <span class="text-xs text-gray-400">#{{ $e->id }}</span>
-                            </label>
-                        @endforeach
+                    <div class="max-h-64 overflow-auto bg-white rounded-xl border border-gray-200 p-3">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                            @foreach($groupEmployeesForSelect as $e)
+                                <label class="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 border border-transparent hover:border-gray-100 transition-all cursor-pointer group">
+                                    <input type="checkbox" value="{{ $e->id }}" wire:model="groupEmployeeIds" 
+                                        class="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                        @cannot('attendance.manage') disabled @endcannot />
+                                    <div class="flex flex-col">
+                                        <span class="text-xs font-bold text-gray-800 group-hover:text-indigo-600 transition-colors">
+                                            {{ $e->name_ar ?? $e->name_en ?? $e->name ?? $e->full_name ?? ('#'.$e->id) }}
+                                        </span>
+                                        <span class="text-[10px] text-gray-400">#{{ $e->id }}</span>
+                                    </div>
+                                </label>
+                            @endforeach
+                        </div>
                     </div>
 
                     @error('groupEmployeeIds') <div class="text-xs text-red-600 mt-2">{{ $message }}</div> @enderror
                 </x-ui.card>
 
-                <div class="flex justify-end gap-2 pt-3 border-t border-gray-100">
-                    <x-ui.secondary-button type="button" wire:click="closeCreateGroupLeave">{{ tr('Cancel') }}</x-ui.secondary-button>
-                    @can('attendance.manage')
-                    <x-ui.primary-button type="button" wire:click="saveGroupLeave">{{ tr('Save') }}</x-ui.primary-button>
-                    @endcan
-                </div>
+                <x-slot name="footer">
+                    <div class="flex items-center justify-end gap-3">
+                        <x-ui.secondary-button type="button" wire:click="closeCreateGroupLeave">{{ tr('Cancel') }}</x-ui.secondary-button>
+                        @can('attendance.manage')
+                        <x-ui.primary-button type="button" wire:click="saveGroupLeave" class="!px-8">{{ tr('Save') }}</x-ui.primary-button>
+                        @endcan
+                    </div>
+                </x-slot>
             </div>
 
         </x-slot>
@@ -1560,7 +1674,17 @@
 
     {{-- Cut Leave Modal --}}
     <x-ui.modal wire:model="cutLeaveOpen" max-width="lg">
-        <x-slot name="title">{{ tr('Cut Leave') }}</x-slot>
+        <x-slot name="title">
+             <div class="flex items-center gap-3">
+                <div class="p-2 bg-red-50 text-red-600 rounded-lg">
+                    <i class="fas fa-cut text-lg"></i>
+                </div>
+                <div>
+                    <div class="font-black text-gray-900">{{ tr('Cut Leave') }}</div>
+                    <div class="text-[10px] text-gray-500 font-medium">{{ tr('Interrupt an existing approved leave') }}</div>
+                </div>
+            </div>
+        </x-slot>
 
         <x-slot name="content">
            <div class="space-y-4">
@@ -1592,12 +1716,14 @@
                 @error('cut_reason') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
             </div>
 
-            <div class="flex justify-end gap-2 pt-3 border-t border-gray-100">
-                <x-ui.secondary-button type="button" wire:click="closeCutLeave">{{ tr('Cancel') }}</x-ui.secondary-button>
-                @can('attendance.manage')
-                <x-ui.primary-button type="button" wire:click="saveCutLeaveRequest">{{ tr('Save') }}</x-ui.primary-button>
-                @endcan
-            </div>
+            <x-slot name="footer">
+                <div class="flex items-center justify-end gap-3">
+                    <x-ui.secondary-button type="button" wire:click="closeCutLeave">{{ tr('Cancel') }}</x-ui.secondary-button>
+                    @can('attendance.manage')
+                    <x-ui.primary-button type="button" wire:click="saveCutLeaveRequest" class="!px-8">{{ tr('Save') }}</x-ui.primary-button>
+                    @endcan
+                </div>
+            </x-slot>
         </div>
 
         </x-slot>
@@ -1703,8 +1829,18 @@
 
 
     {{-- Create Group Permission Modal --}}
-    <x-ui.modal wire:model="createGroupPermissionOpen" max-width="2xl">
-        <x-slot name="title">{{ tr('New Group Permission') }}</x-slot>
+    <x-ui.modal wire:model="createGroupPermissionOpen" max-width="4xl">
+        <x-slot name="title">
+            <div class="flex items-center gap-3">
+                <div class="p-2 bg-amber-50 text-amber-600 rounded-lg">
+                    <i class="fas fa-users-cog text-lg"></i>
+                </div>
+                <div>
+                    <div class="font-black text-gray-900">{{ tr('New Group Permission') }}</div>
+                    <div class="text-[10px] text-gray-500 font-medium">{{ tr('Assign common exit to multiple staff members') }}</div>
+                </div>
+            </div>
+        </x-slot>
 
         <x-slot name="content">
             <div class="space-y-4">
@@ -1802,27 +1938,35 @@
     </div>
 
 </div>
-                    <div class="max-h-56 overflow-auto bg-white rounded-xl border border-gray-200 p-2 space-y-1">
-                        @foreach($groupEmployeesForSelect as $e)
-                            <label class="flex items-center gap-2 text-sm text-gray-800">
-                                <input type="checkbox" value="{{ $e->id }}" wire:model="groupPermissionEmployeeIds" @cannot('attendance.manage') disabled @endcannot />
-                                <span class="font-semibold">
-                                    {{ $e->name_ar ?? $e->name_en ?? $e->name ?? $e->full_name ?? ('#'.$e->id) }}
-                                </span>
-                                <span class="text-xs text-gray-400">#{{ $e->id }}</span>
-                            </label>
-                        @endforeach
+                    <div class="max-h-64 overflow-auto bg-white rounded-xl border border-gray-200 p-3">
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
+                            @foreach($groupEmployeesForSelect as $e)
+                                <label class="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 border border-transparent hover:border-gray-100 transition-all cursor-pointer group">
+                                    <input type="checkbox" value="{{ $e->id }}" wire:model="groupPermissionEmployeeIds" 
+                                        class="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                                        @cannot('attendance.manage') disabled @endcannot />
+                                    <div class="flex flex-col">
+                                        <span class="text-xs font-bold text-gray-800 group-hover:text-amber-600 transition-colors">
+                                            {{ $e->name_ar ?? $e->name_en ?? $e->name ?? $e->full_name ?? ('#'.$e->id) }}
+                                        </span>
+                                        <span class="text-[10px] text-gray-400">#{{ $e->id }}</span>
+                                    </div>
+                                </label>
+                            @endforeach
+                        </div>
                     </div>
 
                     @error('groupPermissionEmployeeIds') <div class="text-xs text-red-600 mt-2">{{ $message }}</div> @enderror
                 </x-ui.card>
 
-                <div class="flex justify-end gap-2 pt-3 border-t border-gray-100">
-                    <x-ui.secondary-button type="button" wire:click="closeCreateGroupPermission">{{ tr('Cancel') }}</x-ui.secondary-button>
-                    @can('attendance.manage')
-                    <x-ui.primary-button type="button" wire:click="saveGroupPermission">{{ tr('Save') }}</x-ui.primary-button>
-                    @endcan
-                </div>
+                <x-slot name="footer">
+                    <div class="flex items-center justify-end gap-3">
+                        <x-ui.secondary-button type="button" wire:click="closeCreateGroupPermission">{{ tr('Cancel') }}</x-ui.secondary-button>
+                        @can('attendance.manage')
+                        <x-ui.primary-button type="button" wire:click="saveGroupPermission" class="!px-8">{{ tr('Save') }}</x-ui.primary-button>
+                        @endcan
+                    </div>
+                </x-slot>
             </div>
         </x-slot>
     </x-ui.modal>
@@ -1938,7 +2082,17 @@
 
     {{-- Create Mission Modal --}}
     <x-ui.modal wire:model="createMissionOpen" max-width="lg">
-        <x-slot name="title">{{ tr('New Mission Request') }}</x-slot>
+        <x-slot name="title">
+            <div class="flex items-center gap-3">
+                <div class="p-2 bg-blue-50 text-blue-600 rounded-lg">
+                    <i class="fas fa-briefcase text-lg"></i>
+                </div>
+                <div>
+                    <div class="font-black text-gray-900">{{ tr('New Mission Request') }}</div>
+                    <div class="text-[10px] text-gray-500 font-medium">{{ tr('Log external assignments and field work') }}</div>
+                </div>
+            </div>
+        </x-slot>
 
         <x-slot name="content">
             <div class="space-y-4">
@@ -2010,9 +2164,12 @@
         </x-slot>
 
         <x-slot name="footer">
+            <div class="flex items-center justify-end gap-3">
+                <x-ui.secondary-button type="button" wire:click="closeCreateMission">{{ tr('Cancel') }}</x-ui.secondary-button>
                 @can('attendance.manage')
-            <x-ui.primary-button wire:click="saveMission" class="w-full">{{ tr('Save') }}</x-ui.primary-button>
+                <x-ui.primary-button wire:click="saveMission" class="!px-8">{{ tr('Save') }}</x-ui.primary-button>
                 @endcan
+            </div>
         </x-slot>
     </x-ui.modal>
 

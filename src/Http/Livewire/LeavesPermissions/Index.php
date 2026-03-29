@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Livewire\WithFileUploads;
+use Athka\SystemSettings\Services\LeaveSettingService;
 
 use Athka\Employees\Models\Employee;
 use Athka\SystemSettings\Models\LeavePolicyYear;
@@ -47,12 +48,13 @@ class Index extends Component
     public $currentWorkflowTasks = [];
     public $currentRequest = null;
     public string $currentRequestType = 'leave';
+    public string $pendingSubTab = 'leaves';
 
     public ?string $employeeBranchColumn = null;
 
     protected $paginationTheme = 'tailwind';
 
-    public function mount(): void
+    public function mount(LeaveSettingService $leaveSettingService): void
     {
         $this->companyId = (int) $this->resolveCompanyId();
 
@@ -68,6 +70,14 @@ class Index extends Component
                 ->when($yearCoCol, fn ($q) => $q->where($yearCoCol, $this->companyId))
                 ->orderByDesc('year')
                 ->first();
+
+        if (!$year) {
+            $leaveSettingService->ensureDefaultConfiguration($this->companyId);
+            $year = LeavePolicyYear::query()
+                ->when($yearCoCol, fn ($q) => $q->where($yearCoCol, $this->companyId))
+                ->where('is_active', true)
+                ->first();
+        }
 
         $this->selectedYearId = $year ? (int) $year->id : null;
 
@@ -99,6 +109,11 @@ class Index extends Component
     public function setTab(string $tab): void
     {
         $this->tab = in_array($tab, ['balances', 'pending', 'history'], true) ? $tab : 'pending';
+    }
+
+    public function setPendingSubTab(string $subTab): void
+    {
+        $this->pendingSubTab = in_array($subTab, ['leaves', 'permissions', 'cuts', 'missions'], true) ? $subTab : 'leaves';
     }
 
     public function openWorkflow(string $type, int $id): void
