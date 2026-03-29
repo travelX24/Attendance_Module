@@ -62,7 +62,7 @@
                                     <td class="px-4 py-2 whitespace-nowrap">
                                         <div class="flex flex-col">
                                             <span class="font-bold text-gray-800">{{ \Carbon\Carbon::parse($day['date'])->translatedFormat('l') }}</span>
-                                            <span class="text-[10px] text-gray-400 group-hover:text-[color:var(--brand-via)] transition-colors">{{ $day['date'] }}</span>
+                                            <span class="text-[10px] text-gray-400 group-hover:text-[color:var(--brand-via)] transition-colors">{{ company_date($day['date']) }}</span>
                                         </div>
                                     </td>
                                     

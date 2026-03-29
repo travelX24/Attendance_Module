@@ -58,7 +58,7 @@
                                     </div>
                                     <span class="text-xs text-gray-500 font-medium flex items-center bg-white px-2 py-1 rounded-md border border-gray-100 shadow-sm">
                                         <i class="far fa-clock me-1.5 text-gray-400"></i>
-                                        {{ $log->created_at->format('Y/m/d H:i') }}
+                                        {{ company_date($log->created_at) }} {{ $log->created_at->format('H:i') }}
                                     </span>
                                 </div>
 
@@ -89,14 +89,14 @@
                                                 @if($startDate)
                                                     <div class="flex items-center gap-1.5 px-2 py-1 bg-gray-50 rounded border border-gray-100 text-gray-600">
                                                         <span class="font-semibold">{{ tr('From') }}:</span>
-                                                        <span class="font-mono text-gray-800">{{ $startDate }}</span>
+                                                        <span class="font-mono text-gray-800">{{ company_date($startDate) }}</span>
                                                     </div>
                                                 @endif
                                                 
                                                 @if($endDate)
                                                     <div class="flex items-center gap-1.5 px-2 py-1 bg-gray-50 rounded border border-gray-100 text-gray-600">
                                                         <span class="font-semibold">{{ tr('To') }}:</span>
-                                                        <span class="font-mono text-gray-800">{{ $endDate }}</span>
+                                                        <span class="font-mono text-gray-800">{{ company_date($endDate) }}</span>
                                                     </div>
                                                 @else
                                                     <div class="flex items-center gap-1.5 px-2 py-1 bg-purple-50 rounded border border-purple-100 text-purple-700">
