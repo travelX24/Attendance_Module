@@ -4,6 +4,7 @@ namespace Athka\Attendance\Http\Livewire\DailyAttendance\Traits;
 
 use Athka\Attendance\Models\AttendanceDailyLog;
 use Barryvdh\DomPDF\Facade\Pdf;
+use App\Services\ExcelExportService;
 
 trait WithAttendanceExports
 {
@@ -54,38 +55,26 @@ trait WithAttendanceExports
 
         $logs = $query->orderByDesc('attendance_date')->get();
 
+        $filename = "attendance_report_" . now()->format('Y-m-d');
         $headers = [
-            "Content-type" => "text/csv",
-            "Content-Disposition" => "attachment; filename=attendance_report_" . now()->format('Y-m-d') . ".csv",
-            "Pragma" => "no-cache",
-            "Cache-Control" => "must-revalidate, post-check=0, pre-check=0",
-            "Expires" => "0"
+            tr('Employee No'), tr('Employee Name'), tr('Date'), 
+            tr('Status'), tr('In'), tr('Out'), tr('Actual Hours'), tr('Compliance')
         ];
 
-        $callback = function() use ($logs) {
-            $file = fopen('php://output', 'w');
-            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF)); // UTF-8 BOM
-            fputcsv($file, [
-                tr('Employee No'), tr('Employee Name'), tr('Date'), 
-                tr('Status'), tr('In'), tr('Out'), tr('Actual Hours'), tr('Compliance')
-            ]);
+        $data = $logs->map(function ($row) {
+            return [
+                $row->employee->employee_no ?? '-',
+                $row->employee->name_ar ?? $row->employee->name_en ?? '-',
+                $row->attendance_date->toDateString(),
+                tr(ucfirst($row->attendance_status)),
+                $row->check_in_hm ?? '-',
+                $row->check_out_hm ?? '-',
+                $row->actual_hours,
+                $row->compliance_percentage . '%'
+            ];
+        })->toArray();
 
-            foreach ($logs as $row) {
-                fputcsv($file, [
-                    $row->employee->employee_no ?? '-',
-                    $row->employee->name_ar ?? $row->employee->name_en ?? '-',
-                    $row->attendance_date->toDateString(),
-                    tr($row->attendance_status),
-                    $row->check_in_hm ?? '-',
-                    $row->check_out_hm ?? '-',
-                    $row->actual_hours,
-                    $row->compliance_percentage . '%'
-                ]);
-            }
-            fclose($file);
-        };
-
-        return response()->stream($callback, 200, $headers);
+        return app(ExcelExportService::class)->export($filename, $headers, $data);
     }
 
     public function exportPDF()

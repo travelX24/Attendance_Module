@@ -4,6 +4,7 @@ namespace Athka\Attendance\Http\Livewire\DailyPenalties;
 
 use Livewire\Component;
 use Livewire\WithPagination;
+use App\Services\ExcelExportService;
 use Athka\Attendance\Models\AttendanceDailyLog;
 use Athka\Attendance\Models\AttendanceDailyPenalty;
 use Athka\Employees\Models\Employee;
@@ -377,42 +378,27 @@ class Index extends Component
             ])->layout('layouts.company-admin');
     }
 
-    public function exportExcel()
+    public function exportExcel(ExcelExportService $exporter)
     {
         $penalties = $this->getPenaltiesQuery()->get();
-        $filename = "daily_penalties_" . now()->format('YmdHis') . ".csv";
+        $filename = "daily_penalties_" . now()->format('YmdHis');
         
-        $headers = [
-            "Content-type" => "text/csv; charset=UTF-8",
-            "Content-Disposition" => "attachment; filename=$filename",
-            "Pragma" => "no-cache",
-            "Cache-Control" => "must-revalidate, post-check=0, pre-check=0",
-            "Expires" => "0"
-        ];
+        $headers = [tr('Employee'), tr('Employee No'), tr('Date'), tr('Violation'), tr('Minutes'), tr('Amount'), tr('Net'), tr('Status')];
 
-        $columns = [tr('Employee'), tr('Employee No'), tr('Date'), tr('Violation'), tr('Minutes'), tr('Amount'), tr('Net'), tr('Status')];
+        $data = $penalties->map(function ($p) {
+            return [
+                $p->employee->name_ar ?? $p->employee->name_en,
+                $p->employee->employee_no,
+                $p->attendance_date->format('Y-m-d'),
+                tr(ucfirst($p->violation_type)),
+                $p->violation_minutes,
+                $p->calculated_amount,
+                $p->net_amount,
+                tr(ucfirst($p->status))
+            ];
+        })->toArray();
 
-        $callback = function() use($penalties, $columns) {
-            $file = fopen('php://output', 'w');
-            fprintf($file, chr(0xEF).chr(0xBB).chr(0xBF)); // BOM for Arabic
-            fputcsv($file, $columns);
-
-            foreach ($penalties as $p) {
-                fputcsv($file, [
-                    $p->employee->name_ar ?? $p->employee->name_en,
-                    $p->employee->employee_no,
-                    $p->attendance_date->format('Y-m-d'),
-                    $p->violation_type,
-                    $p->violation_minutes,
-                    $p->calculated_amount,
-                    $p->net_amount,
-                    $p->status
-                ]);
-            }
-            fclose($file);
-        };
-
-        return response()->stream($callback, 200, $headers);
+        return $exporter->export($filename, $headers, $data);
     }
 
     public function exportPdf()
