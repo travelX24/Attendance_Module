@@ -66,11 +66,11 @@ trait WithRequestApprovals
             
             if (!($content['ok'] ?? false)) {
                 $err = $content['message'] ?? $content['error'] ?? 'Approval failed';
-                session()->flash('error', $err);
+                $this->dispatch('toast', ['type' => 'error', 'message' => $err]);
                 return;
             }
         } catch (\Throwable $e) {
-            session()->flash('error', $e->getMessage());
+            $this->dispatch('toast', ['type' => 'error', 'message' => $e->getMessage()]);
             return;
         }
 
@@ -95,7 +95,7 @@ trait WithRequestApprovals
             }
         }
 
-        session()->flash('success', tr('Saved successfully'));
+        $this->dispatch('toast', ['type' => 'success', 'message' => tr('Saved successfully')]);
         $this->resetPage('leavePage');
     }
 
@@ -122,11 +122,11 @@ trait WithRequestApprovals
             
             if (!($content['ok'] ?? false)) {
                 $err = $content['message'] ?? $content['error'] ?? 'Approval failed';
-                session()->flash('error', $err);
+                $this->dispatch('toast', ['type' => 'error', 'message' => $err]);
                 return;
             }
         } catch (\Throwable $e) {
-            session()->flash('error', $e->getMessage());
+            $this->dispatch('toast', ['type' => 'error', 'message' => $e->getMessage()]);
             return;
         }
 
@@ -146,7 +146,7 @@ trait WithRequestApprovals
             ], (int) $row->employee_id);
         }
 
-        session()->flash('success', tr('Saved successfully'));
+        $this->dispatch('toast', ['type' => 'success', 'message' => tr('Saved successfully')]);
         $this->resetPage('permPage');
     }
 
@@ -180,7 +180,7 @@ trait WithRequestApprovals
             'previous_status' => $wasApproved ? 'approved' : 'pending'
         ], (int) $row->employee_id);
 
-        session()->flash('success', tr('Saved successfully'));
+        $this->dispatch('toast', ['type' => 'success', 'message' => tr('Saved successfully')]);
         $this->resetPage('historyPermPage');
     }
 
@@ -221,7 +221,7 @@ trait WithRequestApprovals
             );
         }
 
-        session()->flash('success', tr('Saved successfully'));
+        $this->dispatch('toast', ['type' => 'success', 'message' => tr('Saved successfully')]);
         $this->resetPage('historyLeavePage');
     }
 
@@ -284,11 +284,11 @@ trait WithRequestApprovals
                 
                 if (!($content['ok'] ?? false)) {
                     $err = $content['message'] ?? $content['error'] ?? 'Rejection failed';
-                    session()->flash('error', $err);
+                    $this->dispatch('toast', ['type' => 'error', 'message' => $err]);
                     return;
                 }
             } catch (\Throwable $e) {
-                session()->flash('error', $e->getMessage());
+                $this->dispatch('toast', ['type' => 'error', 'message' => $e->getMessage()]);
                 return;
             }
 
@@ -306,7 +306,7 @@ trait WithRequestApprovals
         };
         $this->resetPage($page);
 
-        session()->flash('success', tr('Saved successfully'));
+        $this->dispatch('toast', ['type' => 'success', 'message' => tr('Saved successfully')]);
         $this->closeReject();
     }
 
@@ -333,11 +333,11 @@ trait WithRequestApprovals
             
             if (!($content['ok'] ?? false)) {
                 $err = $content['message'] ?? $content['error'] ?? 'Approval failed';
-                session()->flash('error', $err);
+                $this->dispatch('toast', ['type' => 'error', 'message' => $err]);
                 return;
             }
         } catch (\Throwable $e) {
-            session()->flash('error', $e->getMessage());
+            $this->dispatch('toast', ['type' => 'error', 'message' => $e->getMessage()]);
             return;
         }
 
@@ -347,7 +347,7 @@ trait WithRequestApprovals
             $this->logAction('mission', (int) $row->id, 'approved', [], (int) $row->employee_id);
         }
 
-        session()->flash('success', tr('Saved successfully'));
+        $this->dispatch('toast', ['type' => 'success', 'message' => tr('Saved successfully')]);
         $this->resetPage('missionPage');
     }
 
@@ -374,11 +374,11 @@ trait WithRequestApprovals
             
             if (!($content['ok'] ?? false)) {
                 $err = $content['message'] ?? $content['error'] ?? 'Approval failed';
-                session()->flash('error', $err);
+                $this->dispatch('toast', ['type' => 'error', 'message' => $err]);
                 return;
             }
         } catch (\Throwable $e) {
-            session()->flash('error', $e->getMessage());
+            $this->dispatch('toast', ['type' => 'error', 'message' => $e->getMessage()]);
             return;
         }
 
@@ -405,7 +405,7 @@ trait WithRequestApprovals
             $cutEnd    = Carbon::parse($cut->cut_end_date)->startOfDay();
 
             if ($cutEnd->lt($origStart) || $cutEnd->gte($origEnd)) {
-                session()->flash('error', tr('Invalid date range'));
+                $this->dispatch('toast', ['type' => 'error', 'message' => tr('Invalid date range')]);
                 return;
             }
 
@@ -465,7 +465,7 @@ trait WithRequestApprovals
             });
         }
 
-        session()->flash('success', tr('Saved successfully'));
+        $this->dispatch('toast', ['type' => 'success', 'message' => tr('Saved successfully')]);
         $this->resetPage('cutPage');
     }
 

@@ -77,18 +77,14 @@ trait WithMissionRequests
 
         $mission = AttendanceMissionRequest::create($payload);
 
-        // âœ… Trigger task generation
+        // ✅ Trigger task generation
         try {
-            $controller = app(\Athka\SystemSettings\Http\Controllers\Api\Employee\ApprovalInboxController::class);
-            $method = new \ReflectionMethod(get_class($controller), 'requestSource');
-            $method->setAccessible(true);
-            $src = $method->invoke($controller, 'missions');
+            $approvalService = app(\Athka\SystemSettings\Services\Approvals\ApprovalService::class);
+            $src = $approvalService->getRequestSource('missions');
             if ($src) {
-                $controller->ensureTasksForRequest($src, $mission->id);
+                $approvalService->ensureTasksForRequest($src, $mission, $this->companyId);
             }
-        } catch (\Throwable $e) {
-            // ignore
-        }
+        } catch (\Throwable $e) {}
 
         session()->flash('success', tr('Saved successfully'));
         $this->closeCreateMission();

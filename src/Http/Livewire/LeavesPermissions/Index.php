@@ -763,12 +763,12 @@ private function allowedBranchIds(): array
         $employeeId = auth()->user()->employee_id;
         if (!$employeeId) return $q;
 
-        // âœ… NEW: Ensure tasks exist for all pending requests of this type
+        // ✅ NEW: Ensure tasks exist for all pending requests of this type
         try {
-            $controller = app(\Athka\SystemSettings\Http\Controllers\Api\Employee\ApprovalInboxController::class);
-            $src = $controller->requestSource($type);
+            $approvalService = app(\Athka\SystemSettings\Services\Approvals\ApprovalService::class);
+            $src = $approvalService->getRequestSource($type);
             if ($src) {
-                $controller->ensureTasksForPendingRequests($src);
+                $approvalService->ensureTasksForPendingRequests($src, $this->companyId);
             }
         } catch (\Throwable $e) {}
 

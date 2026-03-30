@@ -110,29 +110,30 @@ trait WithLeaveRequests
 
     public function getCreateLeavePoliciesProperty()
     {
-        $empId = (int) $this->employee_id;
-        if ($empId <= 0) return collect();
-
-        $allowed = $this->lpAllowedBranchIdsSafe();
-        $branchCol = $this->employeeBranchColumn ?: $this->detectEmployeeBranchColumn();
-
-        $employee = Employee::query()
-            ->when($this->employeeCompanyColumn, fn ($q) => $q->where($this->employeeCompanyColumn, $this->companyId))
-            ->when($branchCol && !empty($allowed), fn ($q) => $q->whereIn($branchCol, $allowed))
-            ->find($empId);
-
-        if (!$employee) return collect();
-
-        $gender = $this->normalizeEmployeeGender($employee);
-
         $companyCol = $this->leavePoliciesCompanyColumn();
-
         $q = LeavePolicy::query();
         if ($companyCol) $q->where($companyCol, $this->companyId);
 
         if (Schema::hasColumn('leave_policies', 'is_active')) $q->where('is_active', true);
 
         $this->applyLeavePolicyYearFilter($q);
+
+        $empId = (int) $this->employee_id;
+        if ($empId <= 0) {
+            return $q->orderBy('name')->get();
+        }
+
+        $allowed = $this->lpAllowedBranchIdsSafe();
+        $branchCol = $this->employeeBranchColumn ?: $this->detectEmployeeBranchColumn();
+
+        $employee = Employee::query()
+            ->when($this->employeeCompanyColumn, fn ($q2) => $q2->where($this->employeeCompanyColumn, $this->companyId))
+            ->when($branchCol && !empty($allowed), fn ($q2) => $q2->whereIn($branchCol, $allowed))
+            ->find($empId);
+
+        if (!$employee) return collect();
+
+        $gender = $this->normalizeEmployeeGender($employee);
 
         if (Schema::hasColumn('leave_policies', 'gender') && in_array($gender, ['male', 'female'], true)) {
             $q->whereIn('gender', ['all', $gender]);
@@ -271,8 +272,14 @@ trait WithLeaveRequests
     {
         $this->ensureCanManage();
 
+        // 0) Early validation to avoid 404/500 before policy-specific rules
+        $this->validate([
+            'employee_id' => 'required|integer|min:1',
+            'leave_policy_id' => 'required|integer|min:1',
+        ]);
+
         // 1) Validate employee exists (same company)
-      $allowed = $this->lpAllowedBranchIdsSafe();
+        $allowed = $this->lpAllowedBranchIdsSafe();
         $branchCol = $this->employeeBranchColumn ?: $this->detectEmployeeBranchColumn();
 
         $employee = Employee::query()
@@ -433,7 +440,7 @@ trait WithLeaveRequests
             'requested_days' => $requestedDays,
             'reason' => $data['reason'] ?? null,
 
-            // âœ… NEW fields
+            // ✅ NEW fields
             'duration_unit' => $this->create_leave_duration_unit,
             'half_day_part' => $halfPart,
             'from_time' => $fromTime,
@@ -454,6 +461,17 @@ trait WithLeaveRequests
             'replacement_employee_id' => $data['replacement_employee_id'] ?? null,
             'replacement_status' => !empty($data['replacement_employee_id']) ? 'pending' : null,
         ]);
+
+        // ✅ Integrate with Approval Workflow
+        try {
+            $approvalService = app(\Athka\SystemSettings\Services\Approvals\ApprovalService::class);
+            $src = $approvalService->getRequestSource('leaves');
+            if ($src) {
+                $approvalService->ensureTasksForRequest($src, $row, (int) $this->companyId);
+            }
+        } catch (\Exception $e) {
+            \Log::error("Approval Task Generation Error (Leave): " . $e->getMessage());
+        }
 
         $this->logAction('leave', (int) $row->id, 'created', [
             'requested_days' => $requestedDays,

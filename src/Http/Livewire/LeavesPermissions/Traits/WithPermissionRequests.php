@@ -237,9 +237,20 @@ trait WithPermissionRequests
         if (Schema::hasColumn($permTable, 'requested_by')) $payload['requested_by'] = auth()->id();
         if (Schema::hasColumn($permTable, 'requested_at')) $payload['requested_at'] = now();
 
-        AttendancePermissionRequest::create($payload);
+        $row = AttendancePermissionRequest::create($payload);
 
-        // âœ… activity log (Ù„Ùˆ Ø¹Ù†Ø¯Ùƒ logAction)
+        // ✅ Integrate with Approval Workflow
+        try {
+            $approvalService = app(\Athka\SystemSettings\Services\Approvals\ApprovalService::class);
+            $src = $approvalService->getRequestSource('permissions');
+            if ($src) {
+                $approvalService->ensureTasksForRequest($src, $row, (int) $this->companyId);
+            }
+        } catch (\Exception $e) {
+            \Log::error("Approval Task Generation Error (Permission): " . $e->getMessage());
+        }
+
+        // ✅ activity log (لو عندك logAction)
         if (method_exists($this, 'logAction')) {
             $this->logAction('permission', 0, 'created', ['minutes' => $mins], (int) $employee->id);
         }

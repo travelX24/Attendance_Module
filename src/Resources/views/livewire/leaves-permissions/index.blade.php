@@ -363,8 +363,12 @@
                                             <x-ui.primary-button
                                                 type="button"
                                                 wire:click.prevent="approveLeave({{ $r->id }})"
-                                                class="px-3 py-1.5 text-xs font-bold bg-green-600 hover:bg-green-700 text-white"
+                                                loading="approveLeave({{ $r->id }})"
+                                                :full-width="false"
+                                                size="sm"
+                                                class="px-5 py-2.5 text-xs font-bold"
                                             >
+                                                <i class="fas fa-check me-2"></i>
                                                 {{ tr('Approve') }}
                                             </x-ui.primary-button>
 
@@ -380,7 +384,7 @@
                                             <x-ui.secondary-button
                                                 type="button"
                                                 wire:click.prevent="openReject('leave', {{ $r->id }})"
-                                                class="px-3 py-1.5 text-xs font-bold !bg-red-600 hover:!bg-red-700 !text-white !border-red-600"
+                                                class="px-5 py-2.5 text-xs font-bold !text-red-600 !border-red-600 hover:!bg-red-50"
                                             >
                                                 {{ tr('Reject') }}
                                             </x-ui.secondary-button>
@@ -465,8 +469,12 @@
                                             <x-ui.primary-button
                                                 type="button"
                                                 wire:click.prevent="approvePermission({{ $r->id }})"
-                                                class="px-3 py-1.5 text-xs font-bold bg-green-600 hover:bg-green-700 text-white"
+                                                loading="approvePermission({{ $r->id }})"
+                                                :full-width="false"
+                                                size="sm"
+                                                class="px-5 py-2.5 text-xs font-bold"
                                             >
+                                                <i class="fas fa-check me-2"></i>
                                                 {{ tr('Approve') }}
                                             </x-ui.primary-button>
 
@@ -482,7 +490,7 @@
                                             <x-ui.secondary-button
                                                 type="button"
                                                 wire:click.prevent="openReject('permission', {{ $r->id }})"
-                                                class="px-3 py-1.5 text-xs font-bold !bg-red-600 hover:!bg-red-700 !text-white !border-red-600"
+                                                class="px-5 py-2.5 text-xs font-bold !text-red-600 !border-red-600 hover:!bg-red-50"
                                             >
                                                 {{ tr('Reject') }}
                                             </x-ui.secondary-button>
@@ -564,15 +572,19 @@
                                             <x-ui.primary-button
                                                 type="button"
                                                 wire:click.prevent="approveCutLeave({{ (int) $row->id }})"
-                                                class="px-3 py-1.5 text-xs font-bold bg-green-600 hover:bg-green-700 text-white"
+                                                loading="approveCutLeave({{ (int) $row->id }})"
+                                                :full-width="false"
+                                                size="sm"
+                                                class="px-5 py-2.5 text-xs font-bold"
                                             >
+                                                <i class="fas fa-check me-2"></i>
                                                 {{ tr('Approve') }}
                                             </x-ui.primary-button>
 
                                             <x-ui.secondary-button
                                                 type="button"
                                                 wire:click.prevent="openReject('cut_leave', {{ (int) $row->id }})"
-                                                class="px-3 py-1.5 text-xs font-bold !bg-red-600 hover:!bg-red-700 !text-white !border-red-600"
+                                                class="px-5 py-2.5 text-xs font-bold !text-red-600 !border-red-600 hover:!bg-red-50"
                                             >
                                                 {{ tr('Reject') }}
                                             </x-ui.secondary-button>
@@ -662,8 +674,12 @@
                                             <x-ui.primary-button
                                                 type="button"
                                                 wire:click.prevent="approveMission({{ $r->id }})"
-                                                class="px-3 py-1.5 text-xs font-bold bg-green-600 hover:bg-green-700 text-white"
+                                                loading="approveMission({{ $r->id }})"
+                                                :full-width="false"
+                                                size="sm"
+                                                class="px-5 py-2.5 text-xs font-bold"
                                             >
+                                                <i class="fas fa-check me-2"></i>
                                                 {{ tr('Approve') }}
                                             </x-ui.primary-button>
 
@@ -679,7 +695,7 @@
                                             <x-ui.secondary-button
                                                 type="button"
                                                 wire:click.prevent="openReject('mission', {{ $r->id }})"
-                                                class="px-3 py-1.5 text-xs font-bold !bg-red-600 hover:!bg-red-700 !text-white !border-red-600"
+                                                class="px-5 py-2.5 text-xs font-bold !text-red-600 !border-red-600 hover:!bg-red-50"
                                             >
                                                 {{ tr('Reject') }}
                                             </x-ui.secondary-button>
@@ -1341,9 +1357,26 @@
 
         <x-slot name="footer">
             <div class="flex items-center justify-end gap-3">
-                <x-ui.secondary-button type="button" wire:click="closeCreateLeave">{{ tr('Cancel') }}</x-ui.secondary-button>
+                <x-ui.secondary-button 
+                    type="button" 
+                    wire:click="closeCreateLeave"
+                    :full-width="false"
+                    size="sm"
+                >
+                    {{ tr('Cancel') }}
+                </x-ui.secondary-button>
+
                 @can('attendance.manage')
-                <x-ui.primary-button type="button" wire:click="saveLeave" class="!px-8">{{ tr('Save') }}</x-ui.primary-button>
+                <x-ui.primary-button 
+                    type="button" 
+                    wire:click="saveLeave" 
+                    :loading="'saveLeave'"
+                    :full-width="false"
+                    size="sm"
+                    class="!px-10"
+                >
+                    {{ tr('Save') }}
+                </x-ui.primary-button>
                 @endcan
             </div>
         </x-slot>
@@ -1426,9 +1459,26 @@
 
         <x-slot name="footer">
             <div class="flex items-center justify-end gap-3">
-                <x-ui.secondary-button type="button" wire:click="closeCreatePermission">{{ tr('Cancel') }}</x-ui.secondary-button>
+                <x-ui.secondary-button 
+                    type="button" 
+                    wire:click="closeCreatePermission"
+                    :full-width="false"
+                    size="sm"
+                >
+                    {{ tr('Cancel') }}
+                </x-ui.secondary-button>
+
                 @can('attendance.manage')
-                <x-ui.primary-button type="button" wire:click="savePermission" class="!px-8">{{ tr('Save') }}</x-ui.primary-button>
+                <x-ui.primary-button 
+                    type="button" 
+                    wire:click="savePermission" 
+                    :loading="'savePermission'"
+                    :full-width="false"
+                    size="sm"
+                    class="!px-10"
+                >
+                    {{ tr('Save') }}
+                </x-ui.primary-button>
                 @endcan
             </div>
         </x-slot>
@@ -1447,8 +1497,25 @@
 
         <x-slot name="footer">
             <div class="flex items-center justify-end gap-3">
-                <x-ui.secondary-button type="button" wire:click="closeReject">{{ tr('Cancel') }}</x-ui.secondary-button>
-                <x-ui.primary-button type="button" wire:click="confirmReject" class="!px-8">{{ tr('Confirm') }}</x-ui.primary-button>
+                <x-ui.secondary-button 
+                    type="button" 
+                    wire:click="closeReject"
+                    :full-width="false"
+                    size="sm"
+                >
+                    {{ tr('Cancel') }}
+                </x-ui.secondary-button>
+
+                <x-ui.primary-button 
+                    type="button" 
+                    wire:click="confirmReject" 
+                    :loading="'confirmReject'"
+                    :full-width="false"
+                    size="sm"
+                    class="!px-10"
+                >
+                    {{ tr('Confirm') }}
+                </x-ui.primary-button>
             </div>
         </x-slot>
     </x-ui.modal>
@@ -2165,9 +2232,26 @@
 
         <x-slot name="footer">
             <div class="flex items-center justify-end gap-3">
-                <x-ui.secondary-button type="button" wire:click="closeCreateMission">{{ tr('Cancel') }}</x-ui.secondary-button>
+                <x-ui.secondary-button 
+                    type="button" 
+                    wire:click="closeCreateMission"
+                    :full-width="false"
+                    size="sm"
+                >
+                    {{ tr('Cancel') }}
+                </x-ui.secondary-button>
+
                 @can('attendance.manage')
-                <x-ui.primary-button wire:click="saveMission" class="!px-8">{{ tr('Save') }}</x-ui.primary-button>
+                <x-ui.primary-button 
+                    type="button" 
+                    wire:click="saveMission" 
+                    :loading="'saveMission'"
+                    :full-width="false"
+                    size="sm"
+                    class="!px-10"
+                >
+                    {{ tr('Save') }}
+                </x-ui.primary-button>
                 @endcan
             </div>
         </x-slot>
