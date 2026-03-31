@@ -364,6 +364,36 @@
                         />
                     </div>
 
+                    {{-- Clear Filters Button --}}
+                    <div
+                        x-data="{
+                            hasFilters() {
+                                return ($wire.search && $wire.search.trim() !== '') ||
+                                       $wire.department_id !== 'all' ||
+                                       $wire.schedule_type !== 'all' ||
+                                       $wire.work_schedule_id !== 'all' ||
+                                       $wire.filterWarning !== 'all' ||
+                                       ($wire.location_id !== 'all' && $wire.location_id != '{{ auth()->user()->branch_id ?: 0 }}');
+                            }
+                        }"
+                        x-show="hasFilters()"
+                        x-transition
+                        class="flex items-center"
+                    >
+                        <button
+                            type="button"
+                            wire:click="clearAllFilters"
+                            wire:loading.attr="disabled"
+                            wire:target="clearAllFilters"
+                            class="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:text-gray-900 transition-colors disabled:opacity-50"
+                        >
+                            <i class="fas fa-times" wire:loading.remove wire:target="clearAllFilters"></i>
+                            <i class="fas fa-spinner fa-spin" wire:loading wire:target="clearAllFilters"></i>
+                            <span wire:loading.remove wire:target="clearAllFilters">{{ tr('Clear all filters') }}</span>
+                            <span wire:loading wire:target="clearAllFilters">{{ tr('Clearing...') }}</span>
+                        </button>
+                    </div>
+
                 </div>
             </div>
         </div>

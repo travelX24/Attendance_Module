@@ -268,6 +268,40 @@
                                 :disabled="!auth()->user()->can('attendance.manage')"
                             />
                         </div>
+
+                        {{-- Clear Filters Button --}}
+                        <div
+                            x-data="{
+                                hasFilters() {
+                                    return ($wire.search && $wire.search.trim() !== '') ||
+                                           $wire.attendance_status_filter !== 'all' ||
+                                           $wire.approval_status_filter !== 'all' ||
+                                           $wire.work_schedule_id !== 'all' ||
+                                           $wire.job_title_id !== 'all' ||
+                                           $wire.department_id !== 'all' ||
+                                           ($wire.branch_id !== 'all' && $wire.branch_id != '{{ auth()->user()->branch_id ?: 0 }}') ||
+                                           $wire.compliance_from !== '' ||
+                                           $wire.compliance_to !== '' ||
+                                           ($wire.view_mode === 'daily' ? ($wire.date_from !== '{{ now()->toDateString() }}') : ($wire.date_from !== '{{ now()->startOfMonth()->toDateString() }}' || $wire.date_to !== '{{ now()->toDateString() }}'));
+                                }
+                            }"
+                            x-show="hasFilters()"
+                            x-transition
+                            class="flex items-center"
+                        >
+                            <button
+                                type="button"
+                                wire:click="clearAllFilters"
+                                wire:loading.attr="disabled"
+                                wire:target="clearAllFilters"
+                                class="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:text-gray-900 transition-colors disabled:opacity-50"
+                            >
+                                <i class="fas fa-times" wire:loading.remove wire:target="clearAllFilters"></i>
+                                <i class="fas fa-spinner fa-spin" wire:loading wire:target="clearAllFilters"></i>
+                                <span wire:loading.remove wire:target="clearAllFilters">{{ tr('Clear all filters') }}</span>
+                                <span wire:loading wire:target="clearAllFilters">{{ tr('Clearing...') }}</span>
+                            </button>
+                        </div>
                 </div>
 
                 {{-- Second Row: Action Buttons --}}

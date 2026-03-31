@@ -41,7 +41,7 @@
 
 
 @section('topbar-left-content')
-    <x-ui.page-header title="{{ tr('Leaves & Permissions') }}" subtitle="{{ tr('Manage requests, approvals, and balances') }}" />
+    <x-ui.page-header title="{{ tr('Leaves and Permissions') }}" subtitle="{{ tr('Manage requests, approvals, and balances') }}" />
 @endsection
 
 <div class="p-6 space-y-6" dir="{{ $dir }}" wire:poll.15s>
@@ -207,7 +207,31 @@
                     </div>
                 @endif
             </div>
+
         </div>
+
+        {{-- Clear Filters Button --}}
+        <div x-data="{
+            hasFilters() {
+                return ($wire.search && $wire.search.trim() !== '') ||
+                    ($wire.branchId && $wire.branchId !== '') ||
+                    ($wire.departmentId && $wire.departmentId !== '') ||
+                    ($wire.jobTitleId && $wire.jobTitleId !== '') ||
+                    ($wire.filterLeavePolicyId && $wire.filterLeavePolicyId !== '') ||
+                    ($wire.fromDate && $wire.fromDate !== '') ||
+                    ($wire.toDate && $wire.toDate !== '') ||
+                    ($wire.historyStatus && $wire.historyStatus !== '');
+            }
+        }" x-show="hasFilters()" x-transition class="flex items-center justify-end mt-4 pt-4 border-t border-gray-100">
+            <button type="button" wire:click="clearAllFilters" wire:loading.attr="disabled"
+                wire:target="clearAllFilters"
+                class="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:text-gray-900 transition-colors disabled:opacity-50 cursor-pointer">
+                <i class="fas fa-times" wire:loading.remove wire:target="clearAllFilters"></i>
+                <i class="fas fa-spinner fa-spin" wire:loading wire:target="clearAllFilters"></i>
+                <span wire:loading.remove wire:target="clearAllFilters">{{ tr('Clear filters') }}</span>
+            </button>
+        </div>
+
     </x-ui.card>
 
     {{-- Pending Section --}}

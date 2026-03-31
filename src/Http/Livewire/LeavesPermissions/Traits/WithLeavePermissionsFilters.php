@@ -61,6 +61,20 @@ trait WithLeavePermissionsFilters
 
         $this->resetAllPages();
     }
+
+    public function clearAllFilters(): void
+    {
+        $this->search = '';
+        $this->departmentId = null;
+        $this->jobTitleId = null;
+        $this->filterLeavePolicyId = null;
+        $this->fromDate = '';
+        $this->toDate = '';
+        $this->historyStatus = '';
+        $this->branchId = '';
+        $this->resetAllPages();
+    }
+
     public function getCompanyIdProperty(): int
     {
         return $this->resolveCompanyId();

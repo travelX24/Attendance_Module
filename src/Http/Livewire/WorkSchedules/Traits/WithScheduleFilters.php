@@ -107,6 +107,26 @@ trait WithScheduleFilters
         $this->loadStats();
     }
 
+    public function clearAllFilters()
+    {
+        $this->search = '';
+        $this->department_id = 'all';
+        $this->schedule_type = 'all';
+        $this->work_schedule_id = 'all';
+        $this->filterWarning = 'all';
+
+        // Reset location if forced or default
+        if (!empty($this->forcedLocationId)) {
+            $this->location_id = (string) $this->forcedLocationId;
+        } else {
+            $userBranchId = (int) (auth()->user()->branch_id ?? 0);
+            $this->location_id = $userBranchId ?: 'all';
+        }
+
+        $this->resetPage();
+        $this->loadStats();
+    }
+
 
     public function loadStats()
     {

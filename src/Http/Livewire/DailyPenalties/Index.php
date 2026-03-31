@@ -94,6 +94,28 @@ class Index extends Component
         $this->loadStats();
     }
 
+    public function clearAllFilters()
+    {
+        $this->search = '';
+        $this->date_from = '';
+        $this->date_to = '';
+        $this->violation_type_filter = 'all';
+        $this->status_filter = 'all';
+        $this->department_id = 'all';
+        $this->job_title_id = 'all';
+
+        $userBranchId = (int) (auth()->user()->branch_id ?? 0);
+        $allowed = $this->allowedBranchIds();
+
+        if (!empty($allowed)) {
+            $this->branch_id = in_array($userBranchId, $allowed, true) ? $userBranchId : 'all';
+        } else {
+            $this->branch_id = $userBranchId ?: 'all';
+        }
+
+        $this->refreshData();
+    }
+
     public function updatedDateFrom() { $this->refreshData(); }
     public function updatedDateTo() { $this->refreshData(); }
     public function updatedViolationTypeFilter() { $this->refreshData(); }

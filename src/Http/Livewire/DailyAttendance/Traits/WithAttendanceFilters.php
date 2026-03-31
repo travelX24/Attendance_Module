@@ -125,6 +125,40 @@ trait WithAttendanceFilters
         $this->resetPage();
     }
 
+    public function clearAllFilters()
+    {
+        $this->search = '';
+        $this->attendance_status_filter = 'all';
+        $this->approval_status_filter = 'all';
+        $this->work_schedule_id = 'all';
+        $this->compliance_from = '';
+        $this->compliance_to = '';
+        $this->department_id = 'all';
+        $this->job_title_id = 'all';
+
+        $userBranchId = (int) (auth()->user()->branch_id ?? 0);
+        $allowed = $this->allowedBranchIds();
+
+        if (!empty($allowed)) {
+            $this->branch_id = in_array($userBranchId, $allowed, true) ? $userBranchId : 'all';
+        } else {
+            $this->branch_id = $userBranchId ?: 'all';
+        }
+
+        // Reset dates based on view mode
+        if ($this->view_mode === 'daily') {
+            $this->date_from = now()->toDateString();
+            $this->date_to = now()->toDateString();
+        } else {
+            $this->date_from = now()->startOfMonth()->toDateString();
+            $this->date_to = now()->toDateString();
+        }
+
+        $this->resetPage();
+        if (method_exists($this, 'loadStats')) $this->loadStats();
+        if (method_exists($this, 'loadWarnings')) $this->loadWarnings();
+    }
+
     public function getAttendanceLogsProperty()
     {
         $companyId = auth()->user()->saas_company_id;

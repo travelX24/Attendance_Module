@@ -10,6 +10,7 @@ use Athka\SystemSettings\Models\Department;
 use Athka\Attendance\Models\EmployeeWorkSchedule;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Validation\ValidationException;
 
 use Athka\Attendance\Http\Livewire\WorkSchedules\Traits\WithScheduleFilters;
 use Athka\Attendance\Http\Livewire\WorkSchedules\Traits\WithScheduleAssignments;
@@ -430,6 +431,9 @@ class Index extends Component
 
             $type = (string) ($r->assignment_type ?? '');
 
+            $isFuture = $start && $start->gt($today);
+            $isDefault = ((int) $r->id === (int) $oldestId);
+
             return [
                 'id' => (int) $r->id,
                 'schedule_name' => (string) ($r->schedule_name ?: ('#' . $r->work_schedule_id)),
@@ -438,10 +442,9 @@ class Index extends Component
                 'is_active' => (int) $r->is_active,
                 'assignment_type' => $type,
                 'status' => $status,
-                'can_edit' => ($type !== 'rotation') || ($status === 'future'),
-                'can_delete' => ((int) $r->id !== (int) $oldestId),
-
-                        ];
+                'can_edit' => $isDefault || $isFuture,
+                'can_delete' => !$isDefault && $isFuture,
+            ];
         })->toArray();
 
         $this->showScheduleEyeModal = true;
@@ -515,9 +518,25 @@ class Index extends Component
         $newStart = Carbon::parse($startYmd)->startOfDay();
         $newEnd   = $endYmd ? Carbon::parse($endYmd)->startOfDay() : null;
 
+        $originalStart = $row->start_date ? Carbon::parse($row->start_date)->startOfDay() : null;
+        
+        $oldestId = EmployeeWorkSchedule::where('employee_id', $row->employee_id)
+            ->where('saas_company_id', $companyId)
+            ->orderBy('start_date', 'asc')
+            ->orderBy('id', 'asc')
+            ->value('id');
+        
+        $isDefaultAssignment = ((int) $row->id === (int) $oldestId);
+
+        if (!$isDefaultAssignment && $originalStart && $originalStart->lte(Carbon::today())) {
+            throw ValidationException::withMessages([
+                'editScheduleForm.start_date' => tr('Cannot edit non-default schedules for today or past dates.'),
+            ]);
+        }
+
         if ((string) ($row->assignment_type ?? '') === 'rotation') {
             if ($newStart->lte(Carbon::today())) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
+                throw ValidationException::withMessages([
                     'editScheduleForm.start_date' => tr('Rotation edit here is allowed for future schedules only.'),
                 ]);
             }
@@ -590,6 +609,29 @@ class Index extends Component
             ->first();
 
         if ($row) {
+            $originalStart = $row->start_date ? Carbon::parse($row->start_date)->startOfDay() : null;
+            if ($originalStart && $originalStart->lte(Carbon::today())) {
+                $this->dispatch('toast', [
+                    'type' => 'error',
+                    'message' => tr('Cannot delete schedules for today or past dates.'),
+                ]);
+                return;
+            }
+
+            $oldestId = EmployeeWorkSchedule::where('employee_id', $row->employee_id)
+                ->where('saas_company_id', $companyId)
+                ->orderBy('start_date', 'asc')
+                ->orderBy('id', 'asc')
+                ->value('id');
+
+            if ((int) $row->id === (int) $oldestId) {
+                $this->dispatch('toast', [
+                    'type' => 'error',
+                    'message' => tr('Default schedule cannot be deleted.'),
+                ]);
+                return;
+            }
+
             $employeeId = $row->employee_id;
             $before = $row->toArray();
             

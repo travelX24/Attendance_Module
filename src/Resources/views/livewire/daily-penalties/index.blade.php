@@ -171,6 +171,38 @@
                     </div>
                 </div>
 
+                {{-- Clear Filters Button --}}
+                <div
+                    x-data="{
+                        hasFilters() {
+                            return ($wire.search && $wire.search.trim() !== '') ||
+                                   ($wire.date_from && $wire.date_from !== '') ||
+                                   ($wire.date_to && $wire.date_to !== '') ||
+                                   ($wire.violation_type_filter && $wire.violation_type_filter !== 'all') ||
+                                   ($wire.status_filter && $wire.status_filter !== 'all') ||
+                                   ($wire.branch_id && $wire.branch_id !== 'all' && $wire.branch_id !== '') ||
+                                   ($wire.department_id && $wire.department_id !== 'all') ||
+                                   ($wire.job_title_id && $wire.job_title_id !== 'all');
+                        }
+                    }"
+                    x-show="hasFilters()"
+                    x-transition
+                    class="flex items-center justify-end mt-3 mb-1"
+                >
+                    <button
+                        type="button"
+                        wire:click="clearAllFilters"
+                        wire:loading.attr="disabled"
+                        wire:target="clearAllFilters"
+                        class="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:text-gray-900 transition-colors disabled:opacity-50"
+                    >
+                        <i class="fas fa-times" wire:loading.remove wire:target="clearAllFilters"></i>
+                        <i class="fas fa-spinner fa-spin" wire:loading wire:target="clearAllFilters"></i>
+                        <span wire:loading.remove wire:target="clearAllFilters">{{ tr('Clear all filters') }}</span>
+                        <span wire:loading wire:target="clearAllFilters">{{ tr('Clearing...') }}</span>
+                    </button>
+                </div>
+
                 {{-- Action Buttons --}}
                 <div class="flex flex-wrap items-center justify-between border-t border-gray-100 pt-3 mt-1">
                     <div class="flex items-center gap-2">
