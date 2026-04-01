@@ -43,6 +43,11 @@ class Index extends Component
         WithMissionRequests,
         WithDataScoping;
 
+    protected $listeners = ['year-added' => 'refreshYears', 'leave-request-updated' => 'refreshLeaveRequests', 'permission-request-updated' => 'refreshPermissionRequests'];
+
+    // Cache for computed properties to avoid repeated queries
+    private $cachedProperties = [];
+
     public int $companyId = 0;
     public bool $workflowModalOpen = false;
     public $currentWorkflowTasks = [];
@@ -75,7 +80,7 @@ class Index extends Component
             $leaveSettingService->ensureDefaultConfiguration($this->companyId);
             $year = LeavePolicyYear::query()
                 ->when($yearCoCol, fn ($q) => $q->where($yearCoCol, $this->companyId))
-                ->where('is_active', true)
+                ->when(Schema::hasColumn($yearTable, 'is_active'), fn ($q) => $q->where('is_active', true))
                 ->first();
         }
 
@@ -104,6 +109,24 @@ class Index extends Component
         $this->resetPage('historyPermPage');
         $this->resetPage('historyCutPage');
         $this->resetPage('historyMissionPage');
+        
+        // Clear cache when switching tabs
+        $this->cachedProperties = [];
+    }
+
+    // Helper method to cache computed properties
+    private function getCachedProperty(string $key, callable $callback)
+    {
+        if (!isset($this->cachedProperties[$key])) {
+            $this->cachedProperties[$key] = $callback();
+        }
+        return $this->cachedProperties[$key];
+    }
+
+    // Only load data for active tab
+    private function shouldLoadProperty(string $tab): bool
+    {
+        return $this->tab === $tab;
     }
 
     public function setTab(string $tab): void
@@ -147,22 +170,24 @@ class Index extends Component
 
     public function getPendingLeaveRequestsProperty()
     {
-        $q = AttendanceLeaveRequest::query()
-            ->with(['employee', 'policy'])
-            ->where('company_id', $this->companyId)
-            ->where('status', 'pending');
+        return $this->getCachedProperty('pendingLeaveRequests', function() {
+            $q = AttendanceLeaveRequest::query()
+                ->with(['employee', 'policy'])
+                ->where('company_id', $this->companyId)
+                ->where('status', 'pending');
 
-        // âœ… Data scoping
-        $q = $this->applyDataScoping($q, 'attendance.leaves.view', 'attendance.leaves.view-subordinates');
+            // ✅ Data scoping
+            $q = $this->applyDataScoping($q, 'attendance.leaves.view', 'attendance.leaves.view-subordinates');
 
-        if ($this->selectedYearId) $q->where('policy_year_id', (int) $this->selectedYearId);
-        if ($this->filterLeavePolicyId) $q->where('leave_policy_id', (int) $this->filterLeavePolicyId);
+            if ($this->selectedYearId) $q->where('policy_year_id', (int) $this->selectedYearId);
+            if ($this->filterLeavePolicyId) $q->where('leave_policy_id', (int) $this->filterLeavePolicyId);
 
-        $this->applyDateRangeOverlapFilter($q, 'start_date', 'end_date');
-        $this->applyEmployeeFilters($q);
-        $this->applyApprovalTaskFilter($q, 'leaves');
+            $this->applyDateRangeOverlapFilter($q, 'start_date', 'end_date');
+            $this->applyEmployeeFilters($q);
+            $this->applyApprovalTaskFilter($q, 'leaves');
 
-        return $q->orderByDesc('id')->paginate($this->perPage, ['*'], 'leavePage');
+            return $q->orderByDesc('id')->paginate($this->perPage, ['*'], 'leavePage');
+        });
     }
 
     public function getPendingPermissionRequestsProperty()
@@ -189,19 +214,29 @@ class Index extends Component
 
     public function getBalancesProperty()
     {
-        $q = AttendanceLeaveBalance::query()
-            ->with(['employee', 'policy', 'year'])
-            ->where('company_id', $this->companyId);
+        if (!$this->shouldLoadProperty('balances')) {
+            return $this->emptyPaginator('balancePage');
+        }
 
-        // âœ… Data scoping
-        $q = $this->applyDataScoping($q, 'attendance.leaves.view', 'attendance.leaves.view-subordinates');
+        return $this->getCachedProperty('balances', function() {
+            if (!Schema::hasTable('attendance_leave_balances')) {
+                return $this->emptyPaginator('balancePage');
+            }
 
-        if ($this->selectedYearId) $q->where('policy_year_id', (int) $this->selectedYearId);
-        if ($this->filterLeavePolicyId) $q->where('leave_policy_id', (int) $this->filterLeavePolicyId);
+            $q = AttendanceLeaveBalance::query()
+                ->with(['employee', 'policy', 'year'])
+                ->where('company_id', $this->companyId);
 
-        $this->applyEmployeeFilters($q);
+            // ✅ Data scoping
+            $q = $this->applyDataScoping($q, 'attendance.leaves.view', 'attendance.leaves.view-subordinates');
 
-        return $q->orderByDesc('remaining_days')->paginate($this->perPage, ['*'], 'balancePage');
+            if ($this->selectedYearId) $q->where('policy_year_id', (int) $this->selectedYearId);
+            if ($this->filterLeavePolicyId) $q->where('leave_policy_id', (int) $this->filterLeavePolicyId);
+
+            $this->applyEmployeeFilters($q);
+
+            return $q->orderByDesc('remaining_days')->paginate($this->perPage, ['*'], 'balancePage');
+        });
     }
 
     public function getHistoryProperty()
@@ -806,6 +841,24 @@ private function allowedBranchIds(): array
         });
 
         return $q;
+    }
+
+    public function refreshYears()
+    {
+        // Refresh the years property to update the filter
+        $this->resetPage();
+    }
+
+    public function refreshLeaveRequests()
+    {
+        // Refresh leave requests after update
+        $this->resetPage('leavePage');
+    }
+
+    public function refreshPermissionRequests()
+    {
+        // Refresh permission requests after update
+        $this->resetPage('permPage');
     }
 }
 

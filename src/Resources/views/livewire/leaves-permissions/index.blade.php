@@ -44,8 +44,10 @@
     <x-ui.page-header title="{{ tr('Leaves and Permissions') }}" subtitle="{{ tr('Manage requests, approvals, and balances') }}" />
 @endsection
 
-<div class="p-6 space-y-6" dir="{{ $dir }}" wire:poll.15s>
-    <x-ui.loading-bar />
+<div class="p-6 space-y-6" dir="{{ $dir }}" wire:poll.5s>
+
+    {{-- Tab Transition Indicator using loading-bar component --}}
+    <x-ui.loading-bar :fullPage="true" />
 
     {{-- Flash --}}
     <x-ui.flash-toast />
@@ -54,18 +56,21 @@
     <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-4">
         <div class="flex items-center gap-1 bg-gray-100/50 p-1 rounded-xl border border-gray-200 shadow-sm w-fit">
             <button wire:click="$set('tab', 'pending')"
+                onclick="showTabLoadingBar()"
                 class="px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300 min-w-[100px] {{ $tab === 'pending' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-transparent text-gray-400 hover:text-gray-700 hover:bg-gray-200/50' }}">
                 <i class="fas fa-clock-rotate-left me-1 opacity-70"></i>
                 {{ tr('Pending') }}
             </button>
 
             <button wire:click="$set('tab', 'balances')"
+                onclick="showTabLoadingBar()"
                 class="px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300 min-w-[100px] {{ $tab === 'balances' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-transparent text-gray-400 hover:text-gray-700 hover:bg-gray-200/50' }}">
                 <i class="fas fa-wallet me-1 opacity-70"></i>
                 {{ tr('Balances') }}
             </button>
 
             <button wire:click="$set('tab', 'history')"
+                onclick="showTabLoadingBar()"
                 class="px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300 min-w-[100px] {{ $tab === 'history' ? 'bg-indigo-600 text-white shadow-sm' : 'bg-transparent text-gray-400 hover:text-gray-700 hover:bg-gray-200/50' }}">
                 <i class="fas fa-history me-1 opacity-70"></i>
                 {{ tr('History') }}
@@ -240,6 +245,7 @@
             {{-- Sub Tabs --}}
             <div class="flex items-center gap-6 border-b border-gray-200">
                 <button wire:click="setPendingSubTab('leaves')" 
+                    onclick="showTabLoadingBar()"
                     class="pb-3 text-sm font-bold transition-all relative {{ $pendingSubTab === 'leaves' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600' }}">
                     <span>{{ tr('Leave Requests') }}</span>
                     @if($pendingLeaveRequests->total() > 0)
@@ -249,6 +255,7 @@
                 </button>
 
                 <button wire:click="setPendingSubTab('permissions')" 
+                    onclick="showTabLoadingBar()"
                     class="pb-3 text-sm font-bold transition-all relative {{ $pendingSubTab === 'permissions' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600' }}">
                     <span>{{ tr('Permission Requests') }}</span>
                     @if($pendingPermissionRequests->total() > 0)
@@ -258,6 +265,7 @@
                 </button>
 
                 <button wire:click="setPendingSubTab('cuts')" 
+                    onclick="showTabLoadingBar()"
                     class="pb-3 text-sm font-bold transition-all relative {{ $pendingSubTab === 'cuts' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600' }}">
                     <span>{{ tr('Cut Requests') }}</span>
                     @if($pendingCutLeaveRequests->total() > 0)
@@ -267,6 +275,7 @@
                 </button>
 
                 <button wire:click="setPendingSubTab('missions')" 
+                    onclick="showTabLoadingBar()"
                     class="pb-3 text-sm font-bold transition-all relative {{ $pendingSubTab === 'missions' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600' }}">
                     <span>{{ tr('Mission Requests') }}</span>
                     @if($pendingMissionRequests->total() > 0)
@@ -2281,4 +2290,16 @@
         </x-slot>
     </x-ui.modal>
 
+    {{-- Tab Loading Bar JavaScript --}}
+    <script>
+        function showTabLoadingBar() {
+            // Show the loading bar
+            window.dispatchEvent(new CustomEvent('tab-transition-start'));
+            
+            // Hide after reasonable time (adjust based on your performance)
+            setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('tab-transition-stop'));
+            }, 1000);
+        }
+    </script>
 </div>

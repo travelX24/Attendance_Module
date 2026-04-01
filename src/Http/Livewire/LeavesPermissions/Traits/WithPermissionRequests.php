@@ -256,6 +256,7 @@ trait WithPermissionRequests
         }
 
         session()->flash('success', tr('Saved successfully'));
+        $this->dispatch('permission-request-updated');
         $this->closeCreatePermission();
         $this->resetPage('permPage');
     }
@@ -489,7 +490,7 @@ trait WithPermissionRequests
         });
 
         session()->flash('success', tr('Saved successfully') . ' (' . count($ids) . ')');
-
+        $this->dispatch('permission-request-updated');
         $this->closeCreateGroupPermission();
         $this->resetPage('permPage');
     }

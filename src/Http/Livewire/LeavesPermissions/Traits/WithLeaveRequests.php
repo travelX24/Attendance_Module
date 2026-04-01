@@ -480,6 +480,7 @@ trait WithLeaveRequests
         ], (int) $row->employee_id);
 
         session()->flash('success', tr('Saved successfully'));
+        $this->dispatch('leave-request-updated');
         $this->closeCreateLeave();
         $this->resetPage('leavePage');
     }
