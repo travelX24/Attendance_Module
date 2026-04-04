@@ -164,9 +164,25 @@ class AttendanceDailyLog extends Model
         }
 
         $service = app(\Athka\SystemSettings\Services\WorkScheduleService::class);
-        $schedule = $service->getEffectiveSchedule((int)$companyId, $this->employee, $date->toDateString());
-        
-        $dateStr = $date->toDateString();
+        $dateStr = \Carbon\Carbon::parse($date)->toDateString();
+
+        // âœ… Check for approved leaves
+        $leave = \Athka\Attendance\Models\AttendanceLeaveRequest::withoutGlobalScopes()
+            ->where('employee_id', $this->employee_id)
+            ->where('status', 'approved')
+            ->whereDate('start_date', '<=', $dateStr)
+            ->whereDate('end_date', '>=', $dateStr)
+            ->first();
+
+        if ($leave) {
+            $this->attendance_status = 'on_leave';
+            $this->scheduled_hours = 0;
+            $this->scheduled_check_in = null;
+            $this->scheduled_check_out = null;
+            return;
+        }
+
+        $schedule = $service->getEffectiveSchedule((int)$companyId, $this->employee, $dateStr);
         $holidays = $service->getHolidays((int)$companyId, $dateStr, $dateStr);
         $metrics = $service->getMetricsForDate($dateStr, $schedule, $holidays);
 

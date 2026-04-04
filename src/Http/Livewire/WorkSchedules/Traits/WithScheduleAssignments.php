@@ -807,6 +807,21 @@ private function buildSchedulePreview(int $employeeId, int $companyId, Carbon $f
         ->orderBy('id', 'desc')
         ->get();
 
+    $leaves = \Athka\Attendance\Models\AttendanceLeaveRequest::query()
+        ->where('employee_id', $employeeId)
+        ->where('status', 'approved')
+        ->where(function ($q) use ($from, $to) {
+            $f = $from->toDateString();
+            $t = $to->toDateString();
+            $q->whereBetween('start_date', [$f, $t])
+                ->orWhereBetween('end_date', [$f, $t])
+                ->orWhere(function ($qq) use ($f, $t) {
+                    $qq->where('start_date', '<=', $f)->where('end_date', '>=', $t);
+                });
+        })
+        ->with('policy')
+        ->get();
+
     $scheduleIds = [];
 
     foreach ($assignments as $a) {
@@ -924,8 +939,19 @@ private function buildSchedulePreview(int $employeeId, int $companyId, Carbon $f
                 $source = 'single';
             }
         }
+        
+        $leave = $leaves->first(function($l) use ($day) {
+            $s = Carbon::parse($l->start_date)->startOfDay();
+            $e = Carbon::parse($l->end_date)->startOfDay();
+            return $day->between($s, $e);
+        });
 
-        if ($scheduleId) {
+        if ($leave) {
+            $type = 'leave';
+            $scheduleName = $leave->policy?->name ?? tr('Leave');
+            $periods = [];
+            $scheduleDisabled = false;
+        } elseif ($scheduleId) {
             $sch = $schedules[$scheduleId] ?? null;
             $dayNameFull = strtolower($day->format('l'));
             $workDays = $sch?->work_days ?? [];

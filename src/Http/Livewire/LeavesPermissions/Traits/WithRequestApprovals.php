@@ -246,7 +246,10 @@ trait WithRequestApprovals
 
     public function confirmReject(): void
     {
-        $this->validate(['rejectReason' => ['required', 'string', 'min:2', 'max:2000']]);
+        $this->validate(
+            ['rejectReason' => ['required', 'string', 'min:2', 'max:2000']],
+            ['rejectReason.required' => tr('Note is mandatory when rejecting')]
+        );
 
         $model = match($this->rejectType) {
             'leave', 'replacement' => AttendanceLeaveRequest::class,

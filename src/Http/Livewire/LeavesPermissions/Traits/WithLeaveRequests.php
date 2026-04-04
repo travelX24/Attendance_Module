@@ -298,6 +298,15 @@ trait WithLeaveRequests
             $this->leaveRequestsValidationAttributes()
         );
 
+        // ✅ Check Workflow existence
+        if (class_exists(\Athka\SystemSettings\Services\Approvals\ApprovalService::class)) {
+            $approvalService = app(\Athka\SystemSettings\Services\Approvals\ApprovalService::class);
+            if (!$approvalService->hasApproversForEmployee('leaves', (int) $employee->id, (int) $this->companyId)) {
+                $this->addError('start_date', 'لا يمكن تقديم الطلب، يرجى التواصل مع الإدارة لتعيين تسلسل موافقات (سير عمل) خاص بك.');
+                return;
+            }
+        }
+
         // 4) Normalize dates based on duration unit
         $start = Carbon::parse($data['start_date'])->startOfDay();
         $end = $this->create_leave_duration_unit === 'full_day'
@@ -480,6 +489,11 @@ trait WithLeaveRequests
         ], (int) $row->employee_id);
 
         session()->flash('success', tr('Saved successfully'));
+        $this->dispatch('toast', [
+            'type'    => 'success',
+            'title'   => tr('Success'),
+            'message' => tr('Saved successfully'),
+        ]);
         $this->dispatch('leave-request-updated');
         $this->closeCreateLeave();
         $this->resetPage('leavePage');
@@ -1080,6 +1094,11 @@ trait WithLeaveRequests
         ]);
 
         session()->flash('success', tr('Saved successfully'));
+        $this->dispatch('toast', [
+            'type'    => 'success',
+            'title'   => tr('Success'),
+            'message' => tr('Saved successfully'),
+        ]);
         $this->closeCutLeave();
     }
 
@@ -1703,6 +1722,11 @@ trait WithLeaveRequests
         });
 
         session()->flash('success', tr('Saved successfully'));
+        $this->dispatch('toast', [
+            'type'    => 'success',
+            'title'   => tr('Success'),
+            'message' => tr('Saved successfully'),
+        ]);
         $this->createGroupLeaveOpen = false;
         $this->resetPage('leavePage');
     }

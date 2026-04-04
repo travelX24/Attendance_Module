@@ -375,12 +375,20 @@
 
 
                                 <td class="p-3">
-                                    <div class="flex flex-wrap items-center gap-2">
+                                    <div class="flex flex-wrap items-center gap-1.5">
+                                        @if($r->attachment_path)
+                                            <a href="{{ asset('storage/' . $r->attachment_path) }}" target="_blank"
+                                               class="p-2 text-xs font-bold bg-white text-blue-600 border border-blue-100 rounded-lg shadow-sm hover:bg-blue-50 transition-all"
+                                               title="{{ $r->attachment_name ?: tr('View Attachment') }}">
+                                                <i class="fas fa-paperclip"></i>
+                                            </a>
+                                        @endif
+
                                         @if($r->replacement_employee_id == auth()->user()->employee_id && $r->replacement_status === 'pending')
                                             <x-ui.primary-button
                                                 type="button"
                                                 wire:click.prevent="respondToReplacementRequest({{ $r->id }}, 'approve')"
-                                                class="px-3 py-1.5 text-xs font-bold bg-green-600 hover:bg-green-700 text-white"
+                                                class="px-4 py-1.5 text-xs font-bold bg-green-600 hover:bg-green-700 text-white !rounded-lg"
                                             >
                                                 {{ tr('Accept Coverage') }}
                                             </x-ui.primary-button>
@@ -388,7 +396,7 @@
                                             <x-ui.secondary-button
                                                 type="button"
                                                 wire:click.prevent="openReject('replacement', {{ $r->id }})"
-                                                class="px-3 py-1.5 text-xs font-bold bg-red-50 text-red-600 border-red-100 hover:bg-red-100"
+                                                class="px-4 py-1.5 text-xs font-bold bg-red-50 text-red-600 border-red-100 hover:bg-red-100 !rounded-lg"
                                             >
                                                 {{ tr('Reject Coverage') }}
                                             </x-ui.secondary-button>
@@ -399,16 +407,15 @@
                                                 loading="approveLeave({{ $r->id }})"
                                                 :full-width="false"
                                                 size="sm"
-                                                class="px-5 py-2.5 text-xs font-bold"
+                                                class="px-4 py-2 text-xs font-bold !rounded-lg shadow-sm"
                                             >
-                                                <i class="fas fa-check me-2"></i>
-                                                {{ tr('Approve') }}
+                                                <i class="fas fa-check me-2"></i> {{ tr('Approve') }}
                                             </x-ui.primary-button>
 
                                             <x-ui.secondary-button
                                                 type="button"
                                                 wire:click="openWorkflow('leave', {{ $r->id }})"
-                                                class="px-3 py-1.5 text-xs font-bold bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100"
+                                                class="p-2 text-xs font-bold bg-white text-blue-600 border border-blue-100 hover:bg-blue-50 !rounded-lg transition-all"
                                                 title="{{ tr('Workflow') }}"
                                             >
                                                 <i class="fas fa-route"></i>
@@ -417,15 +424,15 @@
                                             <x-ui.secondary-button
                                                 type="button"
                                                 wire:click.prevent="openReject('leave', {{ $r->id }})"
-                                                class="px-5 py-2.5 text-xs font-bold !text-red-600 !border-red-600 hover:!bg-red-50"
+                                                class="px-4 py-2 text-xs font-bold !text-red-500 !border-red-200 hover:!bg-red-50 !rounded-lg"
                                             >
-                                                {{ tr('Reject') }}
+                                                <i class="fas fa-times me-2"></i> {{ tr('Reject') }}
                                             </x-ui.secondary-button>
                                         @else
                                             <x-ui.secondary-button
                                                 type="button"
                                                 wire:click="openWorkflow('leave', {{ $r->id }})"
-                                                class="px-3 py-1.5 text-xs font-bold bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100"
+                                                class="p-2 text-xs font-bold bg-white text-blue-600 border border-blue-100 hover:bg-blue-50 !rounded-lg"
                                                 title="{{ tr('Workflow') }}"
                                             >
                                                 <i class="fas fa-route"></i>
@@ -497,7 +504,15 @@
                                 </td>
 
                                 <td class="p-3">
-                                    <div class="flex items-center gap-2">
+                                    <div class="flex flex-wrap items-center gap-1.5">
+                                        @if($r->attachment_path)
+                                            <a href="{{ asset('storage/' . $r->attachment_path) }}" target="_blank"
+                                               class="p-2 text-xs font-bold bg-white text-blue-600 border border-blue-100 rounded-lg shadow-sm hover:bg-blue-50 transition-all"
+                                               title="{{ $r->attachment_name ?: tr('View Attachment') }}">
+                                                <i class="fas fa-paperclip"></i>
+                                            </a>
+                                        @endif
+
                                         @if(auth()->user()->can('attendance.manage') || $tab === 'pending')
                                             <x-ui.primary-button
                                                 type="button"
@@ -505,16 +520,15 @@
                                                 loading="approvePermission({{ $r->id }})"
                                                 :full-width="false"
                                                 size="sm"
-                                                class="px-5 py-2.5 text-xs font-bold"
+                                                class="px-4 py-2 text-xs font-bold !rounded-lg shadow-sm"
                                             >
-                                                <i class="fas fa-check me-2"></i>
-                                                {{ tr('Approve') }}
+                                                <i class="fas fa-check me-2"></i> {{ tr('Approve') }}
                                             </x-ui.primary-button>
 
                                             <x-ui.secondary-button
                                                 type="button"
                                                 wire:click="openWorkflow('permission', {{ $r->id }})"
-                                                class="px-3 py-1.5 text-xs font-bold bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100"
+                                                class="p-2 text-xs font-bold bg-white text-blue-600 border border-blue-100 hover:bg-blue-50 !rounded-lg"
                                                 title="{{ tr('Workflow') }}"
                                             >
                                                 <i class="fas fa-route"></i>
@@ -523,15 +537,15 @@
                                             <x-ui.secondary-button
                                                 type="button"
                                                 wire:click.prevent="openReject('permission', {{ $r->id }})"
-                                                class="px-5 py-2.5 text-xs font-bold !text-red-600 !border-red-600 hover:!bg-red-50"
+                                                class="px-4 py-2 text-xs font-bold !text-red-500 !border-red-200 hover:!bg-red-50 !rounded-lg"
                                             >
-                                                {{ tr('Reject') }}
+                                                <i class="fas fa-times me-2"></i> {{ tr('Reject') }}
                                             </x-ui.secondary-button>
                                         @else
                                             <x-ui.secondary-button
                                                 type="button"
                                                 wire:click="openWorkflow('permission', {{ $r->id }})"
-                                                class="px-3 py-1.5 text-xs font-bold bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100"
+                                                class="p-2 text-xs font-bold bg-white text-blue-600 border border-blue-100 hover:bg-blue-50 !rounded-lg"
                                                 title="{{ tr('Workflow') }}"
                                             >
                                                 <i class="fas fa-route"></i>
@@ -702,7 +716,15 @@
                                 </td>
 
                                 <td class="p-3">
-                                    <div class="flex items-center gap-2">
+                                    <div class="flex flex-wrap items-center gap-1.5">
+                                        @if($r->attachment_path)
+                                            <a href="{{ asset('storage/' . $r->attachment_path) }}" target="_blank"
+                                               class="p-2 text-xs font-bold bg-white text-blue-600 border border-blue-100 rounded-lg shadow-sm hover:bg-blue-50 transition-all font-mono"
+                                               title="{{ $r->attachment_name ?: tr('View Attachment') }}">
+                                                <i class="fas fa-paperclip"></i>
+                                            </a>
+                                        @endif
+
                                         @if(auth()->user()->can('attendance.manage') || $tab === 'pending')
                                             <x-ui.primary-button
                                                 type="button"
@@ -710,7 +732,7 @@
                                                 loading="approveMission({{ $r->id }})"
                                                 :full-width="false"
                                                 size="sm"
-                                                class="px-5 py-2.5 text-xs font-bold"
+                                                class="px-4 py-2 text-xs font-bold !rounded-lg shadow-sm"
                                             >
                                                 <i class="fas fa-check me-2"></i>
                                                 {{ tr('Approve') }}
@@ -719,7 +741,7 @@
                                             <x-ui.secondary-button
                                                 type="button"
                                                 wire:click="openWorkflow('mission', {{ $r->id }})"
-                                                class="px-3 py-1.5 text-xs font-bold bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100"
+                                                class="p-2 text-xs font-bold bg-white text-blue-600 border border-blue-100 hover:bg-blue-50 !rounded-lg transition-all"
                                                 title="{{ tr('Workflow') }}"
                                             >
                                                 <i class="fas fa-route"></i>
@@ -728,15 +750,16 @@
                                             <x-ui.secondary-button
                                                 type="button"
                                                 wire:click.prevent="openReject('mission', {{ $r->id }})"
-                                                class="px-5 py-2.5 text-xs font-bold !text-red-600 !border-red-600 hover:!bg-red-50"
+                                                class="px-4 py-2 text-xs font-bold !text-red-500 !border-red-200 hover:!bg-red-50 !rounded-lg"
                                             >
+                                                <i class="fas fa-times me-2"></i>
                                                 {{ tr('Reject') }}
                                             </x-ui.secondary-button>
                                         @else
                                             <x-ui.secondary-button
                                                 type="button"
                                                 wire:click="openWorkflow('mission', {{ $r->id }})"
-                                                class="px-3 py-1.5 text-xs font-bold bg-blue-50 text-blue-600 border-blue-100 hover:bg-blue-100"
+                                                class="p-2 text-xs font-bold bg-white text-blue-600 border border-blue-100 hover:bg-blue-50 !rounded-lg"
                                                 title="{{ tr('Workflow') }}"
                                             >
                                                 <i class="fas fa-route"></i>
@@ -932,7 +955,15 @@
                                 </td>
 
                                 <td class="p-3">
-                                    <div class="flex items-center gap-2">
+                                    <div class="flex items-center gap-1.5">
+                                        @if($r->attachment_path)
+                                            <a href="{{ asset('storage/' . $r->attachment_path) }}" target="_blank"
+                                               class="p-2 text-xs font-bold bg-white text-blue-600 border border-blue-100 rounded-lg shadow-sm hover:bg-blue-50 transition-all"
+                                               title="{{ $r->attachment_name ?: tr('View Attachment') }}">
+                                                <i class="fas fa-paperclip"></i>
+                                            </a>
+                                        @endif
+
                                         {{-- Cancel allowed only if salary not processed --}}
                                         @if(!$r->salary_processed_at && in_array($r->status, ['approved','pending'], true))
                                             @can('attendance.manage')
@@ -940,7 +971,7 @@
                                                 type="button"
                                                 wire:click="cancelLeave({{ $r->id }})"
                                                 onclick="return confirm('Are you sure?')"
-                                                class="px-3 py-1.5 text-xs font-bold bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
+                                                class="px-3 py-1.5 text-xs font-bold bg-white text-red-500 border-red-100 hover:bg-red-50 !rounded-lg"
                                             >
                                                 {{ tr('Cancel') }}
                                             </x-ui.secondary-button>
@@ -1018,22 +1049,32 @@
                                 </td>
 
                                 <td class="p-3">
-                                    @if(in_array($r->status, ['approved','pending'], true))
-                                        @can('attendance.manage')
-                                        <x-ui.secondary-button
-                                            type="button"
-                                            wire:click="cancelPermission({{ $r->id }})"
-                                            onclick="return confirm('Are you sure?')"
-                                            class="px-3 py-1.5 text-xs font-bold bg-white text-gray-700 border-gray-200 hover:bg-gray-50"
-                                        >
-                                            {{ tr('Cancel') }}
-                                        </x-ui.secondary-button>
+                                    <div class="flex items-center gap-1.5">
+                                        @if($r->attachment_path)
+                                            <a href="{{ asset('storage/' . $r->attachment_path) }}" target="_blank"
+                                               class="p-2 text-xs font-bold bg-white text-blue-600 border border-blue-100 rounded-lg shadow-sm hover:bg-blue-50 transition-all font-mono"
+                                               title="{{ $r->attachment_name ?: tr('View Attachment') }}">
+                                                <i class="fas fa-paperclip"></i>
+                                            </a>
+                                        @endif
+
+                                        @if(in_array($r->status, ['approved','pending'], true))
+                                            @can('attendance.manage')
+                                            <x-ui.secondary-button
+                                                type="button"
+                                                wire:click="cancelPermission({{ $r->id }})"
+                                                onclick="return confirm('Are you sure?')"
+                                                class="px-3 py-1.5 text-xs font-bold bg-white text-red-500 border-red-100 hover:bg-red-50 !rounded-lg shadow-sm transition-all"
+                                            >
+                                                {{ tr('Cancel') }}
+                                            </x-ui.secondary-button>
+                                            @else
+                                                <span class="text-xs text-gray-400 italic">{{ tr('Locked') }}</span>
+                                            @endcan
                                         @else
-                                            <span class="text-xs text-gray-400 italic">{{ tr('Locked') }}</span>
-                                        @endcan
-                                    @else
-                                        <span class="text-xs text-gray-400">—</span>
-                                    @endif
+                                            <span class="text-xs text-gray-400">—</span>
+                                        @endif
+                                    </div>
                                 </td>
                             </tr>
                         @empty
@@ -1068,6 +1109,7 @@
                             <th class="text-start p-3">{{ tr('Dates') }}</th>
                             <th class="text-start p-3">{{ tr('Duration') }}</th>
                             <th class="text-start p-3">{{ tr('Status') }}</th>
+                            <th class="text-start p-3">{{ tr('Actions') }}</th>
                         </tr>
                         </thead>
 
@@ -1100,10 +1142,24 @@
                                         {{ $r->status }}
                                     </x-ui.badge>
                                 </td>
+
+                                <td class="p-3">
+                                    <div class="flex items-center gap-1.5">
+                                        @if($r->attachment_path)
+                                            <a href="{{ asset('storage/' . $r->attachment_path) }}" target="_blank"
+                                               class="p-2 text-xs font-bold bg-white text-blue-600 border border-blue-100 rounded-lg shadow-sm hover:bg-blue-50 transition-all font-mono"
+                                               title="{{ $r->attachment_name ?: tr('View Attachment') }}">
+                                                <i class="fas fa-paperclip"></i>
+                                            </a>
+                                        @else
+                                            <span class="text-xs text-gray-400">—</span>
+                                        @endif
+                                    </div>
+                                </td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="p-4 text-center text-gray-500">
+                                <td colspan="6" class="p-4 text-center text-gray-500">
                                     {{ tr('No previous mission requests') }}
                                 </td>
                             </tr>
@@ -1524,7 +1580,6 @@
         <x-slot name="content">
             <div class="space-y-3">
                 <x-ui.textarea wire:model="rejectReason" class="w-full" :placeholder="tr('Please provide a reason...')" />
-                @error('rejectReason') <div class="text-xs text-red-600">{{ $message }}</div> @enderror
             </div>
         </x-slot>
 

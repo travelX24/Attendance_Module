@@ -685,11 +685,14 @@
                                         @if($dayData && $dayData['type'] !== 'none')
                                             @php
                                                 $isHoliday = $dayData['type'] === 'holiday';
+                                                $isLeave   = $dayData['type'] === 'leave';
                                                 $bgClass = $dayData['disabled'] 
                                                     ? 'bg-gray-100 text-gray-400' 
                                                     : ($isHoliday 
                                                         ? 'bg-slate-50 text-slate-400 border-slate-100' 
-                                                        : 'bg-[color:var(--brand-via)]/10 text-[color:var(--brand-via)] border-[color:var(--brand-via)]/20');
+                                                        : ($isLeave 
+                                                            ? 'bg-blue-50 text-blue-600 border-blue-100' 
+                                                            : 'bg-[color:var(--brand-via)]/10 text-[color:var(--brand-via)] border-[color:var(--brand-via)]/20'));
                                             @endphp
                                             <div
                                                 class="mx-auto px-2 py-1.5 rounded-md text-[9px] leading-tight font-bold {{ $bgClass }} border shadow-sm"

@@ -113,6 +113,17 @@ trait WithPermissionRequests
     {
         $this->ensureCanManage();
 
+        $policy = $this->permissionPolicyRow();
+        if (!$policy) {
+            $this->addError('permission_date', tr('Permission settings are not configured for this year.'));
+            return;
+        }
+
+        if (Schema::hasColumn($policy->getTable(), 'is_active') && !$policy->is_active) {
+            $this->addError('permission_date', tr('Permission settings are currently inactive.'));
+            return;
+        }
+
         $rules = [
             'permission_employee_id' => ['required', 'integer', 'min:1'],
             'permission_date' => ['required', 'date'],
@@ -201,12 +212,21 @@ trait WithPermissionRequests
             return;
         }
 
-        // âœ… validate within working hours (Ø¨Ù†ÙØ³ Ù…Ù†Ø·Ù‚ Ø§Ù„Ø´ÙØª Ø¹Ù†Ø¯Ùƒ)
+        // ✅ validate within working hours (بنفس منطق الشفت عندك)
         if (!$this->validatePermissionWithinWorkWindow($date, $from, $to)) {
             return;
         }
 
-        // âœ… NEW: hard limits (per request / per day / per month)
+        // ✅ Check Workflow existence
+        if (class_exists(\Athka\SystemSettings\Services\Approvals\ApprovalService::class)) {
+            $approvalService = app(\Athka\SystemSettings\Services\Approvals\ApprovalService::class);
+            if (!$approvalService->hasApproversForEmployee('permissions', (int) $employee->id, (int) $this->companyId)) {
+                $this->addError('permission_date', 'لا يمكن تقديم الطلب، يرجى التواصل مع الإدارة لتعيين تسلسل موافقات (سير عمل) خاص بك.');
+                return;
+            }
+        }
+
+        // ✅ NEW: hard limits (per request / per day / per month)
         if (!$this->validatePermissionLimits((int) $employee->id, $date, $mins)) {
             return;
         }
@@ -256,6 +276,13 @@ trait WithPermissionRequests
         }
 
         session()->flash('success', tr('Saved successfully'));
+        
+        $this->dispatch('toast', [
+            'type'    => 'success',
+            'title'   => tr('Success'),
+            'message' => tr('Saved successfully'),
+        ]);
+
         $this->dispatch('permission-request-updated');
         $this->closeCreatePermission();
         $this->resetPage('permPage');
@@ -265,6 +292,17 @@ trait WithPermissionRequests
     public function saveGroupPermission(): void
     {
         $this->ensureCanManage();
+
+        $policy = $this->permissionPolicyRow();
+        if (!$policy) {
+            $this->addError('group_permission_date', tr('Permission settings are not configured for this year.'));
+            return;
+        }
+
+        if (Schema::hasColumn($policy->getTable(), 'is_active') && !$policy->is_active) {
+            $this->addError('group_permission_date', tr('Permission settings are currently inactive.'));
+            return;
+        }
 
         $rules = [
             'groupPermissionEmployeeIds' => ['required', 'array', 'min:1'],

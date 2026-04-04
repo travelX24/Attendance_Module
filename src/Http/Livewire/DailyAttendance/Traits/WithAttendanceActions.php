@@ -67,7 +67,7 @@ trait WithAttendanceActions
         $this->approvalPreview = [
             'employee_name' => $log->employee->name_ar ?? $log->employee->name_en,
             'employee_no' => $log->employee->employee_no ?? '-',
-            'attendance_date' => $log->attendance_date->format('Y-m-d'),
+            'attendance_date' => \Carbon\Carbon::parse($log->attendance_date)->format('Y-m-d'),
             'status' => $log->attendance_status,
             'check_in' => $log->check_in_hm,
             'check_out' => $log->check_out_hm,
@@ -349,11 +349,23 @@ trait WithAttendanceActions
              return;
         }
 
-        // 1. Sync Existing Logs in range (to fix any inconsistencies)
-       $existingQ = AttendanceDailyLog::forCompany($companyId)
-            ->whereBetween('attendance_date', [$start->toDateString(), $end->toDateString()]);
+        // 1. Fetch relevant employees
+        $empQ = \Athka\Employees\Models\Employee::forCompany($companyId)
+                ->where('status', 'active');
 
+        $allowed = method_exists($this, 'allowedBranchIds') ? $this->allowedBranchIds() : [];
         if (!empty($allowed)) {
+            $empQ->whereIn('branch_id', $allowed);
+        }
+
+        $employees = $empQ->pluck('id', 'id');
+        $employeeIds = $employees->keys()->all();
+
+        // 2. Sync Existing Logs in range (to fix any inconsistencies)
+        $existingQ = AttendanceDailyLog::forCompany($companyId)
+             ->whereBetween('attendance_date', [$start->toDateString(), $end->toDateString()]);
+
+        if (!empty($employeeIds)) {
             $existingQ->whereIn('employee_id', $employeeIds);
         }
 
@@ -362,23 +374,12 @@ trait WithAttendanceActions
         foreach ($existingLogs as $log) {
             // Only trigger save if it looks incomplete or we want to be sure
             // A simple save() triggers our model's booted logic.
-            if ($log->scheduled_hours <= 0 || ($log->check_in_time && !$log->check_out_time) || ($log->check_in_time && $log->attendance_status === 'absent')) {
+            if ($log->scheduled_hours <= 0 || ($log->check_in_time && !$log->check_out_time) || $log->attendance_status === 'absent' || $log->attendance_status === 'on_leave') {
                 $log->save();
             }
         }
 
-        // 2. Generate Missing Logs
-       $empQ = \Athka\Employees\Models\Employee::forCompany($companyId)
-                ->where('status', 'active');
-
-            $allowed = $this->allowedBranchIds();
-            if (!empty($allowed)) {
-                $empQ->whereIn('branch_id', $allowed);
-            }
-
-            $employees = $empQ->pluck('id', 'id');
-            $employeeIds = $employees->keys()->all();
-
+        // 3. Generate Missing Logs
         $count = 0;
         $period = \Carbon\CarbonPeriod::create($start, $end);
 

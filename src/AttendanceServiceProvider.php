@@ -68,6 +68,10 @@ class AttendanceServiceProvider extends ServiceProvider
         if (class_exists(\Athka\Attendance\Models\AttendanceMissionRequest::class)) {
             \Athka\Attendance\Models\AttendanceMissionRequest::observe(\Athka\Attendance\Observers\AttendanceMissionRequestObserver::class);
         }
+
+        if (class_exists(\Athka\Attendance\Models\AttendanceLeaveRequest::class)) {
+            \Athka\Attendance\Models\AttendanceLeaveRequest::observe(\Athka\Attendance\Observers\AttendanceLeaveRequestObserver::class);
+        }
     }
 
     public function register(): void
