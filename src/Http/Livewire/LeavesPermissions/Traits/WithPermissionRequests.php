@@ -217,8 +217,12 @@ trait WithPermissionRequests
             return;
         }
 
-        // ✅ Check Workflow existence
-        if (class_exists(\Athka\SystemSettings\Services\Approvals\ApprovalService::class)) {
+        $this->minutes = $mins;
+
+        $approvalRequired = $this->isPermissionApprovalRequired();
+
+        // ✅ Check Workflow existence (only if approval is required)
+        if ($approvalRequired && class_exists(\Athka\SystemSettings\Services\Approvals\ApprovalService::class)) {
             $approvalService = app(\Athka\SystemSettings\Services\Approvals\ApprovalService::class);
             if (!$approvalService->hasApproversForEmployee('permissions', (int) $employee->id, (int) $this->companyId)) {
                 $this->addError('permission_date', 'لا يمكن تقديم الطلب، يرجى التواصل مع الإدارة لتعيين تسلسل موافقات (سير عمل) خاص بك.');
@@ -231,12 +235,8 @@ trait WithPermissionRequests
             return;
         }
 
-        $this->minutes = $mins;
-
         $permTable = (new AttendancePermissionRequest())->getTable();
         $companyCol = method_exists($this, 'detectCompanyColumn') ? $this->detectCompanyColumn($permTable) : null;
-
-        $approvalRequired = $this->isPermissionApprovalRequired();
 
         $payload = [
             'employee_id' => (int) $employee->id,
@@ -259,15 +259,33 @@ trait WithPermissionRequests
 
         $row = AttendancePermissionRequest::create($payload);
 
-        // ✅ Integrate with Approval Workflow
-        try {
-            $approvalService = app(\Athka\SystemSettings\Services\Approvals\ApprovalService::class);
-            $src = $approvalService->getRequestSource('permissions');
-            if ($src) {
-                $approvalService->ensureTasksForRequest($src, $row, (int) $this->companyId);
+        // ✅ Integrate with Approval Workflow (only if approval is required)
+        if ($approvalRequired) {
+            try {
+                $approvalService = app(\Athka\SystemSettings\Services\Approvals\ApprovalService::class);
+                $src = $approvalService->getRequestSource('permissions');
+                if ($src) {
+                    $approvalService->ensureTasksForRequest($src, $row, (int) $this->companyId);
+                }
+            } catch (\Exception $e) {
+                \Log::error("Approval Task Generation Error (Permission): " . $e->getMessage());
             }
-        } catch (\Exception $e) {
-            \Log::error("Approval Task Generation Error (Permission): " . $e->getMessage());
+        } elseif (!$approvalRequired && class_exists(\App\Notifications\ApprovalTaskNotification::class)) {
+            try {
+                $userTarget = \App\Models\User::where('employee_id', $employee->id)->first();
+                if ($userTarget) {
+                    $dummyTask = new \Athka\SystemSettings\Models\ApprovalTask([
+                        'operation_key' => 'permissions',
+                        'approvable_type' => 'permissions',
+                        'approvable_id' => $row->id,
+                        'request_employee_id' => $employee->id,
+                        'status' => 'approved',
+                    ]);
+                    $dummyTask->id = 0; // Prevent null ID issue
+                    $userTarget->notify(new \App\Notifications\ApprovalTaskNotification($dummyTask, 'submitted'));
+                    $userTarget->notify(new \App\Notifications\ApprovalTaskNotification($dummyTask, 'resolution'));
+                }
+            } catch (\Exception $e) {}
         }
 
         // ✅ activity log (لو عندك logAction)
@@ -519,7 +537,39 @@ trait WithPermissionRequests
                 if (Schema::hasColumn($permTable, 'requested_by')) $payload['requested_by'] = auth()->id();
                 if (Schema::hasColumn($permTable, 'requested_at')) $payload['requested_at'] = now();
 
-                AttendancePermissionRequest::create($payload);
+                $row = AttendancePermissionRequest::create($payload);
+
+                // ✅ No approval workflow for individual rows in group request if $approvalRequired is false
+                // But usually we handle it row by row if needed.
+                // Added check to ensure row is auto-approved if needed.
+                
+                if ($approvalRequired) {
+                    try {
+                        $approvalService = app(\Athka\SystemSettings\Services\Approvals\ApprovalService::class);
+                        $src = $approvalService->getRequestSource('permissions');
+                        if ($src) {
+                            $approvalService->ensureTasksForRequest($src, $row, (int) $this->companyId);
+                        }
+                    } catch (\Exception $e) {
+                        \Log::error("Approval Task Generation Error (Permission Group): " . $e->getMessage());
+                    }
+                } elseif (!$approvalRequired && class_exists(\App\Notifications\ApprovalTaskNotification::class)) {
+                    try {
+                        $userTarget = \App\Models\User::where('employee_id', $empId)->first();
+                        if ($userTarget) {
+                            $dummyTask = new \Athka\SystemSettings\Models\ApprovalTask([
+                                'operation_key' => 'permissions',
+                                'approvable_type' => 'permissions',
+                                'approvable_id' => $row->id,
+                                'request_employee_id' => $empId,
+                                'status' => 'approved',
+                            ]);
+                            $dummyTask->id = 0; // Prevent null ID issue
+                            $userTarget->notify(new \App\Notifications\ApprovalTaskNotification($dummyTask, 'submitted'));
+                            $userTarget->notify(new \App\Notifications\ApprovalTaskNotification($dummyTask, 'resolution'));
+                        }
+                    } catch (\Exception $e) {}
+                }
 
                 if (method_exists($this, 'logAction')) {
                     $this->logAction('permission', 0, 'created', ['minutes' => $mins, 'group' => true], (int) $empId);
@@ -621,8 +671,10 @@ trait WithPermissionRequests
     {
         $maxPerRequest = $this->getPermissionMaxMinutesPerRequest($date);
         if ($maxPerRequest > 0 && $mins > $maxPerRequest) {
-            $this->addError('to_time', tr('Permission duration exceeds the allowed limit') . ' (' . $this->fmtMinutes($maxPerRequest) . ').');
-            return false;
+            if (!$this->isPermissionAllowedAfterLimit()) {
+                $this->addError('to_time', tr('Permission duration exceeds the allowed limit') . ' (' . $this->fmtMinutes($maxPerRequest) . ').');
+                return false;
+            }
         }
 
         $permTable = (new AttendancePermissionRequest())->getTable();
@@ -640,8 +692,12 @@ trait WithPermissionRequests
                 ->sum('minutes');
 
             if (($usedToday + $mins) > $maxPerDay) {
-                $this->addError('permission_date', tr('Daily permission limit exceeded') . ' (' . $this->fmtMinutes($maxPerDay) . ').');
-                return false;
+                if (!$this->isPermissionAllowedAfterLimit()) {
+                    $errorMsg = tr('Daily permission limit exceeded, please contact administration.');
+                    $this->addError('permission_date', $errorMsg);
+                    $this->dispatch('toast', type: 'error', message: $errorMsg);
+                    return false;
+                }
             }
         }
 
@@ -689,13 +745,8 @@ trait WithPermissionRequests
 
     protected function getPermissionMaxMinutesPerDay(Carbon $date): int
     {
-        $m = (int) config('attendance.permission_max_minutes_per_day', 0);
-        if ($m > 0) return $m;
-
-        $h = (float) config('attendance.permission_max_hours_per_day', 0);
-        if ($h > 0) return (int) round($h * 60);
-
-        return 0;
+        // Use Max Minutes Per Request as the definitive Daily Limit logic requested by the user
+        return $this->getPermissionMaxMinutesPerRequest($date);
     }
 
     protected function getPermissionMaxMinutesPerMonth(int $employeeId, Carbon $date): int
