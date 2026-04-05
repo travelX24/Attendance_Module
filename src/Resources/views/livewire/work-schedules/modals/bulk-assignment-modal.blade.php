@@ -90,13 +90,40 @@
         @endphp
 
         <div class="space-y-5">
-            <div class="flex items-center gap-3 p-3 bg-indigo-50 rounded-xl border border-indigo-100">
-                <i class="fas fa-info-circle text-[color:var(--brand-via)]"></i>
-                <p class="text-xs text-indigo-900 font-medium">
-                    {{ tr('Changes will apply to') }}:
-                    <span class="font-bold underline">{{ count($selectedEmployees) }}</span>
-                    {{ tr('selected employees') }}
-                </p>
+            @if($contractMessage)
+                <div class="flex items-start gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100 shadow-sm">
+                    <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                        <i class="fas fa-file-contract text-sm"></i>
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-xs text-blue-900 font-bold leading-relaxed">
+                            {{ tr('Contract Insight') }}:
+                        </p>
+                        <p class="text-[11px] text-blue-700 mt-0.5">
+                            {{ $contractMessage }}
+                        </p>
+                    </div>
+                </div>
+            @endif
+
+            <div class="flex items-center justify-between gap-3 p-3 bg-indigo-50 rounded-xl border border-indigo-100">
+                <div class="flex items-center gap-3">
+                    <i class="fas fa-info-circle text-[color:var(--brand-via)]"></i>
+                    <p class="text-xs text-indigo-900 font-medium">
+                        {{ tr('Changes will apply to') }}:
+                        <span class="font-bold underline">{{ count($selectedEmployees) }}</span>
+                        {{ tr('selected employees') }}
+                    </p>
+                </div>
+                
+                {{-- Toggle Override --}}
+                <div class="flex items-center gap-2 px-2 py-1 bg-white rounded-lg border border-indigo-200 shadow-sm">
+                    <span class="text-[10px] font-bold text-gray-500 uppercase tracking-tight">{{ tr('Manual Override') }}</span>
+                    <label class="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" wire:model.live="overrideContractDates" class="sr-only peer">
+                        <div class="w-7 h-4 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
+                    </label>
+                </div>
             </div>
 
             <div class="space-y-4">
@@ -107,36 +134,38 @@
                     <input type="hidden" wire:model="bulkFormData.is_rotation" value="0">
                 @endif
 
-                <div class="grid grid-cols-2 gap-4">
+                <div class="grid @if($overrideContractDates) grid-cols-2 @else grid-cols-1 @endif gap-4">
                     <x-ui.company-date-picker
                         model="bulkFormData.start_date"
-                        :label="tr('Effective Date')"
+                        :label="tr('Start Date')"
                         :disabled="!auth()->user()->can('attendance.manage')"
                     />
 
-                    @if($isRotationMode)
-                        <x-ui.input
-                            type="number"
-                            min="1"
-                            step="1"
-                            wire:model="bulkFormData.rotation_days"
-                            :label="tr('Rotation Days')"
-                            error="bulkFormData.rotation_days"
-                            required
-                            :disabled="!auth()->user()->can('attendance.manage')"
-                        />
-                    @else
-                        <div>
-                            <label class="block text-sm font-semibold text-gray-700 mb-1.5">{{ tr('Duration') }}</label>
-                            <x-ui.select wire:model.live="bulkFormData.is_permanent" class="w-full" align="up" :disabled="!auth()->user()->can('attendance.manage')">
-                                <option value="1">{{ tr('Permanent') }}</option>
-                                <option value="0">{{ tr('Temporary') }}</option>
-                            </x-ui.select>
-                        </div>
+                    @if($overrideContractDates)
+                        @if($isRotationMode)
+                            <x-ui.input
+                                type="number"
+                                min="1"
+                                step="1"
+                                wire:model="bulkFormData.rotation_days"
+                                :label="tr('Rotation Days')"
+                                error="bulkFormData.rotation_days"
+                                required
+                                :disabled="!auth()->user()->can('attendance.manage')"
+                            />
+                        @else
+                            <div>
+                                <label class="block text-sm font-semibold text-gray-700 mb-1.5">{{ tr('Duration') }}</label>
+                                <x-ui.select wire:model.live="bulkFormData.is_permanent" class="w-full" align="up" :disabled="!auth()->user()->can('attendance.manage')">
+                                    <option value="1">{{ tr('Permanent') }}</option>
+                                    <option value="0">{{ tr('Temporary') }}</option>
+                                </x-ui.select>
+                            </div>
+                        @endif
                     @endif
                 </div>
 
-                @if($isRotationMode)
+                @if($isRotationMode && $overrideContractDates)
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-1.5">{{ tr('Duration') }}</label>
@@ -150,16 +179,8 @@
                     </div>
                 @endif
 
-                {{-- âœ… End Date ÙŠØ¸Ù‡Ø± Ø¥Ø°Ø§ Ù…Ø¤Ù‚Øª (Single Ø£Ùˆ Rotation) --}}
-                @if((empty($bulkFormData['is_permanent']) || $bulkFormData['is_permanent'] === '0'))
-                    <div class="grid grid-cols-2 gap-4">
-                        <x-ui.company-date-picker model="bulkFormData.end_date" :label="tr('End Date')" :disabled="!auth()->user()->can('attendance.manage')" />
-                        <div class="hidden md:block"></div>
-                    </div>
-                @endif
-
-
-                @if(!$isRotationMode && (empty($bulkFormData['is_permanent']) || $bulkFormData['is_permanent'] === '0'))
+                {{-- End Date --}}
+                @if($overrideContractDates && (empty($bulkFormData['is_permanent']) || $bulkFormData['is_permanent'] === '0'))
                     <div class="grid grid-cols-2 gap-4">
                         <x-ui.company-date-picker model="bulkFormData.end_date" :label="tr('End Date')" :disabled="!auth()->user()->can('attendance.manage')" />
                         <div class="hidden md:block"></div>
@@ -186,47 +207,6 @@
                         <span class="text-red-500 text-xs mt-1">{{ $message }}</span>
                     @enderror
 
-                    <div class="mt-2 p-3 bg-gray-50 rounded-xl border border-gray-100">
-                        <div class="flex items-center justify-between">
-                            <div class="text-xs text-gray-500 font-semibold">{{ tr('Work Period') }}</div>
-                            <div class="text-[11px] text-gray-500">
-                                {{ tr('Select one or more periods') }}
-                            </div>
-                        </div>
-
-                        <div class="mt-2 space-y-2">
-                            @php
-                                $periodModel = $isRotationMode ? 'bulkFormData.work_periods_a' : 'bulkFormData.work_periods';
-                            @endphp
-
-                            @forelse($periodsA as $pid => $label)
-                                <label class="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-white transition">
-                                    <input
-                                        type="checkbox"
-                                        class="w-4 h-4 text-[color:var(--brand-via)] border-gray-300 rounded focus:ring-[color:var(--brand-via)]"
-                                        value="{{ $pid }}"
-                                        wire:model.live="{{ $periodModel }}"
-                                        @cannot('attendance.manage') disabled @endcannot
-                                    >
-                                    <span class="text-sm font-bold text-gray-900 font-mono" dir="ltr">{{ $label }}</span>
-                                </label>
-                            @empty
-                                <p class="text-xs text-gray-400 italic">
-                                    {{ tr('No work periods found for this schedule') }}
-                                </p>
-                            @endforelse
-
-                            @if(!$isRotationMode)
-                                @error('bulkFormData.work_periods')
-                                    <span class="text-red-500 text-xs mt-1 block">{{ $message }}</span>
-                                @enderror
-                            @else
-                                @error('bulkFormData.work_periods_a')
-                                    <span class="text-red-500 text-xs mt-1 block">{{ $message }}</span>
-                                @enderror
-                            @endif
-                        </div>
-                    </div>
                 </div>
 
                 @if($isRotationMode)
@@ -246,38 +226,6 @@
                         @error('bulkFormData.rotation_work_schedule_id')
                             <span class="text-red-500 text-xs mt-1">{{ $message }}</span>
                         @enderror
-
-                        <div class="mt-2 p-3 bg-gray-50 rounded-xl border border-gray-100">
-                            <div class="flex items-center justify-between">
-                                <div class="text-xs text-gray-500 font-semibold">{{ tr('Work Period') }}</div>
-                                <div class="text-[11px] text-gray-500">
-                                    {{ tr('Select one or more periods') }}
-                                </div>
-                            </div>
-
-                            <div class="mt-2 space-y-2">
-                                @forelse($periodsB as $pid => $label)
-                                    <label class="flex items-center gap-2 rounded-lg px-2 py-1 hover:bg-white transition">
-                                        <input
-                                            type="checkbox"
-                                            class="w-4 h-4 text-[color:var(--brand-via)] border-gray-300 rounded focus:ring-[color:var(--brand-via)]"
-                                            value="{{ $pid }}"
-                                            wire:model.live="bulkFormData.work_periods_b"
-                                            @cannot('attendance.manage') disabled @endcannot
-                                        >
-                                        <span class="text-sm font-bold text-gray-900 font-mono" dir="ltr">{{ $label }}</span>
-                                    </label>
-                                @empty
-                                    <p class="text-xs text-gray-400 italic">
-                                        {{ tr('No work periods found for this schedule') }}
-                                    </p>
-                                @endforelse
-
-                                @error('bulkFormData.work_periods_b')
-                                    <span class="text-red-500 text-xs mt-1 block">{{ $message }}</span>
-                                @enderror
-                            </div>
-                        </div>
                     </div>
                 @endif
 

@@ -112,6 +112,11 @@ class AttendanceDailyLog extends Model
         return $this->hasMany(AttendanceDailyDetail::class, 'daily_log_id');
     }
 
+    public function scheduleException(): BelongsTo
+    {
+        return $this->belongsTo(EmployeeWorkScheduleException::class, 'employee_id', 'employee_id');
+    }
+
     // Scopes
     public function scopeForCompany($query, $companyId)
     {
@@ -166,7 +171,7 @@ class AttendanceDailyLog extends Model
         $service = app(\Athka\SystemSettings\Services\WorkScheduleService::class);
         $dateStr = \Carbon\Carbon::parse($date)->toDateString();
 
-        // âœ… Check for approved leaves
+        // ✅ Check for approved leaves
         $leave = \Athka\Attendance\Models\AttendanceLeaveRequest::withoutGlobalScopes()
             ->where('employee_id', $this->employee_id)
             ->where('status', 'approved')
@@ -184,7 +189,7 @@ class AttendanceDailyLog extends Model
 
         $schedule = $service->getEffectiveSchedule((int)$companyId, $this->employee, $dateStr);
         $holidays = $service->getHolidays((int)$companyId, $dateStr, $dateStr);
-        $metrics = $service->getMetricsForDate($dateStr, $schedule, $holidays);
+        $metrics = $service->getMetricsForDate($dateStr, $schedule, $holidays, $this->employee);
 
         $this->work_schedule_id = $schedule ? $schedule->id : null;
         $this->scheduled_hours = $metrics['hours'] ?? 0;

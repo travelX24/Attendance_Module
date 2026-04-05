@@ -56,6 +56,30 @@ trait WithMissionRequests
 
         $data = $this->validate($rules);
 
+        // ✅ Exceptional Day Overlap Check
+        if (class_exists(\Athka\SystemSettings\Services\WorkScheduleService::class)) {
+            $wsService = app(\Athka\SystemSettings\Services\WorkScheduleService::class);
+            $start = Carbon::parse($data['mission_start_date']);
+            $end = $data['mission_type'] === 'full_day' ? Carbon::parse($data['mission_end_date'] ?: $data['mission_start_date']) : $start->copy();
+            
+            $employee = \Athka\Employees\Models\Employee::find((int)$data['mission_employee_id']);
+            
+            $currDate = $start->copy();
+            while ($currDate->lte($end)) {
+                $exDay = $wsService->getExceptionalDay($this->companyId, $currDate->toDateString(), $employee);
+                if ($exDay && (bool)($exDay->is_holiday ?? true)) {
+                    $isOfficial = (bool)($exDay->is_official_holiday ?? false);
+                    $typeLabel = $isOfficial ? tr('Official Holiday') : tr('Exceptional Day');
+                    $msgPart = tr('Cannot request mission on this date');
+                    
+                    $msg = $msgPart . ': ' . $typeLabel . ' - ' . ($exDay->name ?? '') . ' (' . $currDate->toDateString() . ')';
+                    $this->addError('mission_start_date', $msg);
+                    return;
+                }
+                $currDate->addDay();
+            }
+        }
+
         $table = (new AttendanceMissionRequest())->getTable();
         $coCol = $this->detectCompanyColumn($table);
 

@@ -47,8 +47,7 @@
                             <tr>
                                 <th class="px-4 py-3 min-w-[140px]">{{ tr('Date') }}</th>
                                 <th class="px-2 py-3 w-32 text-center">{{ tr('Status') }}</th>
-                                <th class="px-2 py-3 w-20 text-center text-gray-400">{{ tr('Sched In') }}</th>
-                                <th class="px-2 py-3 w-20 text-center text-gray-400">{{ tr('Sched Out') }}</th>
+                                <th class="px-2 py-3 w-32 text-center text-gray-400 font-bold tracking-tight">{{ tr('Scheduled Periods') }}</th>
                                 <th class="px-2 py-3 w-28 text-center bg-[color:var(--brand-via)]/5 border-s border-[color:var(--brand-via)]/10 text-[color:var(--brand-via)]">{{ tr('Check In') }}</th>
                                 <th class="px-2 py-3 w-28 text-center bg-[color:var(--brand-via)]/5 border-e border-[color:var(--brand-via)]/10 text-[color:var(--brand-via)]">{{ tr('Check Out') }}</th>
                                 <th class="px-2 py-3 w-20 text-center">{{ tr('Actual') }}</th>
@@ -68,29 +67,46 @@
                                     
                                     <!-- Status -->
                                     <td class="px-2 py-2 text-center">
-                                        <select wire:model="monthlyEditForm.{{ $index }}.status" 
-                                             class="text-[10px] font-bold rounded-lg border-gray-200 focus:ring-[color:var(--brand-via)] focus:border-[color:var(--brand-via)] block w-full py-1.5 px-2 cursor-pointer
-                                             {{ $day['status'] == 'present' ? 'text-green-700 bg-green-50 border-green-100' : 
-                                               ($day['status'] == 'absent' ? 'text-red-700 bg-red-50 border-red-100' : 
-                                               ($day['status'] == 'late' ? 'text-yellow-700 bg-yellow-50 border-yellow-100' : 
-                                               ($day['status'] == 'weekend' ? 'text-gray-400 bg-gray-50' : 'text-gray-700 bg-white'))) }}"
-                                             @cannot('attendance.manage') disabled @endcannot>
-                                            <option value="present">{{ tr('Present') }}</option>
-                                            <option value="late">{{ tr('Late') }}</option>
-                                            <option value="early_departure">{{ tr('Early Leave') }}</option>
-                                            <option value="absent">{{ tr('Absent') }}</option>
-                                            <option value="on_leave">{{ tr('On Leave') }}</option>
-                                            <option value="day_off">{{ tr('Day Off') }}</option>
-                                            <option value="holiday">{{ tr('Holiday') }}</option>
-                                        </select>
-                                    </td>
+                                         <div class="flex items-center gap-1">
+                                            <select wire:model="monthlyEditForm.{{ $index }}.status" 
+                                                 class="text-[10px] font-bold rounded-lg border-gray-200 focus:ring-[color:var(--brand-via)] focus:border-[color:var(--brand-via)] block w-full py-1.5 px-2 cursor-pointer
+                                                 {{ $day['status'] == 'present' ? 'text-green-700 bg-green-50 border-green-100' : 
+                                                   ($day['status'] == 'absent' ? 'text-red-700 bg-red-50 border-red-100' : 
+                                                   ($day['status'] == 'late' ? 'text-yellow-700 bg-yellow-50 border-yellow-100' : 
+                                                   ($day['status'] == 'weekend' ? 'text-gray-400 bg-gray-50' : 'text-gray-700 bg-white'))) }}"
+                                                 @cannot('attendance.manage') disabled @endcannot>
+                                                <option value="present">{{ tr('Present') }}</option>
+                                                <option value="late">{{ tr('Late') }}</option>
+                                                <option value="early_departure">{{ tr('Early Leave') }}</option>
+                                                <option value="absent">{{ tr('Absent') }}</option>
+                                                <option value="on_leave">{{ tr('On Leave') }}</option>
+                                                <option value="day_off">{{ tr('Day Off') }}</option>
+                                                <option value="holiday">{{ tr('Holiday') }}</option>
+                                            </select>
+                                            @if($day['is_exception'] ?? false)
+                                                @php
+                                                    $tooltipPrefix = ($day['is_official_holiday'] ?? false) ? tr('Official Holiday') : tr('Exceptional Day');
+                                                @endphp
+                                                <span class="text-amber-500 shrink-0" title="{{ $tooltipPrefix }}: {{ $day['exception_name'] }}">
+                                                    <i class="fas fa-star text-[10px]"></i>
+                                                </span>
+                                            @endif
+                                         </div>
+                                     </td>
 
-                                    <!-- Scheduled -->
-                                    <td class="px-2 py-2 text-center font-mono text-[10px] text-gray-400">
-                                        {{ $day['scheduled_in'] ? \Carbon\Carbon::parse($day['scheduled_in'])->format('H:i') : '-' }}
-                                    </td>
-                                    <td class="px-2 py-2 text-center font-mono text-[10px] text-gray-400">
-                                        {{ $day['scheduled_out'] ? \Carbon\Carbon::parse($day['scheduled_out'])->format('H:i') : '-' }}
+                                    <!-- Scheduled Periods -->
+                                    <td class="px-2 py-2 text-center font-mono text-[10px] text-gray-400 border-x border-gray-50">
+                                        <div class="flex flex-col gap-0.5">
+                                            @if(!empty($day['scheduled_periods']))
+                                                @foreach($day['scheduled_periods'] as $sp)
+                                                    <div class="whitespace-nowrap px-1 bg-gray-50 rounded border border-gray-100/50">
+                                                        {{ $sp['start'] }} - {{ $sp['end'] }}
+                                                    </div>
+                                                @endforeach
+                                            @else
+                                                <span class="text-gray-300">-</span>
+                                            @endif
+                                        </div>
                                     </td>
 
                                      <!-- Check In/Out Inputs -->

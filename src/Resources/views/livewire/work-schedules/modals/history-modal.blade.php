@@ -44,46 +44,66 @@
                             <div class="absolute top-4 {{ app()->isLocale('ar') ? '-right-[9px]' : '-left-[9px]' }} w-4 h-4 rounded-full bg-white border-4 border-[color:var(--brand-via)] box-content shadow-sm z-10 group-hover:scale-110 transition-transform"></div>
 
                             <x-ui.card class="ms-4 !p-0 overflow-hidden hover:shadow-md transition-all duration-300 border-gray-200">
-                                <div class="p-4 border-b border-gray-50 bg-gray-50/50 flex items-center justify-between gap-2">
+                                <div class="p-4 border-b border-gray-50 bg-gray-50/50 flex items-center justify-between gap-4">
                                     <div class="flex items-center gap-2">
-                                        @if($log->action === 'work_schedule.assigned')
-                                            <x-ui.badge type="success" size="sm">
-                                                <i class="fas fa-plus-circle me-1"></i> {{ tr('Assigned') }}
-                                            </x-ui.badge>
-                                        @else
-                                            <x-ui.badge type="info" size="sm">
-                                                <i class="fas fa-edit me-1"></i> {{ tr('Changed') }}
-                                            </x-ui.badge>
-                                        @endif
+                                        @php
+                                            $actionMap = [
+                                                'work_schedule.assigned' => ['label' => tr('Assigned'), 'type' => 'success', 'icon' => 'fa-plus-circle'],
+                                                'work_schedule.changed'  => ['label' => tr('Changed'),  'type' => 'info',    'icon' => 'fa-edit'],
+                                                'work_schedule.deleted'  => ['label' => tr('Deleted'),  'type' => 'danger',  'icon' => 'fa-trash-alt'],
+                                                'work_schedule.edited'   => ['label' => tr('Modified'), 'type' => 'info',    'icon' => 'fa-pencil-alt'],
+                                                'work_schedule.bulk_assigned' => ['label' => tr('Bulk Assigned'), 'type' => 'success', 'icon' => 'fa-users'],
+                                            ];
+                                            $act = $actionMap[$log->action] ?? ['label' => $log->action, 'type' => 'default', 'icon' => 'fa-info-circle'];
+                                        @endphp
+                                        <x-ui.badge :type="$act['type']" size="sm">
+                                            <i class="fas {{ $act['icon'] }} mr-1.5 opacity-80"></i> {{ $act['label'] }}
+                                        </x-ui.badge>
                                     </div>
-                                    <span class="text-xs text-gray-500 font-medium flex items-center bg-white px-2 py-1 rounded-md border border-gray-100 shadow-sm">
-                                        <i class="far fa-clock me-1.5 text-gray-400"></i>
-                                        {{ company_date($log->created_at) }} {{ $log->created_at->format('H:i') }}
-                                    </span>
+                                    <div class="flex items-center gap-3">
+                                        <span class="text-[10px] font-mono text-gray-400 bg-white px-2 py-1 rounded border border-gray-100 shadow-sm" title="{{ tr('Exact Timestamp') }}">
+                                            {{ $log->created_at->format('Y-m-d H:i') }}
+                                        </span>
+                                        <span class="text-xs text-gray-600 font-bold flex items-center bg-white px-2 py-1 rounded-md border border-gray-100 shadow-sm min-w-[120px] justify-center">
+                                            <i class="far fa-calendar-alt me-1.5 text-blue-400"></i>
+                                            {{ company_date($log->created_at) }}
+                                        </span>
+                                    </div>
                                 </div>
 
                                 <div class="p-4 bg-white">
                                     @php
                                         $after = $log->after_json;
-                                        $scheduleId = $after['work_schedule_id'] ?? 0;
-                                        $schedule = \Athka\SystemSettings\Models\WorkSchedule::find($scheduleId);
-                                        $schName = $schedule ? $schedule->name : ($scheduleId ? tr('Deleted Schedule') . ' #' . $scheduleId : tr('N/A'));
+                                        $before = $log->before_json;
                                         
-                                        $startDate = $after['start_date'] ?? null;
-                                        $endDate = $after['end_date'] ?? null;
+                                        // If deleted, use 'before' data for info
+                                        $data = ($log->action === 'work_schedule.deleted') ? $before : $after;
+                                        
+                                        $scheduleId = $data['work_schedule_id'] ?? 0;
+                                        $schedule = \Athka\SystemSettings\Models\WorkSchedule::find($scheduleId);
+                                        $schName = $schedule ? $schedule->name : ($scheduleId ? tr('Schedule') . ' #' . $scheduleId : tr('N/A'));
+                                        
+                                        $startDate = $data['start_date'] ?? null;
+                                        $endDate = $data['end_date'] ?? null;
+                                        $isDeleted = ($log->action === 'work_schedule.deleted');
                                     @endphp
 
                                     <div class="flex items-start gap-4">
-                                        <div class="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg shrink-0">
-                                            <i class="fas fa-calendar-check"></i>
+                                        <div class="w-10 h-10 rounded-xl {{ $isDeleted ? 'bg-red-50 text-red-500' : 'bg-indigo-50 text-indigo-600' }} flex items-center justify-center text-lg shrink-0 border {{ $isDeleted ? 'border-red-100' : 'border-indigo-100' }}">
+                                            <i class="fas {{ $isDeleted ? 'fa-calendar-times' : 'fa-calendar-check' }}"></i>
                                         </div>
-                                        <div>
-                                            <p class="text-sm font-bold text-gray-900 flex items-center gap-2">
-                                                {{ $schName }}
-                                                @if(!$schedule && $scheduleId)
-                                                    <i class="fas fa-exclamation-triangle text-amber-500 text-xs" title="{{ tr('Schedule no longer exists') }}"></i>
+                                        <div class="flex-1">
+                                            <div class="flex items-center justify-between gap-2">
+                                                <p class="text-sm font-bold {{ $isDeleted ? 'text-red-700 line-through' : 'text-gray-900' }} flex items-center gap-2">
+                                                    {{ $schName }}
+                                                    @if(!$schedule && $scheduleId && !$isDeleted)
+                                                        <i class="fas fa-exclamation-triangle text-amber-500 text-[10px]" title="{{ tr('Schedule no longer exists') }}"></i>
+                                                    @endif
+                                                </p>
+                                                @if($isDeleted)
+                                                    <span class="text-[10px] font-black uppercase text-red-600 tracking-widest bg-red-50 px-2 py-0.5 rounded border border-red-200">{{ tr('Removed') }}</span>
                                                 @endif
-                                            </p>
+                                            </div>
                                             
                                             <div class="mt-2 flex flex-wrap gap-2 text-xs">
                                                 @if($startDate)
@@ -102,6 +122,13 @@
                                                     <div class="flex items-center gap-1.5 px-2 py-1 bg-purple-50 rounded border border-purple-100 text-purple-700">
                                                         <i class="fas fa-infinity text-[10px]"></i>
                                                         <span class="font-bold">{{ tr('Permanent') }}</span>
+                                                    </div>
+                                                @endif
+
+                                                @if($log->action === 'work_schedule.changed' && $before)
+                                                    <div class="w-full mt-1 pt-1 border-t border-dashed border-gray-100 text-[10px] text-gray-400 italic">
+                                                        <i class="fas fa-exchange-alt mr-1"></i>
+                                                        {{ tr('Prev Schedule') }}: {{ \Athka\SystemSettings\Models\WorkSchedule::find($before['work_schedule_id'] ?? 0)?->name ?: '#' . ($before['work_schedule_id'] ?? '?') }}
                                                     </div>
                                                 @endif
                                             </div>

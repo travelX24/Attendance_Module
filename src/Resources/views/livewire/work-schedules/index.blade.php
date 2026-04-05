@@ -16,147 +16,70 @@
             100% { transform: translateX(100%); }
         }
     </style>
-    @section('topbar-left-content')
-        <div x-data="{ selectionCount: {{ count($selectedEmployees) }} }"
-             x-on:selected-employees-count-updated.window="selectionCount = $event.detail[0].count">
-        <x-ui.page-header
-            :title="tr('Work Schedules Management')"
-            :subtitle="tr('Assign and monitor employee work schedules')"
-        >
-            <x-slot name="action">
-                <div class="flex flex-col sm:flex-row gap-2">
-                   @can('attendance.manage')
-                   <template x-if="selectionCount > 0">
-                        <div class="flex flex-col sm:flex-row gap-2">
-                            <x-ui.secondary-button x-on:click="$dispatch('triggerOpenBulkModal')" size="sm" :fullWidth="false" class="gap-2">
-                                <i class="fas fa-calendar-plus"></i>
-                                <span>{{ tr('Add Schedule') }}</span>
-                                (<span x-text="selectionCount"></span>)
-                            </x-ui.secondary-button>
-
-                            <x-ui.primary-button x-on:click="$dispatch('triggerOpenRotationModal')" size="sm" :fullWidth="false" :arrow="false" class="gap-2">
-                                <i class="fas fa-sync-alt"></i>
-                                <span>{{ tr('Add Rotation Schedule') }}</span>
-                                (<span x-text="selectionCount"></span>)
-                            </x-ui.primary-button>
-                        </div>
-                    </template>
-                    @endcan
-                </div>
-            </x-slot>
-        </x-ui.page-header>
-    </div>
-@endsection
+@php
+    // The top bar slot is now handled within the main view for better contextual placement
+@endphp
 
 <div class="space-y-6" dir="{{ $dir }}">
 
     {{-- Stats Grid --}}
-    <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-4">
         {{-- Total Employees - Reset Filter --}}
-        <div x-data="{ open: false }" class="relative" x-on:mouseenter="open = true" x-on:mouseleave="open = false">
+        <div class="relative">
             <x-ui.card hover
-                wire:click="$set('filterWarning', 'all')"
-                class="flex items-center gap-4 cursor-pointer transition-all border-2 {{ $filterWarning === 'all' ? 'border-[color:var(--brand-via)] bg-[color:var(--brand-via)]/5' : 'border-transparent' }}"
+                wire:click="clearAllFilters"
+                :title="tr('Shows all active employees in the company')"
+                class="flex items-center gap-4 cursor-pointer transition-all border-2 {{ $filterWarning === 'all' && $schedule_type === 'all' ? 'border-[color:var(--brand-via)] bg-[color:var(--brand-via)]/5' : 'border-transparent' }}"
             >
                 <div class="p-3 bg-indigo-50 text-[color:var(--brand-via)] rounded-xl">
-                    <i class="fas fa-users fa-lg"></i>
+                    <i class="fas fa-users-cog fa-lg"></i>
                 </div>
                 <div>
                     <p class="text-xs text-gray-500">{{ tr('Total Employees') }}</p>
                     <p class="text-lg font-bold text-gray-900">{{ $stats['total_employees'] }}</p>
                 </div>
             </x-ui.card>
+        </div>
 
-            {{-- Popover --}}
-            @if(count($warningEmployees['total_employees']) > 0)
-            <div 
-                x-show="open"
-                x-transition:enter="transition ease-out duration-200"
-                x-transition:enter-start="opacity-0 translate-y-1"
-                x-transition:enter-end="opacity-100 translate-y-0"
-                x-transition:leave="transition ease-in duration-150"
-                x-transition:leave-start="opacity-100 translate-y-0"
-                x-transition:leave-end="opacity-0 translate-y-1"
-                class="absolute z-50 top-full mt-2 w-full min-w-[240px] bg-white border border-indigo-100 shadow-2xl rounded-xl p-3 pointer-events-none"
-                style="backdrop-filter: blur(12px); background: rgba(255, 255, 255, 0.98);"
+        {{-- NEW: Linked Employees (Blue) --}}
+        <div class="relative">
+            <x-ui.card hover
+                wire:click="$set('schedule_type', 'linked')"
+                :title="tr('Employees who have an active work schedule assigned')"
+                class="flex items-center gap-4 cursor-pointer transition-all border-2 {{ $schedule_type === 'linked' ? 'border-blue-500 bg-blue-50' : 'border-transparent' }}"
             >
-                <div class="text-[10px] font-bold text-indigo-600 mb-2 uppercase tracking-wider flex items-center gap-2">
-                    <i class="fas fa-users text-xs"></i>
-                    {{ tr('Employee List') }}
+                <div class="p-3 bg-blue-50 text-blue-600 rounded-xl">
+                    <i class="fas fa-calendar-check fa-lg"></i>
                 </div>
-                <ul class="space-y-1.5 list-none p-0 m-0">
-                    @foreach($warningEmployees['total_employees'] as $name)
-                        <li class="flex items-center gap-2 text-xs text-gray-700">
-                            <div class="w-1.5 h-1.5 rounded-full bg-indigo-400"></div>
-                            <span class="truncate">{{ $name }}</span>
-                        </li>
-                    @endforeach
-                    @if($stats['total_employees'] > 10)
-                        <li class="pt-1 mt-1 border-t border-indigo-50 text-[10px] text-gray-400 italic">
-                            {{ tr('and :count more...', ['count' => $stats['total_employees'] - 10]) }}
-                        </li>
-                    @endif
-                </ul>
-            </div>
-            @endif
+                <div class="flex-1">
+                    <p class="text-xs text-gray-500">{{ tr('Linked Employees') }}</p>
+                    <p class="text-lg font-bold text-gray-900">{{ $stats['with_schedule'] }}</p>
+                </div>
+            </x-ui.card>
         </div>
 
         {{-- Red Warning: No Schedule --}}
-        <div x-data="{ open: false }" class="relative" x-on:mouseenter="open = true" x-on:mouseleave="open = false">
+        <div class="relative">
             <x-ui.card hover
-                wire:click="setWarningFilter('no_schedule')"
-                class="flex items-center gap-4 cursor-pointer transition-all border-2 {{ $filterWarning === 'no_schedule' ? 'border-red-500 bg-red-50' : 'border-transparent' }}"
+                wire:click="$set('schedule_type', 'unlinked')"
+                :title="tr('Employees who are not yet assigned to any work schedule')"
+                class="flex items-center gap-4 cursor-pointer transition-all border-2 {{ $schedule_type === 'unlinked' || $filterWarning === 'no_schedule' ? 'border-red-500 bg-red-50' : 'border-transparent' }}"
             >
                 <div class="p-3 bg-red-50 text-red-600 rounded-xl">
                     <i class="fas fa-user-slash fa-lg"></i>
                 </div>
                 <div class="flex-1">
                     <p class="text-xs text-gray-500">{{ tr('No Schedule') }}</p>
-                    <div class="flex items-center justify-between">
-                        <p class="text-lg font-bold text-gray-900">{{ $earlyWarnings['no_schedule_overdue'] }}</p>
-                        <x-ui.badge type="danger" size="xs">{{ tr('Critical') }}</x-ui.badge>
-                    </div>
+                    <p class="text-lg font-bold text-gray-900">{{ $earlyWarnings['no_schedule_overdue'] }}</p>
                 </div>
             </x-ui.card>
-
-            {{-- Popover --}}
-            @if(count($warningEmployees['no_schedule_overdue']) > 0)
-            <div 
-                x-show="open"
-                x-transition:enter="transition ease-out duration-200"
-                x-transition:enter-start="opacity-0 translate-y-1"
-                x-transition:enter-end="opacity-100 translate-y-0"
-                x-transition:leave="transition ease-in duration-150"
-                x-transition:leave-start="opacity-100 translate-y-0"
-                x-transition:leave-end="opacity-0 translate-y-1"
-                class="absolute z-50 top-full mt-2 w-full min-w-[240px] bg-white border border-red-100 shadow-2xl rounded-xl p-3 pointer-events-none"
-                style="backdrop-filter: blur(12px); background: rgba(255, 255, 255, 0.98);"
-            >
-                <div class="text-[10px] font-bold text-red-600 mb-2 uppercase tracking-wider flex items-center gap-2">
-                    <i class="fas fa-exclamation-circle text-xs"></i>
-                    {{ tr('Affected Employees') }}
-                </div>
-                <ul class="space-y-1.5 list-none p-0 m-0">
-                    @foreach($warningEmployees['no_schedule_overdue'] as $name)
-                        <li class="flex items-center gap-2 text-xs text-gray-700">
-                            <div class="w-1.5 h-1.5 rounded-full bg-red-400"></div>
-                            <span class="truncate">{{ $name }}</span>
-                        </li>
-                    @endforeach
-                    @if($earlyWarnings['no_schedule_overdue'] > 10)
-                        <li class="pt-1 mt-1 border-t border-red-50 text-[10px] text-gray-400 italic">
-                            {{ tr('and :count more...', ['count' => $earlyWarnings['no_schedule_overdue'] - 10]) }}
-                        </li>
-                    @endif
-                </ul>
-            </div>
-            @endif
         </div>
 
         {{-- Yellow Warning: Ending Soon --}}
-        <div x-data="{ open: false }" class="relative" x-on:mouseenter="open = true" x-on:mouseleave="open = false">
+        <div class="relative">
             <x-ui.card hover
                 wire:click="setWarningFilter('ending_soon')"
+                :title="tr('Employees whose current schedule expires within the next 3 business days')"
                 class="flex items-center gap-4 cursor-pointer transition-all border-2 {{ $filterWarning === 'ending_soon' ? 'border-yellow-500 bg-yellow-50' : 'border-transparent' }}"
             >
                 <div class="p-3 bg-yellow-50 text-yellow-600 rounded-xl">
@@ -164,51 +87,16 @@
                 </div>
                 <div class="flex-1">
                     <p class="text-xs text-gray-500">{{ tr('Ending Soon') }}</p>
-                    <div class="flex items-center justify-between">
-                        <p class="text-lg font-bold text-gray-900">{{ $earlyWarnings['ending_soon'] }}</p>
-                        <x-ui.badge type="warning" size="xs">{{ tr('Warning') }}</x-ui.badge>
-                    </div>
+                    <p class="text-lg font-bold text-gray-900">{{ $earlyWarnings['ending_soon'] }}</p>
                 </div>
             </x-ui.card>
-
-            {{-- Popover --}}
-            @if(count($warningEmployees['ending_soon']) > 0)
-            <div 
-                x-show="open"
-                x-transition:enter="transition ease-out duration-200"
-                x-transition:enter-start="opacity-0 translate-y-1"
-                x-transition:enter-end="opacity-100 translate-y-0"
-                x-transition:leave="transition ease-in duration-150"
-                x-transition:leave-start="opacity-100 translate-y-0"
-                x-transition:leave-end="opacity-0 translate-y-1"
-                class="absolute z-50 top-full mt-2 w-full min-w-[240px] bg-white border border-yellow-100 shadow-2xl rounded-xl p-3 pointer-events-none"
-                style="backdrop-filter: blur(12px); background: rgba(255, 255, 255, 0.98);"
-            >
-                <div class="text-[10px] font-bold text-yellow-600 mb-2 uppercase tracking-wider flex items-center gap-2">
-                    <i class="fas fa-clock text-xs"></i>
-                    {{ tr('Affected Employees') }}
-                </div>
-                <ul class="space-y-1.5 list-none p-0 m-0">
-                    @foreach($warningEmployees['ending_soon'] as $name)
-                        <li class="flex items-center gap-2 text-xs text-gray-700">
-                            <div class="w-1.5 h-1.5 rounded-full bg-yellow-400"></div>
-                            <span class="truncate">{{ $name }}</span>
-                        </li>
-                    @endforeach
-                    @if($earlyWarnings['ending_soon'] > 10)
-                        <li class="pt-1 mt-1 border-t border-yellow-50 text-[10px] text-gray-400 italic">
-                            {{ tr('and :count more...', ['count' => $earlyWarnings['ending_soon'] - 10]) }}
-                        </li>
-                    @endif
-                </ul>
-            </div>
-            @endif
         </div>
 
         {{-- Orange Warning: Changed Too Much --}}
-        <div x-data="{ open: false }" class="relative" x-on:mouseenter="open = true" x-on:mouseleave="open = false">
+        <div class="relative">
             <x-ui.card hover
                 wire:click="setWarningFilter('changed_too_much')"
+                :title="tr('Employees with more than two schedule changes during the current month')"
                 class="flex items-center gap-4 cursor-pointer transition-all border-2 {{ $filterWarning === 'changed_too_much' ? 'border-orange-500 bg-orange-50' : 'border-transparent' }}"
             >
                 <div class="p-3 bg-orange-50 text-orange-600 rounded-xl">
@@ -216,153 +104,190 @@
                 </div>
                 <div class="flex-1">
                     <p class="text-xs text-gray-500">{{ tr('High Turnover') }}</p>
-                    <div class="flex items-center justify-between">
-                        <p class="text-lg font-bold text-gray-900">{{ $earlyWarnings['changed_too_much'] }}</p>
-                        <x-ui.badge type="orange" size="xs">2+</x-ui.badge>
-                    </div>
+                    <p class="text-lg font-bold text-gray-900">{{ $earlyWarnings['changed_too_much'] }}</p>
                 </div>
             </x-ui.card>
-
-            {{-- Popover --}}
-            @if(count($warningEmployees['changed_too_much']) > 0)
-            <div 
-                x-show="open"
-                x-transition:enter="transition ease-out duration-200"
-                x-transition:enter-start="opacity-0 translate-y-1"
-                x-transition:enter-end="opacity-100 translate-y-0"
-                x-transition:leave="transition ease-in duration-150"
-                x-transition:leave-start="opacity-100 translate-y-0"
-                x-transition:leave-end="opacity-0 translate-y-1"
-                class="absolute z-50 top-full mt-2 w-full min-w-[240px] bg-white border border-orange-100 shadow-2xl rounded-xl p-3 pointer-events-none"
-                style="backdrop-filter: blur(12px); background: rgba(255, 255, 255, 0.98);"
-            >
-                <div class="text-[10px] font-bold text-orange-600 mb-2 uppercase tracking-wider flex items-center gap-2">
-                    <i class="fas fa-sync text-xs"></i>
-                    {{ tr('Affected Employees') }}
-                </div>
-                <ul class="space-y-1.5 list-none p-0 m-0">
-                    @foreach($warningEmployees['changed_too_much'] as $name)
-                        <li class="flex items-center gap-2 text-xs text-gray-700">
-                            <div class="w-1.5 h-1.5 rounded-full bg-orange-400"></div>
-                            <span class="truncate">{{ $name }}</span>
-                        </li>
-                    @endforeach
-                    @if($earlyWarnings['changed_too_much'] > 10)
-                        <li class="pt-1 mt-1 border-t border-orange-50 text-[10px] text-gray-400 italic">
-                            {{ tr('and :count more...', ['count' => $earlyWarnings['changed_too_much'] - 10]) }}
-                        </li>
-                    @endif
-                </ul>
-            </div>
-            @endif
         </div>
     </div>
     
-    {{-- Tab Switcher --}}
-    <div class="flex items-center gap-1 bg-white p-1 rounded-xl shadow-sm border border-gray-100 w-fit">
-        <button 
-            wire:click="setTab('list')"
-            class="px-6 py-2 rounded-lg text-sm font-bold transition-all {{ $activeTab === 'list' ? 'bg-[color:var(--brand-via)] text-white shadow-md' : 'text-gray-500 hover:bg-gray-50' }}"
+    {{-- Tab Switcher & Bulk Actions --}}
+    <div class="flex flex-col lg:flex-row lg:items-center justify-between gap-4"
+         x-data="{ selectionCount: {{ count($selectedEmployees) }} }"
+         x-on:selected-employees-count-updated.window="selectionCount = $event.detail[0].count">
+        
+        {{-- Tabs --}}
+        <div class="flex items-center gap-1 bg-white p-1 rounded-xl shadow-sm border border-gray-100 w-fit">
+            <button 
+                wire:click="setTab('list')"
+                class="px-6 py-2 rounded-lg text-sm font-bold transition-all {{ $activeTab === 'list' ? 'bg-[color:var(--brand-via)] text-white shadow-md' : 'text-gray-500 hover:bg-gray-50' }}"
+            >
+                <i class="fas fa-list me-2"></i>
+                {{ tr('Employee List') }}
+            </button>
+            <button 
+                wire:click="setTab('summary')"
+                class="px-6 py-2 rounded-lg text-sm font-bold transition-all {{ $activeTab === 'summary' ? 'bg-[color:var(--brand-via)] text-white shadow-md' : 'text-gray-500 hover:bg-gray-50' }}"
+            >
+                <i class="fas fa-th-list me-2"></i>
+                {{ tr('Schedules Summary') }}
+            </button>
+        </div>
+
+        {{-- Bulk Actions Toolbar (Appears only on selection) --}}
+        @can('attendance.manage')
+        <div 
+            x-show="selectionCount > 0"
+            x-transition:enter="transition ease-out duration-300"
+            x-transition:enter-start="opacity-0 translate-x-4"
+            x-transition:enter-end="opacity-100 translate-x-0"
+            x-transition:leave="transition ease-in duration-200"
+            x-transition:leave-start="opacity-100 translate-x-0"
+            x-transition:leave-end="opacity-0 translate-x-4"
+            class="flex items-center gap-3 bg-gray-900 text-white px-4 py-2 rounded-2xl shadow-xl border border-gray-700"
         >
-            <i class="fas fa-list me-2"></i>
-            {{ tr('Employee List') }}
-        </button>
-        <button 
-            wire:click="setTab('summary')"
-            class="px-6 py-2 rounded-lg text-sm font-bold transition-all {{ $activeTab === 'summary' ? 'bg-[color:var(--brand-via)] text-white shadow-md' : 'text-gray-500 hover:bg-gray-50' }}"
-        >
-            <i class="fas fa-th-list me-2"></i>
-            {{ tr('Schedules Summary') }}
-        </button>
+            <div class="flex items-center gap-2 border-e border-gray-700 pe-4 me-1">
+                <div class="w-8 h-8 rounded-full bg-[color:var(--brand-via)] flex items-center justify-center text-white text-xs font-bold shadow-lg shadow-[color:var(--brand-via)]/20">
+                    <span x-text="selectionCount"></span>
+                </div>
+                <span class="text-xs font-semibold text-gray-300">{{ tr('Selected') }}</span>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <button 
+                    x-on:click="$dispatch('triggerOpenBulkModal')"
+                    class="group flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-xl transition-all active:scale-95"
+                >
+                    <i class="fas fa-calendar-plus text-blue-400 group-hover:scale-110 transition-transform"></i>
+                    <span>{{ tr('Assign Schedule') }}</span>
+                </button>
+
+                <button 
+                    x-on:click="$dispatch('triggerOpenRotationModal')"
+                    class="group flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-xl transition-all active:scale-95 border border-dashed border-gray-600 hover:border-gray-400"
+                >
+                    <i class="fas fa-sync-alt text-purple-400 group-hover:rotate-45 transition-transform"></i>
+                    <span>{{ tr('Assign Rotation') }}</span>
+                </button>
+
+                <button 
+                    wire:click="$set('selectedEmployees', [])"
+                    class="p-2 text-gray-400 hover:text-red-400 transition-colors"
+                    title="{{ tr('Clear Selection') }}"
+                >
+                    <i class="fas fa-times-circle fa-lg"></i>
+                </button>
+            </div>
+        </div>
+        @endcan
     </div>
 
     {{-- Filters & Content --}}
     <x-ui.card padding="false" class="!overflow-visible" wire:poll.60s>
         {{-- Toolbar / Filters --}}
         <div class="p-4 border-b border-gray-100 bg-gray-50/30 relative">
-            {{-- Loading State --}}
-            {{-- ✅ Flex wrap instead of horizontal scroll to ensure dropdowns are never clipped --}}
-            <div class="flex flex-wrap items-end gap-4 p-1">
+            {{-- Filters Grid --}}
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-4 items-end">
 
-                    {{-- Search --}}
-                    <div class="shrink-0 w-[300px] min-w-[300px]">
-                        <x-ui.search-box
-                            model="search"
-                            wire:model.live.debounce.300ms="search"
-                            :placeholder="tr('Search by name or employee ID...')"
-                            class="w-full"
-                            :disabled="!auth()->user()->can('attendance.manage')"
-                        />
-                    </div>
+                {{-- Search --}}
+                <div class="lg:col-span-1 xl:col-span-1">
+                    <x-ui.search-box
+                        model="search"
+                        wire:model.live.debounce.300ms="search"
+                        :placeholder="tr('Search by name or employee ID...')"
+                        class="w-full"
+                        :disabled="!auth()->user()->can('attendance.manage')"
+                    />
+                </div>
 
-                    {{-- Department --}}
-                    <div class="shrink-0 w-[220px] min-w-[220px]">
-                        <x-ui.filter-select
-                            model="department_id"
-                            :label="tr('Department')"
-                            :placeholder="tr('All Departments')"
-                            :options="array_merge([['value' => 'all', 'label' => tr('All Departments')]], $departments->map(fn($d) => ['value' => (string)$d->id, 'label' => $d->name])->toArray())"
-                            width="md"
-                            :defer="false"
-                            :applyOnChange="true"
-                            class="w-full"
-                            :disabled="!auth()->user()->can('attendance.manage')"
-                        />
-                    </div>
+                {{-- Department --}}
+                <div class="">
+                    <x-ui.filter-select
+                        model="department_id"
+                        :label="tr('Department')"
+                        :placeholder="tr('All Departments')"
+                        :options="array_merge([['value' => 'all', 'label' => tr('All Departments')]], $departments->map(fn($d) => ['value' => (string)$d->id, 'label' => $d->name])->toArray())"
+                        width="full"
+                        :defer="false"
+                        :applyOnChange="true"
+                        class="w-full"
+                        :disabled="!auth()->user()->can('attendance.manage')"
+                    />
+                </div>
 
-                    {{-- Link Status --}}
-                    <div class="shrink-0 w-[220px] min-w-[220px]">
-                        <x-ui.filter-select
-                            model="schedule_type"
-                            :label="tr('Link Status')"
-                            :placeholder="tr('All')"
-                            :options="[
-                                ['value' => 'linked', 'label' => tr('Linked')],
-                                ['value' => 'unlinked', 'label' => tr('Unlinked')],
-                            ]"
-                            width="md"
-                            :defer="false"
-                            :applyOnChange="true"
-                            class="w-full"
-                            :disabled="!auth()->user()->can('attendance.manage')"
-                        />
-                    </div>
+                {{-- Link Status --}}
+                <div class="">
+                    <x-ui.filter-select
+                        model="schedule_type"
+                        :label="tr('Link Status')"
+                        :placeholder="tr('All')"
+                        :options="[
+                            ['value' => 'linked', 'label' => tr('Linked')],
+                            ['value' => 'unlinked', 'label' => tr('Unlinked')],
+                        ]"
+                        width="full"
+                        :defer="false"
+                        :applyOnChange="true"
+                        class="w-full"
+                        :disabled="!auth()->user()->can('attendance.manage')"
+                    />
+                </div>
 
-                    {{-- Work Schedule --}}
-                    <div class="shrink-0 w-[280px] min-w-[280px]">
-                        <x-ui.filter-select
-                            model="work_schedule_id"
-                            :label="tr('Work Schedule')"
-                            :placeholder="tr('All Schedules')"
-                            :options="array_merge([['value' => 'all', 'label' => tr('All Schedules')]], $workSchedules->map(fn($s) => ['value' => (string)$s->id, 'label' => $s->name])->toArray())"
-                            width="lg"
-                            :defer="false"
-                            :applyOnChange="true"
-                            class="w-full"
-                            :disabled="!auth()->user()->can('attendance.manage')"
-                        />
-                    </div>
+                {{-- Work Schedule --}}
+                <div class="">
+                    <x-ui.filter-select
+                        model="work_schedule_id"
+                        :label="tr('Work Schedule')"
+                        :placeholder="tr('All Schedules')"
+                        :options="array_merge([['value' => 'all', 'label' => tr('All Schedules')]], $workSchedules->map(fn($s) => ['value' => (string)$s->id, 'label' => $s->name])->toArray())"
+                        width="full"
+                        :defer="false"
+                        :applyOnChange="true"
+                        class="w-full"
+                        :disabled="!auth()->user()->can('attendance.manage')"
+                    />
+                </div>
 
-                    {{-- Warnings --}}
-                    <div class="shrink-0 w-[220px] min-w-[220px]">
-                        <x-ui.filter-select
-                            model="filterWarning"
-                            :label="tr('Warnings')"
-                            :placeholder="tr('All Warnings')"
-                            :options="[
-                                ['value' => 'all', 'label' => tr('All')],
-                                ['value' => 'no_schedule', 'label' => tr('No Schedule')],
-                                ['value' => 'ending_soon', 'label' => tr('Ending Soon')],
-                                ['value' => 'changed_too_much', 'label' => tr('Too many changes')],
-                                ['value' => 'inactive_schedule', 'label' => tr('Inactive Schedule')],
-                            ]"
-                            width="md"
-                            :defer="false"
-                            :applyOnChange="true"
-                            class="w-full"
-                            :disabled="!auth()->user()->can('attendance.manage')"
-                        />
-                    </div>
+                {{-- Status --}}
+                <div class="">
+                    <x-ui.filter-select
+                        model="status"
+                        :label="tr('Employee Status')"
+                        :placeholder="tr('All Statuses')"
+                        :options="[
+                            ['value' => 'all', 'label' => tr('All')],
+                            ['value' => 'ACTIVE', 'label' => tr('Active')],
+                            ['value' => 'SUSPENDED', 'label' => tr('Suspended')],
+                            ['value' => 'TERMINATED', 'label' => tr('Terminated')],
+                        ]"
+                        width="full"
+                        :defer="false"
+                        :applyOnChange="true"
+                        class="w-full"
+                        :disabled="!auth()->user()->can('attendance.manage')"
+                    />
+                </div>
+
+                {{-- Warnings --}}
+                <div class="">
+                    <x-ui.filter-select
+                        model="filterWarning"
+                        :label="tr('Warnings')"
+                        :placeholder="tr('All Warnings')"
+                        :options="[
+                            ['value' => 'all', 'label' => tr('All')],
+                            ['value' => 'no_schedule', 'label' => tr('No Schedule')],
+                            ['value' => 'ending_soon', 'label' => tr('Ending Soon')],
+                            ['value' => 'changed_too_much', 'label' => tr('Too many changes')],
+                            ['value' => 'inactive_schedule', 'label' => tr('Inactive Schedule')],
+                        ]"
+                        width="full"
+                        :defer="false"
+                        :applyOnChange="true"
+                        class="w-full"
+                        :disabled="!auth()->user()->can('attendance.manage')"
+                    />
+                </div>
+            </div>
 
                     {{-- Clear Filters Button --}}
                     <div
@@ -372,6 +297,7 @@
                                        $wire.department_id !== 'all' ||
                                        $wire.schedule_type !== 'all' ||
                                        $wire.work_schedule_id !== 'all' ||
+                                       $wire.status !== 'all' ||
                                        $wire.filterWarning !== 'all' ||
                                        ($wire.location_id !== 'all' && $wire.location_id != '{{ auth()->user()->branch_id ?: 0 }}');
                             }
@@ -394,7 +320,6 @@
                         </button>
                     </div>
 
-                </div>
             </div>
         </div>
 
@@ -457,6 +382,7 @@
                 tr('Work Schedule'),
                 tr('Effective Date'),
                 tr('Expiry Date'),
+                tr('Employee Status'),
                 tr('Current Status'),
                 tr('Control'),
             ];
@@ -545,6 +471,19 @@
                     </td>
 
                     <td class="px-6 py-4">
+                        @php
+                            $status = strtoupper($employee->status ?? 'ACTIVE');
+                            $statusColor = 'green';
+                            if ($status === 'SUSPENDED') $statusColor = 'orange';
+                            elseif ($status === 'TERMINATED') $statusColor = 'red';
+                        @endphp
+                        <div class="flex items-center gap-1.5">
+                            <div class="w-2 h-2 rounded-full bg-{{ $statusColor }}-500"></div>
+                            <span class="text-xs text-{{ $statusColor }}-700 font-bold">{{ tr($status) }}</span>
+                        </div>
+                    </td>
+
+                    <td class="px-6 py-4">
                         @if($employee->current_schedule_name)
                             @php
                                 $today = now()->startOfDay();
@@ -596,23 +535,28 @@
                     <td class="px-6 py-4 text-center">
                         <div class="flex items-center justify-center gap-2">
                            @can('attendance.manage')
-                           <button type="button" wire:click="openBulkModalForSingleEmployee({{ $employee->id }})" wire:loading.attr="disabled" class="text-[color:var(--brand-via)] hover:text-[color:var(--brand-from)] text-xs font-bold transition-colors" title="{{ tr('Assign or change schedule') }}">
-                                {{ tr('Change') }}
+                           <button type="button" 
+                               wire:click="openBulkModalForSingleEmployee({{ $employee->id }})" 
+                               wire:loading.attr="disabled" 
+                               class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white rounded-lg text-xs font-bold transition-all border border-blue-100 hover:border-blue-600 active:scale-95 group shadow-sm" 
+                               title="{{ tr('Assign or change schedule') }}"
+                            >
+                                <i class="fas fa-calendar-plus opacity-70 group-hover:scale-110 transition-transform"></i>
+                                {{ tr('Assign') }}
                             </button>
 
-                            <span class="text-gray-200">|</span>
-
-                            <button type="button" wire:click="openRotationModalForSingleEmployee({{ $employee->id }})" wire:loading.attr="disabled" class="text-[color:var(--brand-via)] hover:text-[color:var(--brand-from)] text-xs font-bold transition-colors" title="{{ tr('Assign rotation schedule') }}">
+                            <button type="button" 
+                                wire:click="openRotationModalForSingleEmployee({{ $employee->id }})" 
+                                wire:loading.attr="disabled" 
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-600 hover:text-white rounded-lg text-xs font-bold transition-all border border-purple-100 hover:border-purple-600 active:scale-95 group shadow-sm" 
+                                title="{{ tr('Assign rotation schedule') }}"
+                            >
+                                <i class="fas fa-sync-alt opacity-70 group-hover:rotate-45 transition-transform"></i>
                                 {{ tr('Rotation') }}
                             </button>
                             @else
                                 <span class="text-gray-400"><i class="fas fa-lock text-[10px]"></i></span>
                             @endcan
-
-                            <span class="text-gray-200">|</span>
-
-
-                            <span class="text-gray-200">|</span>
 
                            <x-ui.actions-menu wire:key="actions-{{ $employee->id }}">
 
@@ -686,21 +630,30 @@
                                             @php
                                                 $isHoliday = $dayData['type'] === 'holiday';
                                                 $isLeave   = $dayData['type'] === 'leave';
+                                                $isExcept  = ($dayData['type'] ?? '') === 'exception';
+
                                                 $bgClass = $dayData['disabled'] 
                                                     ? 'bg-gray-100 text-gray-400' 
-                                                    : ($isHoliday 
-                                                        ? 'bg-slate-50 text-slate-400 border-slate-100' 
-                                                        : ($isLeave 
-                                                            ? 'bg-blue-50 text-blue-600 border-blue-100' 
-                                                            : 'bg-[color:var(--brand-via)]/10 text-[color:var(--brand-via)] border-[color:var(--brand-via)]/20'));
+                                                    : ($isExcept
+                                                        ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                                        : ($isHoliday 
+                                                            ? 'bg-slate-50 text-slate-400 border-slate-100' 
+                                                            : ($isLeave 
+                                                                ? 'bg-blue-50 text-blue-600 border-blue-100' 
+                                                                : 'bg-[color:var(--brand-via)]/10 text-[color:var(--brand-via)] border-[color:var(--brand-via)]/20')));
                                             @endphp
                                             <div
                                                 class="mx-auto px-2 py-1.5 rounded-md text-[9px] leading-tight font-bold {{ $bgClass }} border shadow-sm"
                                                 title="{{ $dayData['schedule'] }} {{ !empty($dayData['periods']) ? '(' . implode(', ', $dayData['periods']) . ')' : '' }}"
                                             >
-                                                <div class="truncate">{{ $dayData['schedule'] }}</div>
+                                                <div class="truncate flex items-center justify-center gap-1">
+                                                    @if($isExcept) <i class="fas fa-star text-[7px]"></i> @endif
+                                                    {{ $dayData['schedule'] }}
+                                                </div>
                                                 @if(!empty($dayData['periods']))
-                                                    <div class="text-[8px] opacity-70 mt-0.5">{{ implode(' | ', $dayData['periods']) }}</div>
+                                                    <div class="text-[8px] opacity-70 mt-0.5" dir="ltr">
+                                                        <span class="inline-block">{{ implode(' | ', $dayData['periods']) }}</span>
+                                                    </div>
                                                 @endif
                                             </div>
                                         @else

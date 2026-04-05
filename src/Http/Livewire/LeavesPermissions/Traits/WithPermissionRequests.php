@@ -219,6 +219,21 @@ trait WithPermissionRequests
 
         $this->minutes = $mins;
 
+        // ✅ Exceptional Day Check
+        if (class_exists(\Athka\SystemSettings\Services\WorkScheduleService::class)) {
+            $wsService = app(\Athka\SystemSettings\Services\WorkScheduleService::class);
+            $exDay = $wsService->getExceptionalDay($this->companyId, $date->toDateString(), $employee);
+            if ($exDay && (bool)($exDay->is_holiday ?? true)) {
+                $isOfficial = (bool)($exDay->is_official_holiday ?? false);
+                $typeLabel = $isOfficial ? tr('Official Holiday') : tr('Exceptional Day');
+                $msgPart = tr('Cannot request permission on this date');
+                
+                $msg = $msgPart . '. ' . $typeLabel . ': ' . ($exDay->name ?? '');
+                $this->addError('permission_date', $msg);
+                return;
+            }
+        }
+
         $approvalRequired = $this->isPermissionApprovalRequired();
 
         // ✅ Check Workflow existence (only if approval is required)
@@ -248,12 +263,12 @@ trait WithPermissionRequests
             'status' => $approvalRequired ? 'pending' : 'approved',
         ];
 
-        // âœ… company column (company_id vs saas_company_id)
+        // ✅ company column (company_id vs saas_company_id)
         if ($companyCol && Schema::hasColumn($permTable, $companyCol)) {
             $payload[$companyCol] = (int) $this->companyId;
         }
 
-        // âœ… optional columns (safe)
+        // ✅ optional columns (safe)
         if (Schema::hasColumn($permTable, 'requested_by')) $payload['requested_by'] = auth()->id();
         if (Schema::hasColumn($permTable, 'requested_at')) $payload['requested_at'] = now();
 
@@ -306,7 +321,7 @@ trait WithPermissionRequests
         $this->resetPage('permPage');
     }
 
-    // âœ… NEW: Group Permission Save
+    // ✅ NEW: Group Permission Save
     public function saveGroupPermission(): void
     {
         $this->ensureCanManage();
@@ -400,6 +415,22 @@ trait WithPermissionRequests
             return;
         }
         $this->group_minutes = $mins;
+
+        // ✅ Exceptional Day Check (for groups)
+        if (class_exists(\Athka\SystemSettings\Services\WorkScheduleService::class)) {
+            $wsService = app(\Athka\SystemSettings\Services\WorkScheduleService::class);
+            // We check the date once; if it's company-wide holiday, it affects all.
+            $exDay = $wsService->getExceptionalDay($this->companyId, $date->toDateString());
+            if ($exDay && (bool)($exDay->is_holiday ?? true)) {
+                $isOfficial = (bool)($exDay->is_official_holiday ?? false);
+                $typeLabel = $isOfficial ? tr('Official Holiday') : tr('Exceptional Day');
+                $msgPart = tr('Cannot request permission on this date');
+
+                $msg = $msgPart . '. ' . $typeLabel . ': ' . ($exDay->name ?? '');
+                $this->addError('group_permission_date', $msg);
+                return;
+            }
+        }
 
         // âœ… Validate within work window (Ù…Ø±Ø© ÙˆØ§Ø­Ø¯Ø©)
         if (!$this->validateGroupPermissionWithinWorkWindow($date, $from, $to)) {

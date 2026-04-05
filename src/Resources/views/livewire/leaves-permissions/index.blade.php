@@ -180,6 +180,16 @@
                 </div>
 
                 <div>
+                    <div class="text-[11px] text-gray-500 mb-1 font-bold uppercase tracking-wider">{{ tr('Employee Status') }}</div>
+                    <x-ui.select wire:model.live="status" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
+                        <option value="all">{{ tr('All Statuses') }}</option>
+                        <option value="ACTIVE">{{ tr('Active') }}</option>
+                        <option value="SUSPENDED">{{ tr('Suspended') }}</option>
+                        <option value="TERMINATED">{{ tr('Terminated') }}</option>
+                    </x-ui.select>
+                </div>
+
+                <div>
                     <div class="text-[11px] text-gray-500 mb-1 font-bold uppercase tracking-wider">{{ tr('Leave Type') }}</div>
                     <x-ui.select wire:model.live="filterLeavePolicyId" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
                         <option value="">{{ tr('All Leave Types') }}</option>
@@ -225,6 +235,7 @@
                     ($wire.filterLeavePolicyId && $wire.filterLeavePolicyId !== '') ||
                     ($wire.fromDate && $wire.fromDate !== '') ||
                     ($wire.toDate && $wire.toDate !== '') ||
+                    ($wire.status && $wire.status !== 'all') ||
                     ($wire.historyStatus && $wire.historyStatus !== '');
             }
         }" x-show="hasFilters()" x-transition class="flex items-center justify-end mt-4 pt-4 border-t border-gray-100">
@@ -239,8 +250,14 @@
 
     </x-ui.card>
 
-    {{-- Pending Section --}}
-    @if($tab === 'pending')
+    {{-- Content Area with Skeleton Loading for Tabs --}}
+    <div wire:loading.delay.longest wire:target="tab, setPendingSubTab, setTab" class="w-full">
+        @include('attendance::livewire.leaves.mini-placeholder')
+    </div>
+
+    <div wire:loading.remove.delay.longest wire:target="tab, setPendingSubTab, setTab">
+        {{-- Pending Section --}}
+        @if($tab === 'pending')
         <div class="space-y-6">
             {{-- Sub Tabs --}}
             <div class="flex items-center gap-6 border-b border-gray-200">
@@ -300,6 +317,7 @@
                         <thead class="bg-gray-50 text-gray-600">
                         <tr>
                             <th class="text-start p-3">{{ tr('Employee & Replacement') }}</th>
+                            <th class="text-start p-3">{{ tr('Emp. Status') }}</th>
                             <th class="text-start p-3">{{ tr('Policy') }}</th>
                             <th class="text-start p-3">{{ tr('Period & Duration') }}</th>
                             <th class="text-start p-3">{{ tr('Reason') }}</th>
@@ -339,6 +357,19 @@
                                             </div>
                                         </div>
                                     @endif
+                                </td>
+
+                                <td class="p-3">
+                                    @php
+                                        $empStatus = strtoupper($r->employee->status ?? 'ACTIVE');
+                                        $empStatusColor = 'green';
+                                        if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
+                                        elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
+                                    @endphp
+                                    <div class="flex items-center gap-1.5">
+                                        <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
+                                        <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
+                                    </div>
                                 </td>
 
                                 <td class="p-3">
@@ -443,7 +474,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="p-12 text-center text-gray-400">
+                                <td colspan="8" class="p-12 text-center text-gray-400">
                                     <div class="flex flex-col items-center gap-3">
                                         <i class="fas fa-file-signature text-3xl opacity-20"></i>
                                         <span class="italic">{{ tr('No pending requests found') }}</span>
@@ -456,7 +487,7 @@
                 </div>
 
                 <div class="p-3 border-t border-gray-100">
-                    {{ $pendingLeaveRequests->links() }}
+                    {{ $pendingLeaveRequests?->links() }}
                 </div>
             </x-ui.card>
             @endif
@@ -474,6 +505,7 @@
                         <thead class="bg-gray-50 text-gray-600">
                         <tr>
                             <th class="text-start p-3">{{ tr('Employee') }}</th>
+                            <th class="text-start p-3">{{ tr('Status') }}</th>
                             <th class="text-start p-3">{{ tr('Date & Time') }}</th>
                             <th class="text-start p-3">{{ tr('Duration') }}</th>
                             <th class="text-start p-3">{{ tr('Actions') }}</th>
@@ -488,6 +520,19 @@
                                         {{ $r->employee->name_ar ?? $r->employee->name_en ?? $r->employee->name ?? $r->employee->full_name ?? ('#' . $r->employee_id) }}
                                     </div>
                                     <div class="text-xs text-gray-400">#{{ $r->employee_id }}</div>
+                                </td>
+
+                                <td class="p-3">
+                                    @php
+                                        $empStatus = strtoupper($r->employee->status ?? 'ACTIVE');
+                                        $empStatusColor = 'green';
+                                        if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
+                                        elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
+                                    @endphp
+                                    <div class="flex items-center gap-1.5">
+                                        <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
+                                        <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
+                                    </div>
                                 </td>
 
                                 <td class="p-3">
@@ -556,7 +601,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="5" class="p-12 text-center text-gray-400">
+                                <td colspan="6" class="p-12 text-center text-gray-400">
                                     <div class="flex flex-col items-center gap-3">
                                         <i class="fas fa-user-clock text-3xl opacity-20"></i>
                                         <span class="italic">{{ tr('No pending permissions found') }}</span>
@@ -569,7 +614,7 @@
                 </div>
 
                 <div class="p-3 border-t border-gray-100">
-                    {{ $pendingPermissionRequests->links() }}
+                    {{ $pendingPermissionRequests?->links() }}
                 </div>
             </x-ui.card>
             @endif
@@ -587,6 +632,7 @@
                         <thead class="bg-gray-50 text-gray-600">
                         <tr>
                             <th class="text-start p-3">{{ tr('Employee') }}</th>
+                            <th class="text-start p-3">{{ tr('Status') }}</th>
                             <th class="text-start p-3">{{ tr('Original Period') }}</th>
                             <th class="text-start p-3">{{ tr('Cut End') }}</th>
                             <th class="text-start p-3">{{ tr('Actions') }}</th>
@@ -601,6 +647,19 @@
                                         {{ $row->employee->name_ar ?? $row->employee->name_en ?? $row->employee->name ?? $row->employee->full_name ?? ('#' . $row->employee_id) }}
                                     </div>
                                     <div class="text-xs text-gray-400">#{{ $row->employee_id }}</div>
+                                </td>
+    
+                                <td class="p-3">
+                                    @php
+                                        $empStatus = strtoupper($row->employee->status ?? 'ACTIVE');
+                                        $empStatusColor = 'green';
+                                        if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
+                                        elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
+                                    @endphp
+                                    <div class="flex items-center gap-1.5">
+                                        <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
+                                        <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
+                                    </div>
                                 </td>
 
                                 <td class="p-3 text-gray-700">
@@ -643,7 +702,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="4" class="p-12 text-center text-gray-400">
+                                <td colspan="5" class="p-12 text-center text-gray-400">
                                     <div class="flex flex-col items-center gap-3">
                                         <i class="fas fa-cut text-3xl opacity-20"></i>
                                         <span class="italic">{{ tr('No pending cut requests found') }}</span>
@@ -656,7 +715,7 @@
                 </div>
 
                 <div class="p-3 border-t border-gray-100">
-                    {{ $pendingCutLeaveRequests->links() }}
+                    {{ $pendingCutLeaveRequests?->links() }}
                 </div>
             </x-ui.card>
             @endif
@@ -674,6 +733,7 @@
                         <thead class="bg-gray-50 text-gray-600">
                         <tr>
                             <th class="text-start p-3">{{ tr('Employee') }}</th>
+                            <th class="text-start p-3">{{ tr('Status') }}</th>
                             <th class="text-start p-3">{{ tr('Type') }}</th>
                             <th class="text-start p-3">{{ tr('Dates') }}</th>
                             <th class="text-start p-3">{{ tr('Duration') }}</th>
@@ -691,6 +751,19 @@
                                         {{ $r->employee->name_ar ?? $r->employee->name_en ?? $r->employee->name ?? $r->employee->full_name ?? ('#' . $r->employee_id) }}
                                     </div>
                                     <div class="text-xs text-gray-400">#{{ $r->employee_id }}</div>
+                                </td>
+
+                                <td class="p-3">
+                                    @php
+                                        $empStatus = strtoupper($r->employee->status ?? 'ACTIVE');
+                                        $empStatusColor = 'green';
+                                        if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
+                                        elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
+                                    @endphp
+                                    <div class="flex items-center gap-1.5">
+                                        <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
+                                        <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
+                                    </div>
                                 </td>
 
                                 <td class="p-3">
@@ -770,7 +843,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="p-12 text-center text-gray-400">
+                                <td colspan="8" class="p-12 text-center text-gray-400">
                                     <div class="flex flex-col items-center gap-3">
                                         <i class="fas fa-plane-departure text-3xl opacity-20"></i>
                                         <span class="italic">{{ tr('No pending mission requests found') }}</span>
@@ -804,6 +877,7 @@
                     <thead class="bg-gray-50 text-gray-600">
                     <tr>
                         <th class="text-start p-3">{{ tr('Employee') }}</th>
+                        <th class="text-start p-3">{{ tr('Status') }}</th>
                         <th class="text-start p-3">{{ tr('Policy') }}</th>
                         <th class="text-start p-3">{{ tr('Entitled') }}</th>
                         <th class="text-start p-3">{{ tr('Taken') }}</th>
@@ -821,6 +895,19 @@
                                     {{ $b->employee->name_ar ?? $b->employee->name_en ?? $b->employee->name ?? $b->employee->full_name ?? ('#' . $b->employee_id) }}
                                 </div>
                                 <div class="text-xs text-gray-400">#{{ $b->employee_id }}</div>
+                            </td>
+
+                            <td class="p-3">
+                                @php
+                                    $empStatus = strtoupper($b->employee->status ?? 'ACTIVE');
+                                    $empStatusColor = 'green';
+                                    if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
+                                    elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
+                                @endphp
+                                <div class="flex items-center gap-1.5">
+                                    <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
+                                    <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
+                                </div>
                             </td>
 
                             <td class="p-3 font-semibold text-gray-800">{{ $b->policy->name ?? '-' }}</td>
@@ -865,7 +952,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="7" class="p-4 text-center text-gray-500">
+                            <td colspan="8" class="p-4 text-center text-gray-500">
                                 {{ tr('No balances yet. Balances will be created automatically after approvals.') }}
                             </td>
                         </tr>
@@ -896,6 +983,7 @@
                         <thead class="bg-gray-50 text-gray-600">
                         <tr>
                             <th class="text-start p-3">{{ tr('Employee & Replacement') }}</th>
+                            <th class="text-start p-3">{{ tr('Emp. Status') }}</th>
                             <th class="text-start p-3">{{ tr('Policy') }}</th>
                             <th class="text-start p-3">{{ tr('Dates') }}</th>
                             <th class="text-start p-3">{{ tr('Duration') }}</th>
@@ -922,6 +1010,32 @@
                                             </span>
                                         </div>
                                     @endif
+                                </td>
+
+                                <td class="p-3">
+                                    @php
+                                        $empStatus = strtoupper($r->employee->status ?? 'ACTIVE');
+                                        $empStatusColor = 'green';
+                                        if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
+                                        elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
+                                    @endphp
+                                    <div class="flex items-center gap-1.5">
+                                        <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
+                                        <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
+                                    </div>
+                                </td>
+
+                                <td class="p-3">
+                                    @php
+                                        $empStatus = strtoupper($r->employee->status ?? 'ACTIVE');
+                                        $empStatusColor = 'green';
+                                        if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
+                                        elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
+                                    @endphp
+                                    <div class="flex items-center gap-1.5">
+                                        <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
+                                        <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
+                                    </div>
                                 </td>
 
                                 <td class="p-3 font-semibold text-gray-800">
@@ -986,7 +1100,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="p-4 text-center text-gray-500">
+                                <td colspan="8" class="p-4 text-center text-gray-500">
                                     {{ tr('No previous leave requests') }}
                                 </td>
                             </tr>
@@ -1012,6 +1126,7 @@
                         <thead class="bg-gray-50 text-gray-600">
                         <tr>
                             <th class="text-start p-3">{{ tr('Employee') }}</th>
+                            <th class="text-start p-3">{{ tr('Emp. Status') }}</th>
                             <th class="text-start p-3">{{ tr('Date') }}</th>
                             <th class="text-start p-3">{{ tr('Time') }}</th>
                             <th class="text-start p-3">{{ tr('Minutes') }}</th>
@@ -1028,6 +1143,19 @@
                                         {{ $r->employee->name_ar ?? $r->employee->name_en ?? $r->employee->name ?? $r->employee->full_name ?? ('#' . $r->employee_id) }}
                                     </div>
                                     <div class="text-xs text-gray-400">#{{ $r->employee_id }}</div>
+                                </td>
+
+                                <td class="p-3">
+                                    @php
+                                        $empStatus = strtoupper($r->employee->status ?? 'ACTIVE');
+                                        $empStatusColor = 'green';
+                                        if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
+                                        elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
+                                    @endphp
+                                    <div class="flex items-center gap-1.5">
+                                        <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
+                                        <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
+                                    </div>
                                 </td>
 
                                 <td class="p-3 text-gray-700 font-mono text-xs">
@@ -1105,6 +1233,7 @@
                         <thead class="bg-gray-50 text-gray-600">
                         <tr>
                             <th class="text-start p-3">{{ tr('Employee') }}</th>
+                            <th class="text-start p-3">{{ tr('Emp. Status') }}</th>
                             <th class="text-start p-3">{{ tr('Type') }}</th>
                             <th class="text-start p-3">{{ tr('Dates') }}</th>
                             <th class="text-start p-3">{{ tr('Duration') }}</th>
@@ -1121,6 +1250,19 @@
                                         {{ $r->employee->name_ar ?? $r->employee->name_en ?? $r->employee->name ?? $r->employee->full_name ?? ('#' . $r->employee_id) }}
                                     </div>
                                     <div class="text-xs text-gray-400">#{{ $r->employee_id }}</div>
+                                </td>
+
+                                <td class="p-3">
+                                    @php
+                                        $empStatus = strtoupper($r->employee->status ?? 'ACTIVE');
+                                        $empStatusColor = 'green';
+                                        if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
+                                        elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
+                                    @endphp
+                                    <div class="flex items-center gap-1.5">
+                                        <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
+                                        <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
+                                    </div>
                                 </td>
 
                                 <td class="p-3">
@@ -1159,7 +1301,7 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="6" class="p-4 text-center text-gray-500">
+                                <td colspan="7" class="p-4 text-center text-gray-500">
                                     {{ tr('No previous mission requests') }}
                                 </td>
                             </tr>
@@ -1169,7 +1311,7 @@
                 </div>
 
                 <div class="p-3 border-t border-gray-100">
-                    {{ $previousMissionRequests->links() }}
+                    {{ $previousMissionRequests?->links() }}
                 </div>
             </x-ui.card>
 
@@ -1189,6 +1331,7 @@
                         <th class="text-start p-3">{{ tr('When') }}</th>
                         <th class="text-start p-3">{{ tr('Actor') }}</th>
                         <th class="text-start p-3">{{ tr('Employee') }}</th>
+                        <th class="text-start p-3">{{ tr('Emp. Status') }}</th>
                         <th class="text-start p-3">{{ tr('Type') }}</th>
                         <th class="text-start p-3">{{ tr('Action') }}</th>
                     </tr>
@@ -1209,13 +1352,30 @@
                                 {{ $h->employee->name_ar ?? $h->employee->name_en ?? $h->employee->name ?? $h->employee->full_name ?? ($h->employee_id ? '#' . $h->employee_id : '-') }}
                             </td>
 
+                            <td class="p-3">
+                                @if($h->employee)
+                                    @php
+                                        $empStatus = strtoupper($h->employee->status ?? 'ACTIVE');
+                                        $empStatusColor = 'green';
+                                        if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
+                                        elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
+                                    @endphp
+                                    <div class="flex items-center gap-1.5">
+                                        <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
+                                        <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
+                                    </div>
+                                @else
+                                    <span class="text-xs text-gray-400">—</span>
+                                @endif
+                            </td>
+
                             <td class="p-3 text-gray-700">{{ $h->subject_type }}</td>
 
                             <td class="p-3 text-gray-900 font-bold">{{ $h->action }}</td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="5" class="p-4 text-center text-gray-500">
+                            <td colspan="6" class="p-4 text-center text-gray-500">
                                 {{ tr('No history yet') }}
                             </td>
                         </tr>
@@ -1225,7 +1385,7 @@
             </div>
 
             <div class="p-3 border-t border-gray-100">
-                {{ $history->links() }}
+                {{ $history?->links() }}
             </div>
         </x-ui.card>
     @endif

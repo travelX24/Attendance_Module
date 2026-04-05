@@ -5,6 +5,7 @@ namespace Athka\Attendance\Http\Livewire\WorkSchedules\Traits;
 use Athka\Employees\Models\Employee;
 use Athka\Attendance\Models\EmployeeWorkSchedule;
 use Athka\Attendance\Models\EmployeeWorkScheduleException;
+use Athka\Attendance\Models\AttendanceAuditLog;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
@@ -179,9 +180,9 @@ trait WithScheduleExceptions
         $companyId = $this->getCompanyId();
         $emp = Employee::forCompany($companyId)->findOrFail($employeeId);
         $this->historyEmployeeName = app()->isLocale('ar') ? ($emp->name_ar ?: $emp->name_en) : ($emp->name_en ?: $emp->name_ar);
-        $this->historyList = EmployeeWorkSchedule::where('saas_company_id', $companyId)
+        $this->historyList = AttendanceAuditLog::where('saas_company_id', $companyId)
             ->where('employee_id', $employeeId)
-            ->with('workSchedule')
+            ->with('actor')
             ->orderByDesc('id')
             ->get();
         $this->showHistoryModal = true;

@@ -21,6 +21,7 @@ trait WithLeavePermissionsFilters
     public string $fromDate = '';
     public string $toDate = '';
     public string $historyStatus = '';
+    public string $status = 'all';
 
     public string $branchId = '';
 
@@ -48,6 +49,7 @@ trait WithLeavePermissionsFilters
     public function updatedFromDate(): void { $this->resetAllPages(); }
     public function updatedToDate(): void { $this->resetAllPages(); }
     public function updatedHistoryStatus(): void { $this->resetAllPages(); }
+    public function updatedStatus(): void { $this->resetAllPages(); }
     public function updatedBranchId(): void
     {
         $allowed = $this->lpAllowedBranchIds();
@@ -72,6 +74,7 @@ trait WithLeavePermissionsFilters
         $this->toDate = '';
         $this->historyStatus = '';
         $this->branchId = '';
+        $this->status = 'all';
         $this->resetAllPages();
     }
 

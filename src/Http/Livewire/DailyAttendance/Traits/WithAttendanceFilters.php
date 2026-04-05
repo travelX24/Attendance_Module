@@ -27,6 +27,7 @@ trait WithAttendanceFilters
     public $department_id = 'all';
     public $branch_id = 'all';
     public $job_title_id = 'all';
+    public $status = 'all';
 
     public function updatingSearch()
     {
@@ -115,6 +116,12 @@ trait WithAttendanceFilters
         $this->resetPage();
     }
 
+    public function updatedStatus()
+    {
+        $this->resetPage();
+        $this->loadStats();
+    }
+
     public function updatedComplianceFrom()
     {
         $this->resetPage();
@@ -135,6 +142,7 @@ trait WithAttendanceFilters
         $this->compliance_to = '';
         $this->department_id = 'all';
         $this->job_title_id = 'all';
+        $this->status = 'all';
 
         $userBranchId = (int) (auth()->user()->branch_id ?? 0);
         $allowed = $this->allowedBranchIds();
@@ -167,7 +175,7 @@ trait WithAttendanceFilters
         if ($this->view_mode === 'summary') {
             $employeeQuery = Employee::forCompany($companyId)
                 ->with('branch')
-                ->where('status', 'active');
+                ->when($this->status !== 'all', fn($q) => $q->where('status', (string)$this->status));
 
             // âœ… Data scoping
             $employeeQuery = $this->applyDataScoping($employeeQuery, 'attendance.daily.view', 'attendance.daily.view-subordinates', '');
@@ -246,7 +254,7 @@ trait WithAttendanceFilters
 
         // ==================== DAILY VIEW (Standard Log List) ====================
     $query = AttendanceDailyLog::forCompany($companyId)
-            ->with(['employee.branch', 'workSchedule', 'editor', 'approver', 'rejector', 'revoker', 'details'])
+            ->with(['employee.branch', 'workSchedule', 'editor', 'approver', 'rejector', 'revoker', 'details', 'scheduleException'])
             ->withCount([
                 'auditLogs as edits_count' => fn ($q) => $q->where('action', 'attendance.edited'),
             ]);
@@ -262,6 +270,12 @@ trait WithAttendanceFilters
         if ($this->branch_id !== 'all') {
             $query->whereHas('employee', function ($q) {
                 $q->where('branch_id', $this->branch_id);
+            });
+        }
+
+        if ($this->status !== 'all') {
+            $query->whereHas('employee', function ($q) {
+                $q->where('status', (string)$this->status);
             });
         }
 

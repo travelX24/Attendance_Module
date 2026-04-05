@@ -19,7 +19,7 @@ trait WithScheduleFilters
     public $allowedLocationIds = []; 
     public $work_schedule_id = 'all';
 
-    public $status_filter = 'active';
+    public $status = 'all';
     public $filterWarning = 'all'; 
 
 
@@ -44,6 +44,7 @@ trait WithScheduleFilters
     public $warningEmployees = [
         'total_employees' => [],
         'no_schedule_overdue' => [],
+        'with_schedule' => [],
         'ending_soon' => [],
         'changed_too_much' => [],
         'inactive_schedule' => [],
@@ -51,6 +52,7 @@ trait WithScheduleFilters
 
     public $stats = [
         'without_schedule' => 0,
+        'with_schedule' => 0,
         'active_schedules' => 0,
         'incorrect_assignments' => 0,
         'total_employees' => 0,
@@ -106,6 +108,11 @@ trait WithScheduleFilters
         $this->resetPage();
         $this->loadStats();
     }
+    public function updatedStatus()
+    {
+        $this->resetPage();
+        $this->loadStats();
+    }
 
     public function clearAllFilters()
     {
@@ -113,6 +120,7 @@ trait WithScheduleFilters
         $this->department_id = 'all';
         $this->schedule_type = 'all';
         $this->work_schedule_id = 'all';
+        $this->status = 'all';
         $this->filterWarning = 'all';
 
         // Reset location if forced or default
@@ -132,7 +140,8 @@ trait WithScheduleFilters
     {
        $companyId = $this->getCompanyId();
 
-        $baseEmployees = Employee::forCompany($companyId)->where('status', 'active');
+        $baseEmployees = Employee::forCompany($companyId)
+             ->when($this->status !== 'all', fn($q) => $q->where('status', $this->status));
 
       $locationCol = $this->resolveEmployeeLocationColumn();
 
@@ -161,25 +170,26 @@ trait WithScheduleFilters
             ? 0
             : (clone $baseEmployees)->whereNotIn('id', $employeesWithScheduleIds ?: [0])->count();
 
+        $this->stats['with_schedule'] = count($employeesWithScheduleIds);
+        $this->warningEmployees['with_schedule'] = $this->getEmployeeNamesForPop($employeesWithScheduleIds);
+
         $this->stats['active_schedules'] = WorkSchedule::where('saas_company_id', $companyId)
             ->where('is_active', true)
             ->count();
             
         $today = now()->startOfDay();
-        $cutoffNoSchedule = $this->addBusinessDays($today, -3)->endOfDay();
         $soonEndDate      = $this->addBusinessDays($today,  3)->toDateString();
 
-        $noScheduleOverdueIds = empty($employeeIdsScope)
+        $noScheduleIds = empty($employeeIdsScope)
         ? []
         : (clone $baseEmployees)
             ->whereNotIn('id', $employeesWithScheduleIds ?: [0])
-            ->where('created_at', '<=', $cutoffNoSchedule)
             ->pluck('id')
             ->all();
-
-        $this->warningIds['no_schedule_overdue'] = $noScheduleOverdueIds;
-        $this->earlyWarnings['no_schedule_overdue'] = count($noScheduleOverdueIds);
-        $this->warningEmployees['no_schedule_overdue'] = $this->getEmployeeNamesForPop($noScheduleOverdueIds);
+            
+        $this->warningIds['no_schedule_overdue'] = $noScheduleIds;
+        $this->earlyWarnings['no_schedule_overdue'] = count($noScheduleIds);
+        $this->warningEmployees['no_schedule_overdue'] = $this->getEmployeeNamesForPop($noScheduleIds);
 
        $endingSoonIds = EmployeeWorkSchedule::where('saas_company_id', $companyId)
             ->where('is_active', true)
@@ -254,7 +264,7 @@ trait WithScheduleFilters
         $this->earlyWarnings['invalid_dates'] = count($invalidDatesIds);
 
         $incorrectEmployeeIds = array_values(array_unique(array_merge(
-            $noScheduleOverdueIds,
+            $noScheduleIds,
             $endingSoonIds,
             $changedTooMuchIds,
             $contractConflictIds,

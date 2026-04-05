@@ -27,9 +27,9 @@
                 </div>
             @else
                 <x-ui.table
-                    :headers="[tr('Schedule'), tr('Start'), tr('End'), tr('Status'), tr('Action')]"
+                    :headers="[tr('Schedule'), tr('Start'), tr('End'), tr('Period'), tr('Status'), tr('Action')]"
                     :enablePagination="false"
-                    :headerAlign="['start','start','start','start','end']"
+                    :headerAlign="['start','start','start','start','start','end']"
                 >
                     @foreach($scheduleEyeRows as $r)
                         @php
@@ -45,7 +45,7 @@
                             <td class="py-3 px-6 font-semibold text-gray-900 text-sm">
                                 {{ $r['schedule_name'] ?? '-' }}
                                 @if(!empty($r['assignment_type']))
-                                    <span class="text-[11px] text-gray-400 ms-2 font-normal">
+                                    <span class="text-[11px] text-gray-400 font-normal">
                                         ({{ $r['assignment_type'] }})
                                     </span>
                                 @endif
@@ -58,7 +58,14 @@
                             <td class="py-3 px-6 font-mono text-gray-700 text-sm">
                                 {{ !empty($r['end_date']) ? $r['end_date'] : tr('Permanent') }}
                             </td>
-
+                            <td class="py-3 px-6">
+                                @php
+                                    $isPerm = empty($r['end_date']) || $r['end_date'] === '-';
+                                @endphp
+                                <x-ui.badge :type="$isPerm ? 'success' : 'info'" size="xs" outline>
+                                    {{ $isPerm ? tr('Permanent') : tr('Limited Duration') }}
+                                </x-ui.badge>
+                            </td>
                             <td class="py-3 px-6">
                                 <x-ui.badge :type="$badgeType" size="xs">
                                     {{ $status === 'active' ? tr('Active') :
@@ -91,12 +98,16 @@
                                             >
                                                 <i class="fas fa-trash-alt"></i>
                                             </button>
+                                        @elseif(!empty($r['is_default']))
+                                            <span class="text-gray-300" title="{{ tr('Base schedule cannot be deleted') }}">
+                                                <i class="fas fa-trash-alt opacity-30 cursor-not-allowed"></i>
+                                            </span>
                                         @endif
 
                                         @if(empty($r['can_edit']) && empty($r['can_delete']))
-                                            <span class="text-[11px] text-gray-400 italic">
-                                                <i class="fas fa-lock text-[10px] me-1"></i>
-                                                {{ tr('Locked') }}
+                                            <span class="text-[11px] text-gray-400 font-bold flex items-center gap-1 justify-end italic whitespace-nowrap">
+                                                <i class="fas fa-lock text-[10px]"></i>
+                                                {{ !empty($r['is_default']) ? tr('Base Schedule') : tr('Locked') }}
                                             </span>
                                         @endif
                                     @else

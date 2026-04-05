@@ -18,8 +18,18 @@ use Athka\Attendance\Http\Livewire\DailyAttendance\Traits\WithManualAttendance;
 use Athka\Attendance\Http\Livewire\DailyAttendance\Traits\WithAttendanceExports;
 use Athka\Attendance\Http\Livewire\Traits\WithDataScoping;
 
+use Livewire\Attributes\Lazy;
+use Livewire\Attributes\Layout;
+
+#[Lazy]
+#[Layout('layouts.company-admin')]
 class Index extends Component
 {
+    public function placeholder()
+    {
+        return view('attendance::livewire.leaves.placeholder'); // Reuse the same skeleton structure
+    }
+
     use WithPagination, 
         WithFileUploads,
         WithAttendanceFilters, 
@@ -118,6 +128,10 @@ class Index extends Component
             $query->whereHas('employee', fn ($q) => $q->where('branch_id', (int) $this->branch_id));
         }
 
+        if ($this->status !== 'all') {
+            $query->whereHas('employee', fn ($q) => $q->where('status', (string) $this->status));
+        }
+
         if ($this->date_from) $query->where('attendance_date', '>=', $this->date_from);
         if ($this->date_to) $query->where('attendance_date', '<=', $this->date_to);
 
@@ -154,6 +168,10 @@ class Index extends Component
             $pendingQ->whereHas('employee', fn ($q) => $q->where('branch_id', (int) $this->branch_id));
         }
 
+        if ($this->status !== 'all') {
+            $pendingQ->whereHas('employee', fn ($q) => $q->where('status', (string) $this->status));
+        }
+
         $this->stats['pending_approval'] = $pendingQ->count();
 
         $totalCount = (int) $this->stats['total'];
@@ -172,7 +190,7 @@ class Index extends Component
         $threeDaysAgo = now()->subDays(3)->toDateString();
 
         $empQ = Employee::forCompany($companyId)
-            ->where('status', 'active');
+            ->when($this->status !== 'all', fn($q) => $q->where('status', (string)$this->status));
 
         // âœ… Data scoping
         $empQ = $this->applyDataScoping($empQ, 'attendance.daily.view', 'attendance.daily.view-subordinates', '');

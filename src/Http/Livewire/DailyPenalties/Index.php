@@ -21,8 +21,18 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Athka\Saas\Models\Branch;
 use Athka\Attendance\Http\Livewire\Traits\WithDataScoping;
 
+use Livewire\Attributes\Lazy;
+use Livewire\Attributes\Layout;
+
+#[Lazy]
+#[Layout('layouts.company-admin')]
 class Index extends Component
 {
+    public function placeholder()
+    {
+        return view('attendance::livewire.leaves.placeholder');
+    }
+
     use WithPagination, WithFileUploads, WithDataScoping;
 
     // ==================== Filters ====================
@@ -31,6 +41,7 @@ class Index extends Component
     public $date_to = '';
     public $violation_type_filter = 'all'; // all/delay/early_departure/absent/auto_checkout
     public $status_filter = 'all'; // all/pending/confirmed/waived
+    public $status_emp_filter = 'all'; // all/ACTIVE/SUSPENDED/TERMINATED
     public $department_id = 'all';
     public $job_title_id = 'all';
     public $branch_id = 'all';
@@ -52,7 +63,7 @@ class Index extends Component
             'type' => 'full', // full/partial
             'amount' => 0,
             'reason' => '',   // Ø³Ø¨Ø¨ Ù…Ø®ØªØµØ± (Ø§Ø®ØªÙŠØ§Ø±)
-            'details' => '',  // Ø´Ø±Ø­ Ø¥Ø¶Ø§ÙÙŠ (Ù†Øµ)
+            'details' => '',  // Ø´Ø±Ø­ Ø¥Ø¶Ø§Ù ÙŠ (Ù†Øµ)
             'attachment' => null,
         ];
 
@@ -65,6 +76,7 @@ class Index extends Component
         'date_to' => ['except' => ''],
         'violation_type_filter' => ['except' => 'all'],
         'status_filter' => ['except' => 'all'],
+        'status_emp_filter' => ['except' => 'all'],
         'department_id' => ['except' => 'all'],
         'job_title_id' => ['except' => 'all'],
         'branch_id' => ['except' => 'all'],
@@ -101,6 +113,7 @@ class Index extends Component
         $this->date_to = '';
         $this->violation_type_filter = 'all';
         $this->status_filter = 'all';
+        $this->status_emp_filter = 'all';
         $this->department_id = 'all';
         $this->job_title_id = 'all';
 
@@ -120,6 +133,7 @@ class Index extends Component
     public function updatedDateTo() { $this->refreshData(); }
     public function updatedViolationTypeFilter() { $this->refreshData(); }
     public function updatedStatusFilter() { $this->refreshData(); }
+    public function updatedStatusEmpFilter() { $this->refreshData(); }
     public function updatingSearch() { $this->resetPage(); }
     public function updatedDepartmentId() { $this->refreshData(); }
     public function updatedJobTitleId() { $this->refreshData(); }
@@ -151,6 +165,10 @@ class Index extends Component
 
         if ($this->date_from) $query->where('attendance_date', '>=', $this->date_from);
         if ($this->date_to)   $query->where('attendance_date', '<=', $this->date_to);
+
+        if ($this->status_emp_filter !== 'all') {
+            $query->whereHas('employee', fn($q) => $q->where('status', (string)$this->status_emp_filter));
+        }
 
         $base = clone $query;
 
@@ -184,6 +202,9 @@ class Index extends Component
         if ($this->status_filter !== 'all') {
             $query->where('status', $this->status_filter);
         }
+        if ($this->status_emp_filter !== 'all') {
+            $query->whereHas('employee', fn($q) => $q->where('status', (string)$this->status_emp_filter));
+        }
         if (!$this->isAll($this->department_id)) {
             $query->whereHas('employee', fn($q) => $q->where('department_id', (int) $this->department_id));
         }
@@ -197,8 +218,7 @@ class Index extends Component
                     ->orWhere('employee_no', 'like', '%' . $this->search . '%');
             });
         }
-
-        return $query->orderByDesc('attendance_date')->paginate(15);
+        return $query->orderByDesc('attendance_date')->paginate(10);
     }
 
     public function runCalculation(PenaltyService $service)

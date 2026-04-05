@@ -134,6 +134,22 @@
                         />
                     </div>
 
+                    {{-- Employee Status --}}
+                    <div>
+                        <x-ui.filter-select
+                            model="status_emp_filter"
+                            :label="tr('Employee Status')"
+                            :placeholder="tr('All')"
+                            :options="[
+                                ['value' => 'ACTIVE', 'label' => tr('Active')],
+                                ['value' => 'SUSPENDED', 'label' => tr('Suspended')],
+                                ['value' => 'TERMINATED', 'label' => tr('Terminated')],
+                            ]"
+                            width="full"
+                            :disabled="!auth()->user()->can('attendance.manage')"
+                        />
+                    </div>
+
                  {{-- Branch --}}
                     <div>
                         <x-ui.filter-select

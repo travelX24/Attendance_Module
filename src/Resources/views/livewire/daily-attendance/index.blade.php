@@ -183,6 +183,24 @@
                             :disabled="!auth()->user()->can('attendance.manage')"
                         />
                     </div>
+
+                    {{-- Employee Status --}}
+                    <div class="w-40">
+                        <x-ui.filter-select
+                            model="status"
+                            :label="tr('Employee Status')"
+                            :placeholder="tr('All')"
+                            :options="[
+                                ['value' => 'ACTIVE', 'label' => tr('Active')],
+                                ['value' => 'SUSPENDED', 'label' => tr('Suspended')],
+                                ['value' => 'TERMINATED', 'label' => tr('Terminated')],
+                            ]"
+                            width="full"
+                            :defer="false"
+                            :applyOnChange="true"
+                            :disabled="!auth()->user()->can('attendance.manage')"
+                        />
+                    </div>
                     {{-- Work Schedule --}}
                     <div class="w-44">
                         <x-ui.filter-select
@@ -276,6 +294,7 @@
                                     return ($wire.search && $wire.search.trim() !== '') ||
                                            $wire.attendance_status_filter !== 'all' ||
                                            $wire.approval_status_filter !== 'all' ||
+                                           $wire.status !== 'all' ||
                                            $wire.work_schedule_id !== 'all' ||
                                            $wire.job_title_id !== 'all' ||
                                            $wire.department_id !== 'all' ||
@@ -352,6 +371,7 @@
                 $headers = [
                     '',
                     tr('Employee'),
+                    tr('Employee Status'),
                     tr('Scheduled Hours'),
                     tr('Actual Hours'),
                     tr('Check In'),
@@ -361,7 +381,7 @@
                     tr('Compliance'),
                     tr('Actions'),
                 ];
-                $headerAlign = ['center', 'start', 'center', 'center', 'center', 'center', 'center', 'center', 'center', 'center'];
+                $headerAlign = ['center', 'start', 'center', 'center', 'center', 'center', 'center', 'center', 'center', 'center', 'center'];
             @endphp
     
             <x-ui.table :headers="$headers" :headerAlign="$headerAlign" :enablePagination="false">
@@ -375,7 +395,7 @@
                             @cannot('attendance.manage') disabled @endcannot
                         >
                     </td>
-                    <td colspan="9" class="px-6 py-3">
+                    <td colspan="10" class="px-6 py-3">
                         @if(count($selectedLogs) > 0)
                             <div class="flex items-center justify-between">
                                 <span class="text-sm font-semibold text-gray-700">
@@ -431,7 +451,7 @@
     
                     @if($currentDate && $currentDate !== $lastDate)
                          <tr class="bg-gray-50/80 border-y border-gray-100">
-                             <td colspan="10" class="px-6 py-2">
+                             <td colspan="11" class="px-6 py-2">
                                  <div class="flex items-center gap-2 text-blue-800">
                                      <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 shadow-sm">
                                          <i class="fas fa-calendar-day text-xs"></i>
@@ -483,6 +503,13 @@
                                                 <i class="fas fa-history"></i>
                                             </span>
                                         @endif
+
+                                        {{-- ⭐ Exceptional Day Badge --}}
+                                        @if($log->scheduleException && $log->scheduleException->exception_date->format('Y-m-d') === $log->attendance_date->format('Y-m-d'))
+                                            <span class="text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded-md border border-amber-200 cursor-help" title="{{ tr('Exceptional Day') }}: {{ $log->scheduleException->exception_type }}">
+                                                <i class="fas fa-star text-[10px]"></i>
+                                            </span>
+                                        @endif
     
                                         {{-- 🟡 Late > 60 min (today row check) --}}
                                         @php
@@ -508,10 +535,21 @@
                                         #{{ $employee?->employee_no }}
                                     </p>
 
-                                    <p class="text-[10px] text-gray-400">
-                                        {{ tr('Branch') }}: {{ $employee?->branch?->name ?: '-' }}
-                                    </p>
                                 </div>
+                            </div>
+                        </td>
+    
+                        {{-- Employee Status --}}
+                        <td class="px-6 py-4">
+                            @php
+                                $empStatus = strtoupper($employee->status ?? 'ACTIVE');
+                                $empStatusColor = 'green';
+                                if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
+                                elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
+                            @endphp
+                            <div class="flex items-center gap-1.5 justify-center">
+                                <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
+                                <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
                             </div>
                         </td>
     
@@ -636,7 +674,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="10" class="px-6 py-12 text-center">
+                        <td colspan="11" class="px-6 py-12 text-center">
                             <div class="flex flex-col items-center gap-3">
                                 <div class="w-16 h-16 bg-gray-50 rounded-full flex items-center justify-center text-gray-300">
                                     <i class="fas fa-clipboard-list fa-2xl"></i>
@@ -652,13 +690,14 @@
             @php
                 $summaryHeaders = [
                     tr('Employee'),
+                    tr('Status'),
                     tr('Hire Date'),
                     tr('Attendance Analytics'),
                     tr('Hours Summary'),
                     tr('Compliance'),
                     tr('Actions'),
                 ];
-                $summaryAlign = ['start', 'center', 'center', 'center', 'center', 'center'];
+                $summaryAlign = ['start', 'center', 'center', 'center', 'center', 'center', 'center'];
             @endphp
 
             <x-ui.table :headers="$summaryHeaders" :headerAlign="$summaryAlign" :enablePagination="false">
@@ -678,9 +717,22 @@
                                     <p class="text-xs text-gray-500">
                                         <span class="inline-block px-1.5 py-0.5 bg-gray-100 rounded text-[10px] font-mono">#{{ $employee->employee_no }}</span>
                                         <span class="mx-1 text-gray-300">|</span>
-                                        <span class="text-[10px]">{{ $employee->summary->schedule_name }}</span>
-                                    </p>
+                                    <p class="text-[10px] uppercase">{{ $employee->summary->schedule_name }}</p>
                                 </div>
+                            </div>
+                        </td>
+
+                        {{-- Status --}}
+                        <td class="px-6 py-4 text-center">
+                            @php
+                                $empStatus = strtoupper($employee->status ?? 'ACTIVE');
+                                $empStatusColor = 'green';
+                                if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
+                                elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
+                            @endphp
+                            <div class="flex items-center gap-1.5 justify-center">
+                                <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
+                                <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
                             </div>
                         </td>
 

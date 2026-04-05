@@ -47,6 +47,8 @@ trait WithScheduleAssignments
     public $criteriaPreviewEmployees = [];
     public $criteriaPreviewSelected = [];
     public $bulkContextMeta = [];
+    public $overrideContractDates = false;
+    public $contractMessage = '';
 
 
     public $showSchedulePreviewModal = false;
@@ -72,11 +74,11 @@ trait WithScheduleAssignments
     public function openBulkModal()
     {
         $this->resetModalFlags();
+        $this->resetBulkFormData();
+
+        $this->applyContractLogic($this->selectedEmployees);
 
         $this->bulkModalMode = 'single';
-        $this->bulkFormData['is_rotation'] = false;
-        $this->bulkFormData['rotation_work_schedule_id'] = '';
-        $this->bulkFormData['rotation_days'] = 7;
 
         if (count($this->selectedEmployees) > 0) {
             $this->showBulkModal = true;
@@ -86,13 +88,13 @@ trait WithScheduleAssignments
     public function openBulkModalForSingleEmployee($employeeId)
     {
         $this->resetModalFlags();
-
-        $this->bulkModalMode = 'single';
-        $this->bulkFormData['is_rotation'] = false;
-        $this->bulkFormData['rotation_work_schedule_id'] = '';
-        $this->bulkFormData['rotation_days'] = 7;
+        $this->resetBulkFormData();
 
         $this->selectedEmployees = [(int) $employeeId];
+        $this->applyContractLogic($this->selectedEmployees);
+
+        $this->bulkModalMode = 'single';
+
         $this->bulkContextMeta = ['source' => 'single'];
         $this->showBulkModal = true;
     }
@@ -158,6 +160,12 @@ trait WithScheduleAssignments
                     $newEnd = Carbon::createFromFormat('Y-m-d', $endYmd)->startOfDay();
                 }
 
+                if ($newEnd && $newEnd->lt($newStart)) {
+                    throw \Illuminate\Validation\ValidationException::withMessages([
+                        'bulkFormData.end_date' => tr('End date cannot be before start date.'),
+                    ]);
+                }
+
                 $currentActive = EmployeeWorkSchedule::where('employee_id', $employeeId)
                     ->where('saas_company_id', $companyId)
                     ->where('is_active', true)
@@ -171,6 +179,9 @@ trait WithScheduleAssignments
                     ->lockForUpdate()
                     ->latest('id')
                     ->first();
+
+                $originalActiveEndDate = $currentActive ? $currentActive->end_date : null;
+                $originalRotationEndDate = $activeRotation ? $activeRotation->end_date : null;
 
                 if ($newStart->gt($today)) {
                     $this->closeAssignmentBeforeDate($currentActive, $newStart);
@@ -286,6 +297,41 @@ trait WithScheduleAssignments
                         'assignment_type'  => count($this->selectedEmployees) > 1 ? 'bulk' : 'individual',
                         'saas_company_id'  => $companyId,
                     ]);
+                }
+
+                if ($newEnd) {
+                    $resumeDate = $newEnd->copy()->addDay();
+                    
+                    if ($currentActive) {
+                        $shouldResume = empty($originalActiveEndDate) || Carbon::parse($originalActiveEndDate)->gt($newEnd);
+                        if ($shouldResume) {
+                            EmployeeWorkSchedule::create([
+                                'employee_id'      => $employeeId,
+                                'work_schedule_id' => $currentActive->work_schedule_id,
+                                'start_date'       => $resumeDate->toDateString(),
+                                'end_date'         => $originalActiveEndDate,
+                                'is_active'        => $resumeDate->lte($today) && (empty($originalActiveEndDate) || Carbon::parse($originalActiveEndDate)->gte($today)),
+                                'assignment_type'  => $currentActive->assignment_type,
+                                'saas_company_id'  => $companyId,
+                            ]);
+                        }
+                    }
+
+                    if ($activeRotation) {
+                        $shouldResume = empty($originalRotationEndDate) || Carbon::parse($originalRotationEndDate)->gt($newEnd);
+                        if ($shouldResume) {
+                            EmployeeShiftRotation::create([
+                                'employee_id'        => $employeeId,
+                                'saas_company_id'    => $companyId,
+                                'work_schedule_id_a' => $activeRotation->work_schedule_id_a,
+                                'work_schedule_id_b' => $activeRotation->work_schedule_id_b,
+                                'start_date'         => $resumeDate->toDateString(),
+                                'end_date'           => $originalRotationEndDate,
+                                'rotation_days'      => $activeRotation->rotation_days,
+                                'is_active'          => clone $resumeDate->lte($today) && (empty($originalRotationEndDate) || Carbon::parse($originalRotationEndDate)->gte($today)),
+                            ]);
+                        }
+                    }
                 }
 
                 $baseMeta = [
@@ -417,16 +463,10 @@ trait WithScheduleAssignments
     public function openRotationModal()
     {
         $this->resetModalFlags();
+        $this->resetBulkFormData();
 
         $this->bulkModalMode = 'rotation';
         $this->bulkFormData['is_rotation'] = true;
-
-        $this->bulkFormData['is_permanent'] = true;
-        $this->bulkFormData['end_date'] = '';
-
-
-        $this->bulkFormData['rotation_work_schedule_id'] = '';
-        $this->bulkFormData['rotation_days'] = $this->bulkFormData['rotation_days'] ?: 7;
 
         if (count($this->selectedEmployees) > 0) {
             $this->showBulkModal = true;
@@ -436,15 +476,10 @@ trait WithScheduleAssignments
     public function openRotationModalForSingleEmployee($employeeId)
     {
         $this->resetModalFlags();
+        $this->resetBulkFormData();
 
         $this->bulkModalMode = 'rotation';
         $this->bulkFormData['is_rotation'] = true;
-
-        $this->bulkFormData['is_permanent'] = true;
-        $this->bulkFormData['end_date'] = '';
-
-        $this->bulkFormData['rotation_work_schedule_id'] = '';
-        $this->bulkFormData['rotation_days'] = $this->bulkFormData['rotation_days'] ?: 7;
 
         $this->selectedEmployees = [(int) $employeeId];
         $this->bulkContextMeta = ['source' => 'single-rotation'];
@@ -726,7 +761,7 @@ trait WithScheduleAssignments
             $empQ->whereIn($locationCol, $this->allowedLocationIds);
         }
 
-        $emp = $empQ->first(['id', 'name_ar', 'name_en', 'employee_no']);
+        $emp = $empQ->first(['id', 'name_ar', 'name_en', 'employee_no', 'department_id', $locationCol ?: 'id']);
 
     if (!$emp) {
         $this->dispatch('toast', ['type' => 'danger', 'message' => tr('Employee not found')]);
@@ -783,8 +818,11 @@ public function generateSchedulePreview(): void
     $this->previewMeta = $data['meta'];
 }
 
-private function buildSchedulePreview(int $employeeId, int $companyId, Carbon $from, Carbon $to): array
+private function buildSchedulePreview($employeeOrId, int $companyId, Carbon $from, Carbon $to): array
 {
+    $employeeId = is_object($employeeOrId) ? $employeeOrId->id : (int) $employeeOrId;
+    $employeeObj = is_object($employeeOrId) ? $employeeOrId : Employee::find($employeeId);
+
     $assignments = EmployeeWorkSchedule::query()
         ->where('employee_id', $employeeId)
         ->where('saas_company_id', $companyId)
@@ -821,6 +859,41 @@ private function buildSchedulePreview(int $employeeId, int $companyId, Carbon $f
         })
         ->with('policy')
         ->get();
+
+    $employeeExceptions = \Athka\Attendance\Models\EmployeeWorkScheduleException::query()
+        ->where('employee_id', $employeeId)
+        ->whereDate('exception_date', '>=', $from->toDateString())
+        ->whereDate('exception_date', '<=', $to->toDateString())
+        ->get()
+        ->keyBy(fn($ex) => \Carbon\Carbon::parse($ex->exception_date)->format('Y-m-d'));
+
+    $companyExceptions = \Athka\SystemSettings\Models\AttendanceExceptionalDay::query()
+        ->where('company_id', $companyId)
+        ->where('is_active', true)
+        ->where(function($q) use ($from, $to) {
+            $q->whereBetween('start_date', [$from->toDateString(), $to->toDateString()])
+              ->orWhereBetween('end_date', [$from->toDateString(), $to->toDateString()])
+              ->orWhere(function($qq) use ($from, $to) {
+                  $qq->where('start_date', '<=', $from->toDateString())
+                     ->where('end_date', '>=', $to->toDateString());
+              });
+        })
+        ->get();
+
+    $officialHolidays = \Athka\SystemSettings\Models\OfficialHolidayOccurrence::query()
+        ->where('company_id', $companyId)
+        ->where(function($q) use ($from, $to) {
+            $q->whereBetween('start_date', [$from->toDateString(), $to->toDateString()])
+              ->orWhereBetween('end_date', [$from->toDateString(), $to->toDateString()])
+              ->orWhere(function($qq) use ($from, $to) {
+                  $qq->where('start_date', '<=', $from->toDateString())
+                     ->where('end_date', '>=', $to->toDateString());
+              });
+        })
+        ->with('template')
+        ->get();
+
+    \Illuminate\Support\Facades\Log::info("DEBUG [buildSchedulePreview]: Found " . count($employeeExceptions) . " individual exceptions and " . count($companyExceptions) . " company exceptions for emp {$employeeId}");
 
     $scheduleIds = [];
 
@@ -909,6 +982,7 @@ private function buildSchedulePreview(int $employeeId, int $companyId, Carbon $f
 
     while ($cursor->lte($to)) {
         $day = $cursor->copy()->startOfDay();
+        $dayIso = $day->toDateString();
 
         $type = 'none';
         $scheduleId = null;
@@ -917,63 +991,130 @@ private function buildSchedulePreview(int $employeeId, int $companyId, Carbon $f
         $periods = [];
         $source = null;
 
-        $rot = $pickRotationForDay($day);
-
-        if ($rot) {
-            $type = 'rotation';
-
-            $rotStart = Carbon::parse($rot->start_date)->startOfDay();
-            $rotationDays = max(1, (int) ($rot->rotation_days ?? 7));
-            $diffDays = $rotStart->diffInDays($day);
-
-            $cycleIndex = intdiv($diffDays, $rotationDays);
-            $isA = ($cycleIndex % 2) === 0;
-
-            $scheduleId = $isA ? (int) $rot->work_schedule_id_a : (int) $rot->work_schedule_id_b;
-            $source = $isA ? 'A' : 'B';
-        } else {
-            $a = $pickAssignmentForDay($day);
-            if ($a) {
-                $type = 'single';
-                $scheduleId = (int) $a->work_schedule_id;
-                $source = 'single';
-            }
-        }
+        // 1. Check for Employee-Specific Exceptions FIRST (Highest Priority)
+        $except = $employeeExceptions->get($dayIso);
         
+        // 1b. Check for Company-Wide Exceptional Days (e.g. Nerve Recovery)
+        $compExcept = $companyExceptions->first(function($ce) use ($day, $employeeObj) {
+            $inDate = $day->between(
+                \Carbon\Carbon::parse($ce->start_date)->startOfDay(),
+                \Carbon\Carbon::parse($ce->end_date)->startOfDay()
+            );
+            if (!$inDate) return false;
+
+            // Scoping logic
+            $applyOn = $ce->apply_on ?: 'everyone';
+            if ($applyOn === 'everyone') return true;
+
+            $include = is_array($ce->include) ? $ce->include : (json_decode($ce->include, true) ?: []);
+            
+            // Fixed: If apply_on is 'employees' OR 'absence' (ghieb), check the 'employees' list
+            if ($applyOn === 'employees' || $applyOn === 'absence') {
+                $targetIds = $include['employees'] ?? [];
+                if (in_array((string)$employeeObj->id, $targetIds)) return true;
+            }
+            
+            if ($applyOn === 'departments') {
+                $targetIds = $include['departments'] ?? [];
+                if (in_array((string)$employeeObj->department_id, $targetIds)) return true;
+            }
+
+            $locCol = $this->resolveEmployeeLocationColumn();
+            if ($applyOn === 'locations' && $locCol) {
+                $targetIds = $include['branches'] ?? $include['locations'] ?? [];
+                if (in_array((string)$employeeObj->{$locCol}, $targetIds)) return true;
+            }
+
+            return false;
+        });
+
         $leave = $leaves->first(function($l) use ($day) {
             $s = Carbon::parse($l->start_date)->startOfDay();
             $e = Carbon::parse($l->end_date)->startOfDay();
             return $day->between($s, $e);
         });
 
-        if ($leave) {
+        $officialHoliday = $officialHolidays->first(function($oh) use ($day) {
+            $s = Carbon::parse($oh->start_date)->startOfDay();
+            $e = Carbon::parse($oh->end_date)->startOfDay();
+            return $day->between($s, $e);
+        });
+
+        if ($except) {
+            $type = 'exception';
+            $typeLabel = match($except->exception_type) {
+                'off_day' => tr('Off Day'),
+                'work_day' => tr('Work Day'),
+                'overtime' => tr('Overtime'),
+                default => tr('Exception'),
+            };
+            $scheduleName = $typeLabel;
+            $periods = [];
+            if ($except->start_time && $except->end_time) {
+                $s = Carbon::parse($except->start_time)->format('g:i A');
+                $e = Carbon::parse($except->end_time)->format('g:i A');
+                $periods = ["$s - $e"];
+            }
+        } elseif ($compExcept) {
+            $type = 'exception';
+            $scheduleName = $compExcept->name ?: tr('Special Day');
+            $periods = [];
+        } elseif ($officialHoliday) {
+            $type = 'holiday';
+            $scheduleName = ($officialHoliday->template?->name ?? tr('Official Holiday'));
+            $periods = [];
+        } elseif ($leave) {
             $type = 'leave';
             $scheduleName = $leave->policy?->name ?? tr('Leave');
             $periods = [];
-            $scheduleDisabled = false;
-        } elseif ($scheduleId) {
-            $sch = $schedules[$scheduleId] ?? null;
-            $dayNameFull = strtolower($day->format('l'));
-            $workDays = $sch?->work_days ?? [];
-            
-            if ($sch && !in_array($dayNameFull, $workDays)) {
-                $type = 'holiday';
-                $scheduleName = tr('Holiday');
-                $periods = [];
+        } else {
+            // 2. Check for Rotations or Regular Assignments
+            $rot = $pickRotationForDay($day);
+
+            if ($rot) {
+                $type = 'rotation';
+
+                $rotStart = Carbon::parse($rot->start_date)->startOfDay();
+                $rotationDays = max(1, (int) ($rot->rotation_days ?? 7));
+                $diffDays = $rotStart->diffInDays($day);
+
+                $cycleIndex = intdiv($diffDays, $rotationDays);
+                $isA = ($cycleIndex % 2) === 0;
+
+                $scheduleId = $isA ? (int) $rot->work_schedule_id_a : (int) $rot->work_schedule_id_b;
+                $source = $isA ? 'A' : 'B';
             } else {
-                $scheduleName = $sch?->name ?? ('#' . $scheduleId);
-                $scheduleDisabled = (bool) ($sch?->is_active === false);
+                $a = $pickAssignmentForDay($day);
+                if ($a) {
+                    $type = 'single';
+                    $scheduleId = (int) $a->work_schedule_id;
+                    $source = 'single';
+                }
+            }
+
+            if ($scheduleId) {
+                $sch = $schedules[$scheduleId] ?? null;
+                $dayNameFull = strtolower($day->format('l'));
+                $workDays = $sch?->work_days ?? [];
                 
-                // Check exceptions
-                $dayIso = $day->toDateString();
-                $exs = $exceptionsBySchedule[$scheduleId] ?? [];
-                
-                if (isset($exs['dates'][$dayIso])) {
-                    $periods = [$exs['dates'][$dayIso]];
-                } elseif (isset($exs['days'][$dayNameFull])) {
-                    $periods = [$exs['days'][$dayNameFull]];
+                if ($sch && !in_array($dayNameFull, $workDays)) {
+                    $type = 'holiday';
+                    $scheduleName = tr('Holiday');
+                    $periods = [];
                 } else {
-                    $periods = $periodsBySchedule[$scheduleId] ?? [];
+                    $scheduleName = $sch?->name ?? ('#' . $scheduleId);
+                    $scheduleDisabled = (bool) ($sch?->is_active === false);
+                    
+                    // Check standard schedule-level exceptions
+                    $exs = $exceptionsBySchedule[$scheduleId] ?? [];
+                    
+                    if (isset($exs['dates'][$dayIso])) {
+                        $periods = [$exs['dates'][$dayIso]];
+                    } elseif (isset($exs['days'][$dayNameFull])) {
+                        $periods = [$exs['days'][$dayNameFull]];
+                    } else {
+                        $periods = $periodsBySchedule[$scheduleId] ?? [];
+                    }
                 }
             }
         }
@@ -1002,6 +1143,61 @@ private function buildSchedulePreview(int $employeeId, int $companyId, Carbon $f
     return ['rows' => $rowsOut, 'meta' => $meta];
 }
 
+    public function resetBulkFormData(): void
+    {
+        $this->resetErrorBag();
+        $this->overrideContractDates = false;
+        $this->contractMessage = '';
+        $this->bulkFormData = [
+            'work_schedule_id' => '',
+            'start_date' => now()->format('Y-m-d'),
+            'end_date' => '',
+            'is_permanent' => true,
+            'work_periods' => [],
+            'is_rotation' => false,
+            'rotation_work_schedule_id' => '',
+            'rotation_days' => 7,
+            'work_periods_a' => [],
+            'work_periods_b' => [],
+        ];
+    }
+
+    private function applyContractLogic($employeeIds)
+    {
+        $this->overrideContractDates = false;
+        $this->contractMessage = '';
+        
+        if (count($employeeIds) !== 1) {
+             $this->bulkFormData['is_permanent'] = true;
+             return;
+        }
+
+        $employeeId = $employeeIds[0];
+        $employee = Employee::find($employeeId);
+        if (!$employee) return;
+
+        $type = strtolower((string)($employee->contract_type ?? 'permanent'));
+        
+        if ($type === 'permanent') {
+            $this->bulkFormData['is_permanent'] = true;
+            $this->bulkFormData['end_date'] = '';
+            $this->contractMessage = tr('Employee has a permanent contract. Schedule will be permanent.');
+        } else {
+            $this->bulkFormData['is_permanent'] = false;
+            
+            $hiredAt = $employee->hired_at ? Carbon::parse($employee->hired_at) : null;
+            $duration = (int) $employee->contract_duration_months;
+            
+            if ($hiredAt && $duration > 0) {
+                $expiry = $hiredAt->copy()->addMonths($duration);
+                $this->bulkFormData['end_date'] = $expiry->toDateString();
+                $this->contractMessage = tr('Employee has a temporary contract ending on') . ' ' . $expiry->toDateString() . '. ' . tr('Schedule end date is set accordingly.');
+            } else {
+                $this->bulkFormData['end_date'] = '';
+                $this->contractMessage = tr('Employee has a temporary contract. Please specify the end date.');
+            }
+        }
+    }
 }
 
 

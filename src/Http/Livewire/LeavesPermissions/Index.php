@@ -30,8 +30,18 @@ use Athka\Attendance\Http\Livewire\LeavesPermissions\Traits\WithAttendanceSync;
 use Athka\Attendance\Http\Livewire\LeavesPermissions\Traits\WithMissionRequests;
 use Athka\Attendance\Http\Livewire\Traits\WithDataScoping;
 
+use Livewire\Attributes\Lazy;
+use Livewire\Attributes\Layout;
+
+// #[Lazy]
+#[Layout('layouts.company-admin')]
 class Index extends Component
 {
+    public function placeholder()
+    {
+        return view('attendance::livewire.leaves.placeholder');
+    }
+
     use WithPagination,
         WithFileUploads,
         WithLeavePermissionsFilters,
@@ -234,6 +244,7 @@ class Index extends Component
             if ($this->filterLeavePolicyId) $q->where('leave_policy_id', (int) $this->filterLeavePolicyId);
 
             $this->applyEmployeeFilters($q);
+            if ($this->status !== 'all') $q->whereHas('employee', fn($qq) => $qq->where('status', (string)$this->status));
 
             return $q->orderByDesc('remaining_days')->paginate($this->perPage, ['*'], 'balancePage');
         });
@@ -392,17 +403,26 @@ class Index extends Component
             $q->where($this->employeeJobTitleColumn, (int) $this->groupJobTitleId);
         }
 
-       if ($this->groupContractType !== '' && $contractTypeColumn) {
-            $q->where($contractTypeColumn, trim((string) $this->groupContractType));
+        if ($this->groupContractType !== '' && $contractTypeColumn) {
+             $q->where($contractTypeColumn, trim((string) $this->groupContractType));
         }
 
-        $term = trim($this->groupEmployeeSearch);
-        
+        $term = trim((string)$this->groupEmployeeSearch);
+
         if ($term !== '') {
-            $q->where(function ($qq) use ($term) {
-                foreach ($this->employeeNameColumns as $col) $qq->orWhere($col, 'like', '%' . $term . '%');
-                if (Schema::hasColumn('employees', 'employee_no')) $qq->orWhere('employee_no', 'like', '%' . $term . '%');
+            $q->where(function ($qq) use ($term, $employeeTable) {
+                foreach ($this->employeeNameColumns as $col) {
+                    $qq->orWhere($col, 'like', '%' . $term . '%');
+                }
+
+                if (Schema::hasColumn($employeeTable, 'employee_no')) {
+                    $qq->orWhere('employee_no', 'like', '%' . $term . '%');
+                }
             });
+        }
+
+        if ($this->status !== 'all') {
+            $q->where('status', (string) $this->status);
         }
 
         return $q->orderByDesc('id')->limit(50)->get();
@@ -422,6 +442,10 @@ class Index extends Component
         if ($this->selectedYearId) $q->where('policy_year_id', (int) $this->selectedYearId);
 
         $this->applyEmployeeFilters($q);
+
+        if ($this->status !== 'all') {
+            $q->whereHas('employee', fn($qq) => $qq->where('status', (string)$this->status));
+        }
 
         return $q->orderByDesc('id')->limit(50)->get();
     }
@@ -487,6 +511,7 @@ class Index extends Component
 
             if ($this->departmentId && $this->employeeDepartmentColumn) $w->where($this->employeeDepartmentColumn, (int) $this->departmentId);
             if ($this->jobTitleId && $this->employeeJobTitleColumn) $w->where($this->employeeJobTitleColumn, (int) $this->jobTitleId);
+            if ($this->status !== 'all') $w->where('status', (string) $this->status);
         });
     }
 

@@ -318,6 +318,25 @@ trait WithLeaveRequests
             return;
         }
 
+        // ✅ Exceptional Day Overlap Check
+        if (class_exists(\Athka\SystemSettings\Services\WorkScheduleService::class)) {
+            $wsService = app(\Athka\SystemSettings\Services\WorkScheduleService::class);
+            $currDate = $start->copy();
+            while ($currDate->lte($end)) {
+                $exDay = $wsService->getExceptionalDay($this->companyId, $currDate->toDateString(), $employee);
+                if ($exDay && (bool)($exDay->is_holiday ?? true)) {
+                    $isOfficial = (bool)($exDay->is_official_holiday ?? false);
+                    $typeLabel = $isOfficial ? tr('Official Holiday') : tr('Exceptional Day');
+                    $msgPart = tr('Cannot request leave on this date');
+                    
+                    $msg = $msgPart . ': ' . $typeLabel . ' - ' . ($exDay->name ?? '') . ' (' . $currDate->toDateString() . ')';
+                    $this->addError('start_date', $msg);
+                    return;
+                }
+                $currDate->addDay();
+            }
+        }
+
         // 5.1) Main employee: check overlap (already on leave or is a replacement)
         $empCheck = $this->isEmployeeLeavePeriodAvailable((int) $employee->id, $start, $end);
         if (!$empCheck['ok']) {
@@ -1645,6 +1664,25 @@ trait WithLeaveRequests
         if ($requestedDays <= 0) {
             $this->addError('group_start_date', tr('Invalid date range'));
             return;
+        }
+
+        // ✅ Exceptional Day Overlap Check (Group)
+        if (class_exists(\Athka\SystemSettings\Services\WorkScheduleService::class)) {
+            $wsService = app(\Athka\SystemSettings\Services\WorkScheduleService::class);
+            $currDate = $start->copy();
+            while ($currDate->lte($end)) {
+                $exDay = $wsService->getExceptionalDay($this->companyId, $currDate->toDateString());
+                if ($exDay && (bool)($exDay->is_holiday ?? true)) {
+                    $isOfficial = (bool)($exDay->is_official_holiday ?? false);
+                    $typeLabel = $isOfficial ? tr('Official Holiday') : tr('Exceptional Day');
+                    $msgPart = tr('Cannot request leave on this date');
+                    
+                    $msg = $msgPart . ': ' . $typeLabel . ' - ' . ($exDay->name ?? '') . ' (' . $currDate->toDateString() . ')';
+                    $this->addError('group_start_date', $msg);
+                    return;
+                }
+                $currDate->addDay();
+            }
         }
 
         $yearId = $this->selectedYearId ? (int) $this->selectedYearId : null;

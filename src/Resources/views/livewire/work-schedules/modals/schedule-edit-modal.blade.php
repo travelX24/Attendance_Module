@@ -30,18 +30,29 @@
                 @enderror
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
-                <x-ui.company-date-picker model="editScheduleForm.start_date" :label="tr('Start Date')" :disabled="!auth()->user()->can('attendance.manage')" />
-                <x-ui.company-date-picker model="editScheduleForm.end_date" :label="tr('End Date')" :disabled="!auth()->user()->can('attendance.manage')" />
+            @php
+                $isDefault = !empty($editScheduleForm['is_default']);
+                $isPermanent = !empty($editScheduleForm['is_permanent']);
+                $showEndDate = !$isDefault && !$isPermanent;
+            @endphp
+
+            <div class="{{ $showEndDate ? 'grid grid-cols-2 gap-4' : 'grid grid-cols-1' }}">
+                <div>
+                    <x-ui.company-date-picker 
+                        model="editScheduleForm.start_date" 
+                        :label="tr('Start Date')" 
+                        :disabled="!auth()->user()->can('attendance.manage')" 
+                    />
+                </div>
+                
+                @if($showEndDate)
+                    <x-ui.company-date-picker 
+                        model="editScheduleForm.end_date" 
+                        :label="tr('End Date')" 
+                        :disabled="!auth()->user()->can('attendance.manage')" 
+                    />
+                @endif
             </div>
-
-            @error('editScheduleForm.start_date')
-                <span class="text-red-500 text-xs mt-1 block">{{ $message }}</span>
-            @enderror
-
-            @error('editScheduleForm.end_date')
-                <span class="text-red-500 text-xs mt-1 block">{{ $message }}</span>
-            @enderror
 
             <p class="text-xs text-gray-500">
                 {{ tr('Note: If the edited range includes today, it will become the active schedule automatically.') }}

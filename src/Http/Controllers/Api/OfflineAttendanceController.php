@@ -104,8 +104,36 @@ class OfflineAttendanceController extends Controller
             ->with(['workSchedule.periods'])
             ->first();
 
+        // 1b. Check for Exceptions (Overrides everything)
+        $exception = \Athka\Attendance\Models\EmployeeWorkScheduleException::where('employee_id', $employee->id)
+            ->whereDate('exception_date', $date->toDateString())
+            ->first();
+
         $schedule = null;
-        if ($assignment && $assignment->workSchedule) {
+        if ($exception) {
+            $typeLabel = match($exception->exception_type) {
+                'off_day' => tr('Off Day'),
+                'work_day' => tr('Work Day'),
+                'overtime' => tr('Overtime'),
+                default => tr('Exception'),
+            };
+
+            $periods = [];
+            if ($exception->start_time && $exception->end_time) {
+                $periods[] = [
+                    'start' => substr($exception->start_time, 0, 5),
+                    'end' => substr($exception->end_time, 0, 5),
+                ];
+            }
+
+            $schedule = [
+                'id' => $exception->id,
+                'name' => $typeLabel,
+                'is_exception' => true,
+                'type' => $exception->exception_type,
+                'periods' => $periods,
+            ];
+        } elseif ($assignment && $assignment->workSchedule) {
             $ws = $assignment->workSchedule;
             $schedule = [
                 'id' => $ws->id,

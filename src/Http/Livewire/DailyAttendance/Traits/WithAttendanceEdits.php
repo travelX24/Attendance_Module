@@ -4,6 +4,7 @@ namespace Athka\Attendance\Http\Livewire\DailyAttendance\Traits;
 
 use Athka\Attendance\Models\AttendanceDailyLog;
 use Athka\Attendance\Models\EmployeeWorkSchedule;
+use Athka\SystemSettings\Models\AttendanceExceptionalDay;
 use Carbon\Carbon;
 
 trait WithAttendanceEdits
@@ -345,74 +346,158 @@ trait WithAttendanceEdits
 
          // Fetch existing logs
          $existingLogs = AttendanceDailyLog::forCompany($companyId)
-             ->with('details') // âœ… Load details for multi-period support
+             ->with('details') // ✅ Load details for multi-period support
              ->where('employee_id', $employeeId)
              ->whereBetween('attendance_date', [$start->toDateString(), $end->toDateString()])
              ->get()
              ->keyBy(fn($l) => $l->attendance_date->format('Y-m-d'));
+
+         $exceptions = \Athka\Attendance\Models\EmployeeWorkScheduleException::query()
+             ->where('employee_id', $employeeId)
+             ->whereBetween('exception_date', [$start->toDateString(), $end->toDateString()])
+             ->get()
+             ->keyBy(fn($ex) => $ex->exception_date->format('Y-m-d'));
+
+         $companyExceptions = AttendanceExceptionalDay::query()
+             ->where('company_id', $companyId)
+             ->where('is_active', true)
+             ->where(function($q) use ($start, $end) {
+                 $q->whereBetween('start_date', [$start->toDateString(), $end->toDateString()])
+                   ->orWhereBetween('end_date', [$start->toDateString(), $end->toDateString()])
+                   ->orWhere(function($qq) use ($start, $end) {
+                       $qq->where('start_date', '<=', $start->toDateString())
+                          ->where('end_date', '>=', $end->toDateString());
+                   });
+             })
+             ->get();
+
+          $officialHolidays = \Athka\SystemSettings\Models\OfficialHolidayOccurrence::query()
+              ->where('company_id', $companyId)
+              ->where(function($q) use ($start, $end) {
+                  $q->whereBetween('start_date', [$start->toDateString(), $end->toDateString()])
+                    ->orWhereBetween('end_date', [$start->toDateString(), $end->toDateString()])
+                    ->orWhere(function($qq) use ($start, $end) {
+                        $qq->where('start_date', '<=', $start->toDateString())
+                           ->where('end_date', '>=', $end->toDateString());
+                    });
+              })
+              ->with('template')
+              ->get();
 
          $this->monthlyEditForm = [];
          
          // Iterate through each day in range
          $current = $start->copy();
          while ($current->lte($end)) {
-             $dateStr = $current->toDateString();
-             $log = $existingLogs->get($dateStr);
+                  $dateStr = $current->toDateString();
+                  $log = $existingLogs->get($dateStr);
+                  $ex = $exceptions->get($dateStr);
 
-             if ($log) {
-                 // Prepare periods
-                 $periods = [];
-                 if ($log->details->isNotEmpty()) {
-                     foreach ($log->details as $d) {
-                         $periods[] = [
-                             'id' => $d->id,
-                             'check_in' => $d->check_in_time ? \Carbon\Carbon::parse($d->check_in_time)->format('H:i') : '',
-                             'check_out' => $d->check_out_time ? \Carbon\Carbon::parse($d->check_out_time)->format('H:i') : '',
-                         ];
-                     }
-                 } else {
-                     // Fallback to main log times if no details exist
-                     $periods[] = [
-                         'id' => null,
-                         'check_in' => $log->check_in_time ? $log->check_in_time->format('H:i') : '',
-                         'check_out' => $log->check_out_time ? $log->check_out_time->format('H:i') : '',
-                     ];
-                 }
+                  $compEx = $this->checkCompanyException($current, $employee, $companyExceptions, $officialHolidays);
+                  $isException = (bool)$ex || (bool)$compEx;
+                  $exceptionName = $ex ? match($ex->exception_type){
+                      'off_day' => tr('Off Day'),
+                      'work_day' => tr('Work Day'),
+                      'overtime' => tr('Overtime'),
+                      default => tr('Exception'),
+                  } : ($compEx instanceof AttendanceExceptionalDay ? $compEx->name : ($compEx ? ($compEx->template?->name ?? tr('Holiday')) : null));
 
-                 $this->monthlyEditForm[] = [
-                     'id' => $log->id, 
-                     'date' => $dateStr,
-                     'is_weekend' => in_array($current->dayOfWeek, [\Carbon\Carbon::FRIDAY, \Carbon\Carbon::SATURDAY]),
-                     'status' => $log->attendance_status,
-                     'scheduled_in' => $log->scheduled_check_in,
-                     'scheduled_out' => $log->scheduled_check_out,
-                     'periods' => $periods, // âœ… Multiple periods
-                     'scheduled_hours' => $log->scheduled_hours,
-                     'actual_hours' => $log->actual_hours,
-                     'notes' => $log->meta_data['notes'] ?? '',
-                 ];
-             } else {
-                 $this->monthlyEditForm[] = [
-                     'id' => null, 
-                     'date' => $dateStr,
-                     'is_weekend' => in_array($current->dayOfWeek, [\Carbon\Carbon::FRIDAY, \Carbon\Carbon::SATURDAY]),
-                     'status' => 'absent', 
-                     'scheduled_in' => null,
-                     'scheduled_out' => null,
-                     'periods' => [['id' => null, 'check_in' => '', 'check_out' => '']], 
-                     'scheduled_hours' => 0,
-                     'actual_hours' => 0,
-                     'notes' => '',
-                 ];
-             }
+                  $isWeekend = in_array($current->dayOfWeek, [\Carbon\Carbon::FRIDAY, \Carbon\Carbon::SATURDAY]);
+
+                  // Fetch Schedule periods for this day
+                  $schedPeriods = [];
+                  $dayName = strtolower($current->format('l'));
+
+                  // Only fetch schedule if it's NOT an "Off Day" exception
+                  $isOffDay = ($ex && $ex->exception_type === 'off_day') || ($compEx);
+
+                  if (!$isOffDay) {
+                      $ws = app(\Athka\SystemSettings\Services\WorkScheduleService::class)->getEffectiveSchedule($companyId, $employee, $current->toDateString());
+
+                      if ($ws) {
+                          if (in_array($dayName, is_array($ws->work_days) ? $ws->work_days : [])) {
+                              foreach ($ws->periods as $p) {
+                                  $schedPeriods[] = [
+                                      'start' => $p->start_time ? Carbon::parse($p->start_time)->format('H:i') : '--:--',
+                                      'end' => $p->end_time ? Carbon::parse($p->end_time)->format('H:i') : '--:--',
+                                  ];
+                              }
+                          }
+                      }
+                  }
+
+                  // Default status for no-work days
+                  $dayOffStatus = 'absent';
+                  if ($ex && $ex->exception_type === 'off_day') {
+                      $dayOffStatus = 'day_off';
+                  } elseif ($compEx) {
+                      $dayOffStatus = 'holiday';
+                  } elseif ($isWeekend || empty($schedPeriods)) {
+                      $defaultHolidayStatus = (auth()->user()->saas_company_id == 1) ? 'holiday' : 'day_off'; // Consistency
+                      $dayOffStatus = 'day_off'; 
+                      // If it's a weekend or no schedule, it's a Day Off/Holiday
+                      $dayOffStatus = 'day_off';
+                  }
+
+                  if ($log) {
+                      $displayStatus = $log->attendance_status;
+                      
+                      // If it's an exception day but log says absent, force it to show exception status
+                      if ($displayStatus === 'absent' && $isException && empty($log->check_in_time)) {
+                           $displayStatus = ($compEx) ? 'holiday' : (($ex && $ex->exception_type === 'off_day') ? 'day_off' : 'absent');
+                      }
+
+                      $day = [
+                          'id' => $log->id, 
+                          'date' => $dateStr,
+                          'is_weekend' => $isWeekend,
+                          'status' => $displayStatus,
+                          'scheduled_periods' => $schedPeriods,
+                          'periods' => $log->details->isNotEmpty() ? $log->details->map(fn($d) => [
+                              'id' => $d->id,
+                              'check_in' => $d->check_in_time ? \Carbon\Carbon::parse($d->check_in_time)->format('H:i') : '',
+                              'check_out' => $d->check_out_time ? \Carbon\Carbon::parse($d->check_out_time)->format('H:i') : '',
+                          ])->toArray() : [[
+                              'id' => null,
+                              'check_in' => $log->check_in_time ? $log->check_in_time->format('H:i') : '',
+                              'check_out' => $log->check_out_time ? $log->check_out_time->format('H:i') : '',
+                          ]],
+                          'scheduled_hours' => $log->scheduled_hours,
+                          'actual_hours' => $log->actual_hours,
+                          'notes' => $log->meta_data['notes'] ?? '',
+                          'is_exception' => $isException,
+                          'exception_name' => $exceptionName,
+                      ];
+                  } else {
+                      $day = [
+                          'id' => null, 
+                          'date' => $dateStr,
+                          'is_weekend' => $isWeekend,
+                          'status' => $dayOffStatus, 
+                          'scheduled_periods' => $schedPeriods,
+                          'periods' => [['id' => null, 'check_in' => '', 'check_out' => '']], 
+                          'scheduled_hours' => 0,
+                          'actual_hours' => 0,
+                          'notes' => '',
+                          'is_exception' => $isException,
+                          'exception_name' => $exceptionName,
+                      ];
+                  }
+
+                   if ($compEx instanceof \Athka\Settings\Models\OfficialHolidayOccurrence) {
+                         $day['is_exception'] = true;
+                         $day['is_official_holiday'] = true;
+                         $day['exception_name'] = $compEx->template?->name ?? 'Holiday';
+                         $day['status'] = 'holiday';
+                   }
+                  
+                  $this->monthlyEditForm[] = $day;
              
              $current->addDay();
          }
          
-         // Initialize reason with the most recent one if it exists to show continuity
-        // $this->editForm['reason'] = count($this->editHistory) > 0 ? $this->editHistory[0]['reason'] : ''; // This line was misplaced
-        $this->monthlyEditReason = ''; // Initialize monthly reason
-        $this->showMonthlyEditModal = true;
+         $this->monthlyEditReason = ''; // Initialize monthly reason
+         $this->showMonthlyEditModal = true;
     }
 
     public function saveMonthlyEdit()
@@ -500,6 +585,53 @@ trait WithAttendanceEdits
             unset($this->monthlyEditForm[$dayIndex]['periods'][$periodIndex]);
             $this->monthlyEditForm[$dayIndex]['periods'] = array_values($this->monthlyEditForm[$dayIndex]['periods']);
         }
+    }
+
+    private function checkCompanyException(Carbon $day, $employee, $companyExceptions, $officialHolidays = null)
+    {
+        $compEx = $companyExceptions->first(function($ce) use ($day, $employee) {
+            $inDate = $day->between(
+                Carbon::parse($ce->start_date)->startOfDay(),
+                Carbon::parse($ce->end_date)->startOfDay()
+            );
+            if (!$inDate) return false;
+
+            $applyOn = $ce->apply_on ?: 'everyone';
+            if ($applyOn === 'everyone') return true;
+
+            $include = is_array($ce->include) ? $ce->include : (json_decode($ce->include, true) ?: []);
+            
+            if ($applyOn === 'employees' || $applyOn === 'absence') {
+                $targetIds = $include['employees'] ?? [];
+                if (in_array((string)$employee->id, $targetIds)) return true;
+            }
+            
+            if ($applyOn === 'departments') {
+                $targetIds = $include['departments'] ?? [];
+                if (in_array((string)$employee->department_id, $targetIds)) return true;
+            }
+
+            // Using branch_id for location scoping in this module
+            if ($applyOn === 'locations' || $applyOn === 'branches') {
+                $targetIds = $include['branches'] ?? $include['locations'] ?? [];
+                if (in_array((string)$employee->branch_id, $targetIds)) return true;
+            }
+
+            return false;
+        });
+
+        if ($compEx) return $compEx;
+
+        if ($officialHolidays) {
+            return $officialHolidays->first(function($oh) use ($day) {
+                return $day->between(
+                    Carbon::parse($oh->start_date)->startOfDay(),
+                    Carbon::parse($oh->end_date)->startOfDay()
+                );
+            });
+        }
+
+        return null;
     }
 }
 

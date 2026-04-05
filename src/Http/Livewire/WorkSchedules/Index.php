@@ -21,8 +21,18 @@ use Athka\Attendance\Models\EmployeeShiftRotation;
 use Athka\Attendance\Http\Livewire\Traits\WithDataScoping;
 
 
+use Livewire\Attributes\Lazy;
+use Livewire\Attributes\Layout;
+
+#[Lazy]
+#[Layout('layouts.company-admin')]
 class Index extends Component
 {
+    public function placeholder()
+    {
+        return view('attendance::livewire.leaves.placeholder');
+    }
+
     use WithPagination, 
         WithScheduleFilters, 
         WithScheduleAssignments, 
@@ -38,6 +48,7 @@ class Index extends Component
         public $showScheduleEyeModal = false;
         public $scheduleEyeEmployeeId = null;
         public $scheduleEyeEmployeeName = '';
+        public $scheduleEyeEmployeeContractType = '';
         public $scheduleEyeRows = [];
 
         public $showScheduleEditModal = false;
@@ -56,6 +67,7 @@ class Index extends Component
             'location_id' => ['except' => 'all'],
             'schedule_type' => ['except' => ''],
             'work_schedule_id' => ['except' => 'all'],
+            'status' => ['except' => 'all'],
         ];
 
 
@@ -139,7 +151,7 @@ class Index extends Component
     {
         $companyId = $this->getCompanyId();
         $query = Employee::forCompany($companyId)
-            ->where('status', 'active')
+            ->when($this->status !== 'all', fn($q) => $q->where('status', (string)$this->status))
             ->with(['department', 'jobTitle']);
 
         // âœ… Data scoping
@@ -301,7 +313,7 @@ class Index extends Component
         $contractTypes = [];
         $contractCol = $this->resolveEmployeeContractTypeColumn();
         if ($contractCol) {
-            $contractTypes = Employee::forCompany($companyId)->where('status', 'active')->whereNotNull($contractCol)->distinct()->pluck($contractCol)->filter()->values()->all();
+            $contractTypes = Employee::forCompany($companyId)->when($this->status !== 'all', fn($q) => $q->where('status', $this->status))->whereNotNull($contractCol)->distinct()->pluck($contractCol)->filter()->values()->all();
         }
 
         $employees = $query->paginate(10);
@@ -350,7 +362,7 @@ class Index extends Component
             }
 
             foreach ($employees as $employee) {
-                $preview = $this->buildSchedulePreview($employee->id, $companyId, $start, $end);
+                $preview = $this->buildSchedulePreview($employee, $companyId, $start, $end);
                 $summaryData[$employee->id] = $preview['rows'];
             }
         }
@@ -377,15 +389,11 @@ class Index extends Component
         // âœ… Data scoping
         $empQ = $this->applyDataScoping($empQ, 'attendance.schedules.view', 'attendance.schedules.view-subordinates', '');
 
-        $locationCol = $this->resolveEmployeeLocationColumn();
-        if ($locationCol && !empty($this->allowedLocationIds)) {
-            $empQ->whereIn($locationCol, $this->allowedLocationIds);
-        }
-
-        $emp = $empQ->firstOrFail(['id', 'name_ar', 'name_en']);
+        $emp = $empQ->firstOrFail(['id', 'name_ar', 'name_en', 'contract_type']);
 
         $this->scheduleEyeEmployeeId = (int) $emp->id;
         $this->scheduleEyeEmployeeName = (string) ($emp->name_ar ?: $emp->name_en ?: ('#' . $emp->id));
+        $this->scheduleEyeEmployeeContractType = (string) ($emp->contract_type ?? '');
 
         $today = now()->startOfDay();
 
@@ -442,7 +450,9 @@ class Index extends Component
                 'is_active' => (int) $r->is_active,
                 'assignment_type' => $type,
                 'status' => $status,
-                'can_edit' => $isDefault || $isFuture,
+                'is_default' => $isDefault,
+                'contract_type' => $this->scheduleEyeEmployeeContractType,
+                'can_edit' => !$isDefault && $isFuture,
                 'can_delete' => !$isDefault && $isFuture,
             ];
         })->toArray();
@@ -472,12 +482,22 @@ class Index extends Component
         }
 
 
+        $oldestId = \Athka\Attendance\Models\EmployeeWorkSchedule::where('employee_id', $row->employee_id)
+            ->where('saas_company_id', $companyId)
+            ->orderBy('start_date', 'asc')
+            ->orderBy('id', 'asc')
+            ->value('id');
+
         $this->editScheduleAssignmentId = (int) $row->id;
+
+        $isPermanent = empty($row->end_date);
 
         $this->editScheduleForm = [
             'work_schedule_id' => (string) $row->work_schedule_id,
             'start_date'       => (string) ($row->start_date ? Carbon::parse($row->start_date)->format('Y-m-d') : ''),
             'end_date'         => (string) ($row->end_date ? Carbon::parse($row->end_date)->format('Y-m-d') : ''),
+            'is_default'       => ((int) $row->id === (int) $oldestId),
+            'is_permanent'     => $isPermanent,
         ];
 
         $this->showScheduleEditModal = true;
@@ -518,6 +538,12 @@ class Index extends Component
         $newStart = Carbon::parse($startYmd)->startOfDay();
         $newEnd   = $endYmd ? Carbon::parse($endYmd)->startOfDay() : null;
 
+        if ($newEnd && $newEnd->lt($newStart)) {
+            throw ValidationException::withMessages([
+                'editScheduleForm.end_date' => tr('End date cannot be before start date.'),
+            ]);
+        }
+
         $originalStart = $row->start_date ? Carbon::parse($row->start_date)->startOfDay() : null;
         
         $oldestId = EmployeeWorkSchedule::where('employee_id', $row->employee_id)
@@ -528,7 +554,13 @@ class Index extends Component
         
         $isDefaultAssignment = ((int) $row->id === (int) $oldestId);
 
-        if (!$isDefaultAssignment && $originalStart && $originalStart->lte(Carbon::today())) {
+        if ($isDefaultAssignment) {
+            throw ValidationException::withMessages([
+                'editScheduleForm.work_schedule_id' => tr('Base schedule is locked and cannot be edited or deleted.'),
+            ]);
+        }
+
+        if ($originalStart && $originalStart->lte(Carbon::today())) {
             throw ValidationException::withMessages([
                 'editScheduleForm.start_date' => tr('Cannot edit non-default schedules for today or past dates.'),
             ]);
