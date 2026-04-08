@@ -3,6 +3,16 @@
     $isRtl  = in_array(substr($locale, 0, 2), ['ar','fa','ur','he']);
     $dir    = $isRtl ? 'rtl' : 'ltr';
 @endphp
+
+@section('topbar-left-content')
+    <x-ui.page-header
+        :title="tr('Work Schedules')"
+        :subtitle="tr('Manage and assign employee work schedules')"
+        class="!flex-col {{ $isRtl ? '!items-end !text-right' : '!items-start !text-left' }} !justify-start !gap-1"
+        titleSize="xl"
+    />
+@endsection
+
 <div class="w-full">
     {{-- Top Fixed Loading Bar --}}
     <div wire:loading class="fixed top-0 left-0 right-0 h-[3px] z-[9999] overflow-hidden pointer-events-none">

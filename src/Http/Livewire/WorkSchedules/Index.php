@@ -21,10 +21,8 @@ use Athka\Attendance\Models\EmployeeShiftRotation;
 use Athka\Attendance\Http\Livewire\Traits\WithDataScoping;
 
 
-use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Layout;
 
-#[Lazy]
 #[Layout('layouts.company-admin')]
 class Index extends Component
 {

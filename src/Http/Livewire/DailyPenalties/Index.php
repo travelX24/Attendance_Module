@@ -21,10 +21,8 @@ use Barryvdh\DomPDF\Facade\Pdf;
 use Athka\Saas\Models\Branch;
 use Athka\Attendance\Http\Livewire\Traits\WithDataScoping;
 
-use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Layout;
 
-#[Lazy]
 #[Layout('layouts.company-admin')]
 class Index extends Component
 {

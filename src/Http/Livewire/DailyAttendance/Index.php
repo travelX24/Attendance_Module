@@ -18,10 +18,8 @@ use Athka\Attendance\Http\Livewire\DailyAttendance\Traits\WithManualAttendance;
 use Athka\Attendance\Http\Livewire\DailyAttendance\Traits\WithAttendanceExports;
 use Athka\Attendance\Http\Livewire\Traits\WithDataScoping;
 
-use Livewire\Attributes\Lazy;
 use Livewire\Attributes\Layout;
 
-#[Lazy]
 #[Layout('layouts.company-admin')]
 class Index extends Component
 {
