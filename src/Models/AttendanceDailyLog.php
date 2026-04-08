@@ -233,7 +233,7 @@ class AttendanceDailyLog extends Model
     }
 
     // Helpers
-    private function formatTimeHm($value): ?string
+    public function formatTimeHm($value): ?string
     {
         if ($value === null || $value === '') {
             return null;
@@ -243,6 +243,26 @@ class AttendanceDailyLog extends Model
         }
         $str = (string) $value;
         return strlen($str) >= 5 ? substr($str, 0, 5) : $str;
+    }
+
+    public function getCheckInHmAttribute(): ?string
+    {
+        return $this->formatTimeHm($this->check_in_time);
+    }
+
+    public function getCheckOutHmAttribute(): ?string
+    {
+        return $this->formatTimeHm($this->check_out_time);
+    }
+
+    public function getScheduledCheckInHmAttribute(): ?string
+    {
+        return $this->formatTimeHm($this->scheduled_check_in);
+    }
+
+    public function getScheduledCheckOutHmAttribute(): ?string
+    {
+        return $this->formatTimeHm($this->scheduled_check_out);
     }
 
     public function calculateCompliance(): void
@@ -366,7 +386,12 @@ class AttendanceDailyLog extends Model
         if ($this->scheduled_check_in && $effectiveCheckIn) {
             $scheduledIn = Carbon::parse($dateStr . " " . $this->formatTimeHm($this->scheduled_check_in));
             $actualIn = Carbon::parse($dateStr . " " . $this->formatTimeHm($effectiveCheckIn));
-            if ($actualIn->greaterThan($scheduledIn->copy()->addMinutes($lateGrace))) {
+            
+            $delayMinutes = $scheduledIn->diffInMinutes($actualIn, false);
+            
+            if ($delayMinutes >= 60) {
+                $newStatus = 'absent';
+            } elseif ($delayMinutes > $lateGrace) {
                 $newStatus = 'late';
             }
         }

@@ -15,52 +15,51 @@
     </style>
 </head>
 <body>
-    <h2>{{ tr('Daily Attendance Log') }}</h2>
+    <h2>{{ $reshaper(tr('Daily Attendance Log')) }}</h2>
     <div class="meta">
-        {{ tr('Generated') }}: {{ now()->format('Y-m-d H:i') }}
+        {{ $reshaper(tr('Generated')) }}: {{ now()->format('Y-m-d H:i') }}
         @if(!empty($filters['date_from']) || !empty($filters['date_to']))
-            — {{ tr('Date Range') }}: {{ $filters['date_from'] ?: '-' }} → {{ $filters['date_to'] ?: '-' }}
+            — {{ $reshaper(tr('Date Range')) }}: {{ $filters['date_from'] ?: '-' }} → {{ $filters['date_to'] ?: '-' }}
         @endif
     </div>
 
     <table>
         <thead>
         <tr>
-            <th>{{ tr('Employee #') }}</th>
-            <th class="left">{{ tr('Employee') }}</th>
-            <th>{{ tr('Date') }}</th>
-            <th class="left">{{ tr('Schedule') }}</th>
-            <th>{{ tr('Scheduled') }}</th>
-            <th>{{ tr('Actual') }}</th>
-            <th>{{ tr('Sch In') }}</th>
-            <th>{{ tr('Sch Out') }}</th>
-            <th>{{ tr('In') }}</th>
-            <th>{{ tr('Out') }}</th>
-            <th>{{ tr('Status') }}</th>
-            <th>{{ tr('Approval') }}</th>
-            <th>{{ tr('Compliance') }}</th>
+            <th>{{ $reshaper(tr('Employee #')) }}</th>
+            <th class="left">{{ $reshaper(tr('Employee')) }}</th>
+            <th>{{ $reshaper(tr('Date')) }}</th>
+            <th class="left">{{ $reshaper(tr('Schedule')) }}</th>
+            <th>{{ $reshaper(tr('Scheduled')) }}</th>
+            <th>{{ $reshaper(tr('Actual')) }}</th>
+            <th>{{ $reshaper(tr('Sch In')) }}</th>
+            <th>{{ $reshaper(tr('Sch Out')) }}</th>
+            <th>{{ $reshaper(tr('In')) }}</th>
+            <th>{{ $reshaper(tr('Out')) }}</th>
+            <th>{{ $reshaper(tr('Status')) }}</th>
+            <th>{{ $reshaper(tr('Approval')) }}</th>
+            <th>{{ $reshaper(tr('Compliance')) }}</th>
         </tr>
         </thead>
         <tbody>
         @foreach($logs as $log)
             @php
                 $emp = $log->employee;
-                $name = $emp ? ($emp->name_ar ?: $emp->name_en) : '-';
                 $no = $emp?->employee_no ?? '-';
             @endphp
             <tr>
                 <td>{{ $no }}</td>
-                <td class="left">{{ $name }}</td>
+                <td class="left">{{ $log->pdf_name }}</td>
                 <td>{{ $log->attendance_date instanceof \DateTimeInterface ? $log->attendance_date->format('Y-m-d') : substr((string)$log->attendance_date,0,10) }}</td>
-                <td class="left">{{ $log->workSchedule?->name ?? '-' }}</td>
+                <td class="left">{{ $log->pdf_schedule }}</td>
                 <td>{{ number_format((float)($log->scheduled_hours ?? 0), 2) }}</td>
                 <td>{{ number_format((float)($log->actual_hours ?? 0), 2) }}</td>
                 <td>{{ $log->scheduled_check_in_hm ?? '-' }}</td>
                 <td>{{ $log->scheduled_check_out_hm ?? '-' }}</td>
                 <td>{{ $log->check_in_hm ?? '-' }}</td>
                 <td>{{ $log->check_out_hm ?? '-' }}</td>
-                <td>{{ $log->attendance_status }}</td>
-                <td>{{ $log->approval_status }}</td>
+                <td>{{ $log->pdf_status }}</td>
+                <td>{{ $log->pdf_approval }}</td>
                 <td>{{ number_format((float)($log->compliance_percentage ?? 0), 0) }}%</td>
             </tr>
         @endforeach

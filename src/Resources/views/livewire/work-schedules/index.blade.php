@@ -153,13 +153,13 @@
             x-transition:leave="transition ease-in duration-200"
             x-transition:leave-start="opacity-100 translate-x-0"
             x-transition:leave-end="opacity-0 translate-x-4"
-            class="flex items-center gap-3 bg-gray-900 text-white px-4 py-2 rounded-2xl shadow-xl border border-gray-700"
+            class="flex items-center gap-3 bg-[color:var(--brand-via)] text-white px-4 py-2 rounded-2xl shadow-xl shadow-[color:var(--brand-via)]/30 border border-white/20"
         >
-            <div class="flex items-center gap-2 border-e border-gray-700 pe-4 me-1">
-                <div class="w-8 h-8 rounded-full bg-[color:var(--brand-via)] flex items-center justify-center text-white text-xs font-bold shadow-lg shadow-[color:var(--brand-via)]/20">
+            <div class="flex items-center gap-2 border-e border-white/20 pe-4 me-1">
+                <div class="w-8 h-8 rounded-full bg-white flex items-center justify-center text-[color:var(--brand-via)] text-xs font-black shadow-lg">
                     <span x-text="selectionCount"></span>
                 </div>
-                <span class="text-xs font-semibold text-gray-300">{{ tr('Selected') }}</span>
+                <span class="text-xs font-bold text-white/90">{{ tr('Selected') }}</span>
             </div>
 
             <div class="flex items-center gap-2">
@@ -173,15 +173,15 @@
 
                 <button 
                     x-on:click="$dispatch('triggerOpenRotationModal')"
-                    class="group flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-xl transition-all active:scale-95 border border-dashed border-gray-600 hover:border-gray-400"
+                    class="group flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-xl transition-all active:scale-95 border border-dashed border-white/30 hover:border-white/60"
                 >
-                    <i class="fas fa-sync-alt text-purple-400 group-hover:rotate-45 transition-transform"></i>
+                    <i class="fas fa-sync-alt text-amber-300 group-hover:rotate-45 transition-transform"></i>
                     <span>{{ tr('Assign Rotation') }}</span>
                 </button>
 
                 <button 
                     wire:click="$set('selectedEmployees', [])"
-                    class="p-2 text-gray-400 hover:text-red-400 transition-colors"
+                    class="p-2 text-white/50 hover:text-white transition-colors"
                     title="{{ tr('Clear Selection') }}"
                 >
                     <i class="fas fa-times-circle fa-lg"></i>

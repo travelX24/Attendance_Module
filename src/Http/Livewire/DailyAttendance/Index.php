@@ -130,6 +130,38 @@ class Index extends Component
             $query->whereHas('employee', fn ($q) => $q->where('status', (string) $this->status));
         }
 
+        if ($this->approval_status_filter !== 'all') {
+            $query->where('approval_status', $this->approval_status_filter);
+        }
+
+        if ($this->work_schedule_id !== 'all') {
+            $query->where('work_schedule_id', $this->work_schedule_id);
+        }
+
+        if ($this->department_id !== 'all') {
+            $query->whereHas('employee', fn ($q) => $q->where('department_id', $this->department_id));
+        }
+
+        if ($this->job_title_id !== 'all') {
+            $query->whereHas('employee', fn ($q) => $q->where('job_title_id', $this->job_title_id));
+        }
+
+        if ($this->compliance_from !== '') {
+            $query->where('compliance_percentage', '>=', $this->compliance_from);
+        }
+
+        if ($this->compliance_to !== '') {
+            $query->where('compliance_percentage', '<=', $this->compliance_to);
+        }
+
+        if ($this->search) {
+            $query->whereHas('employee', function ($q) {
+                $q->where('name_ar', 'like', '%' . $this->search . '%')
+                    ->orWhere('name_en', 'like', '%' . $this->search . '%')
+                    ->orWhere('employee_no', 'like', '%' . $this->search . '%');
+            });
+        }
+
         if ($this->date_from) $query->where('attendance_date', '>=', $this->date_from);
         if ($this->date_to) $query->where('attendance_date', '<=', $this->date_to);
 
@@ -140,8 +172,8 @@ class Index extends Component
 
         $this->stats['total'] = $data->sum('count');
         
-        // Ø§Ù„Ø­Ø§Ø¶Ø±ÙˆÙ† Ù‡Ù… ÙƒÙ„ Ù…Ù† Ø³Ø¬Ù„ Ø¯Ø®ÙˆÙ„ (Ø­Ø§Ø¶Ø±ØŒ Ù…ØªØ£Ø®Ø±ØŒ Ù…ØºØ§Ø¯Ø±Ø© Ù…Ø¨ÙƒØ±Ø©ØŒ Ø®Ø±ÙˆØ¬ ØªÙ„Ù‚Ø§Ø¦ÙŠ)
-        $this->stats['present'] = $data->whereIn('attendance_status', ['present', 'late', 'early_departure', 'auto_checkout'])->sum('count');
+        // الحاضرون هم فقط من سجل دخول في موعده (حاضر)
+        $this->stats['present'] = $data->where('attendance_status', 'present')->sum('count');
         
         $this->stats['late'] = $data->where('attendance_status', 'late')->first()->count ?? 0;
         $this->stats['absent'] = $data->where('attendance_status', 'absent')->first()->count ?? 0;

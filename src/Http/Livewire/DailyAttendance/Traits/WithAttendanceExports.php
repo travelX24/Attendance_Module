@@ -84,16 +84,33 @@ trait WithAttendanceExports
         $query = $this->applyExportFilters($query);
         $logs = $query->orderByDesc('attendance_date')->get();
 
+        // ✅ Reshape Arabic text for PDF
+        $logs->each(function($log) {
+            $log->pdf_name = $this->pdfReshape($log->employee->name_ar ?? $log->employee->name_en ?? '-');
+            $log->pdf_schedule = $this->pdfReshape($log->workSchedule?->name ?? '-');
+            $log->pdf_status = $this->pdfReshape(tr(ucfirst($log->attendance_status)));
+            $log->pdf_approval = $this->pdfReshape(tr(ucfirst($log->approval_status)));
+        });
+
         $pdf = Pdf::loadView('attendance::pdf.daily-attendance', [
             'logs' => $logs,
             'date_from' => $this->date_from,
             'date_to' => $this->date_to,
-            'company' => \Athka\Saas\Models\SaasCompany::find($companyId)
+            'company' => \Athka\Saas\Models\SaasCompany::find($companyId),
+            'reshaper' => function($t) { return $this->pdfReshape($t); }
         ])->setPaper('a4', 'landscape');
 
         return response()->streamDownload(function() use ($pdf) {
             echo $pdf->stream();
         }, "attendance_report.pdf");
+    }
+
+    private function pdfReshape($text)
+    {
+        if (class_exists('\Athka\Employees\Support\ArabicHelper')) {
+            return \Athka\Employees\Support\ArabicHelper::prepareForPdf((string)$text);
+        }
+        return $text;
     }
 }
 

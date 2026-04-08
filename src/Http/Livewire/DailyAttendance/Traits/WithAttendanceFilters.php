@@ -79,11 +79,13 @@ trait WithAttendanceFilters
     public function updatedApprovalStatusFilter()
     {
         $this->resetPage();
+        if (method_exists($this, 'loadStats')) $this->loadStats();
     }
 
     public function updatedWorkScheduleId()
     {
         $this->resetPage();
+        if (method_exists($this, 'loadStats')) $this->loadStats();
     }
 
     public function updatedBranchId()
@@ -114,6 +116,7 @@ trait WithAttendanceFilters
     public function updatedJobTitleId()
     {
         $this->resetPage();
+        if (method_exists($this, 'loadStats')) $this->loadStats();
     }
 
     public function updatedStatus()
@@ -125,11 +128,13 @@ trait WithAttendanceFilters
     public function updatedComplianceFrom()
     {
         $this->resetPage();
+        if (method_exists($this, 'loadStats')) $this->loadStats();
     }
 
     public function updatedComplianceTo()
     {
         $this->resetPage();
+        if (method_exists($this, 'loadStats')) $this->loadStats();
     }
 
     public function clearAllFilters()
@@ -205,6 +210,20 @@ trait WithAttendanceFilters
                 $employeeQuery->where('job_title_id', $this->job_title_id);
             }
 
+            // ✅ If filtering by Attendance Log criteria, use a subquery to only show employees who have such logs
+            if ($this->attendance_status_filter !== 'all' || $this->work_schedule_id !== 'all' || $this->approval_status_filter !== 'all') {
+                $employeeQuery->whereIn('id', function($q) {
+                    $q->select('employee_id')
+                      ->from('attendance_daily_logs')
+                      ->where('saas_company_id', auth()->user()->saas_company_id)
+                      ->whereBetween('attendance_date', [$this->date_from, $this->date_to]);
+
+                    if ($this->attendance_status_filter !== 'all') $q->where('attendance_status', $this->attendance_status_filter);
+                    if ($this->work_schedule_id !== 'all') $q->where('work_schedule_id', $this->work_schedule_id);
+                    if ($this->approval_status_filter !== 'all') $q->where('approval_status', $this->approval_status_filter);
+                });
+            }
+
             // Paginate Employees
             $employees = $employeeQuery->paginate(15);
 
@@ -235,7 +254,7 @@ trait WithAttendanceFilters
 
                 $employee->summary = (object)[
                     'total_days' => $logsData->count(),
-                    'present_days' => $logsData->whereIn('attendance_status', ['present', 'late', 'early_departure', 'auto_checkout'])->count(),
+                    'present_days' => $logsData->where('attendance_status', 'present')->count(),
                     'late_days' => $logsData->where('attendance_status', 'late')->count(),
                     'absent_days' => $logsData->where('attendance_status', 'absent')->count(),
                     'early_departure_days' => $logsData->where('attendance_status', 'early_departure')->count(),
@@ -243,7 +262,7 @@ trait WithAttendanceFilters
                     'auto_checkout_days' => $logsData->where('attendance_status', 'auto_checkout')->count(),
                     'total_scheduled_hours' => $logsData->sum('scheduled_hours'),
                     'total_actual_hours' => $logsData->sum('actual_hours'),
-                    'avg_compliance' => $logsData->avg('compliance_percentage') ?? 0,
+                    'avg_compliance' => $logsData->where('scheduled_hours', '>', 0)->avg('compliance_percentage') ?? 0,
                     // Use arbitrary log for schedule name if needed, or fetch separately
                     'schedule_name' => $logsData->first()->workSchedule->name ?? '-',
                 ];
