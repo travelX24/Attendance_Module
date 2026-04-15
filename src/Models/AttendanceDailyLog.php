@@ -399,10 +399,10 @@ class AttendanceDailyLog extends Model
         }
 
         if (!$effectiveCheckOut && $this->check_in_time && $this->scheduled_check_out) {
-            $autoCheckoutMins = (int)($grace->auto_checkout_after_minutes ?? 0);
-            if ($autoCheckoutMins > 0) {
+            $autoCheckoutHours = (int)($grace->auto_checkout_after_minutes ?? 0);
+            if ($autoCheckoutHours > 0) {
                  $scheduledOut = Carbon::parse($dateStr . " " . $this->formatTimeHm($this->scheduled_check_out));
-                 $limit = $scheduledOut->copy()->addMinutes($autoCheckoutMins);
+                 $limit = $scheduledOut->copy()->addHours($autoCheckoutHours);
                  
                  if (now()->greaterThan($limit)) {
                      // Perform auto-checkout: set time to scheduled out and update status

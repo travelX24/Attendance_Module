@@ -76,11 +76,17 @@ class Index extends Component
         $yearTable  = (new LeavePolicyYear())->getTable();
         $yearCoCol  = $this->detectCompanyColumn($yearTable);
 
+        $currentYearValue = now()->year;
         $year = LeavePolicyYear::query()
             ->when($yearCoCol, fn ($q) => $q->where($yearCoCol, $this->companyId))
+            ->where('year', (int) $currentYearValue)
             ->when(Schema::hasColumn($yearTable, 'is_active'), fn ($q) => $q->where('is_active', true))
-            ->orderByDesc('year')
             ->first()
+            ?: LeavePolicyYear::query()
+                ->when($yearCoCol, fn ($q) => $q->where($yearCoCol, $this->companyId))
+                ->when(Schema::hasColumn($yearTable, 'is_active'), fn ($q) => $q->where('is_active', true))
+                ->orderByDesc('year')
+                ->first()
             ?: LeavePolicyYear::query()
                 ->when($yearCoCol, fn ($q) => $q->where($yearCoCol, $this->companyId))
                 ->orderByDesc('year')

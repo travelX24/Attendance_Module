@@ -86,28 +86,13 @@ trait WithLeavePermissionsFilters
     public function getYearsProperty()
     {
         $table = (new LeavePolicyYear())->getTable();
+        $companyCol = $this->detectCompanyColumn($table);
 
-        $this->leavePolicyYearsCompanyColumnForFilters ??= $this->detectCompanyColumn($table);
-        $companyCol = $this->leavePolicyYearsCompanyColumnForFilters;
-
-        $q = LeavePolicyYear::query();
-        if ($companyCol) {
-            $q->where($companyCol, $this->companyId);
-        }
-
-        $base = LeavePolicyYear::query();
-        if ($companyCol) {
-            $base->where($companyCol, $this->companyId);
-        }
-
-        $active = null;
-        if (Schema::hasColumn($table, 'is_active')) {
-            $active = (clone $base)->where('is_active', true)->orderByDesc('year')->first();
-        }
-
-        $year = $active ?: (clone $base)->orderByDesc('year')->first();
-
-        return $year ? collect([$year]) : collect();
+        return LeavePolicyYear::query()
+            ->when($companyCol, fn ($q) => $q->where($companyCol, $this->companyId))
+            ->when(Schema::hasColumn($table, 'is_active'), fn ($q) => $q->where('is_active', true))
+            ->orderByDesc('year')
+            ->get();
     }
 
     public function getPoliciesProperty()
