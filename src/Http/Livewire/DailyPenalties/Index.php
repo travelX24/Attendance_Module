@@ -354,10 +354,12 @@ class Index extends Component
     {
         $penalty = $this->findPenaltyOrFail((int) $id);
 
+        /*
         if (Carbon::parse($penalty->attendance_date)->diffInDays(now()) > 7) {
             $this->dispatch('toast', ['type' => 'error', 'message' => tr('Cannot modify penalties older than 7 days.')]);
             return;
         }
+        */
 
         if ($penalty->status === 'confirmed') {
             $this->dispatch('toast', ['type' => 'error', 'message' => tr('Confirmed penalties cannot be modified.')]);
@@ -437,10 +439,12 @@ class Index extends Component
     {
         $penalty = $this->findPenaltyOrFail((int) $id);
 
+        /*
         if (Carbon::parse($penalty->attendance_date)->diffInDays(now()) > 7) {
             $this->dispatch('toast', ['type' => 'error', 'message' => tr('Cannot remove penalties older than 7 days.')]);
             return;
         }
+        */
 
         if ($penalty->status === 'confirmed') {
             $this->dispatch('toast', ['type' => 'error', 'message' => tr('Confirmed penalties cannot be removed.')]);
@@ -495,8 +499,8 @@ class Index extends Component
 
         $q = AttendanceDailyPenalty::forCompany($companyId)
             ->whereIn('id', $this->selectedPenalties)
-            ->where('status', '!=', 'confirmed')
-            ->where('attendance_date', '>=', $sevenDaysAgo);
+            ->where('status', '!=', 'confirmed');
+            // ->where('attendance_date', '>=', $sevenDaysAgo);
 
         $q = $this->applyBranchScopeToPenaltiesQuery($q);
 

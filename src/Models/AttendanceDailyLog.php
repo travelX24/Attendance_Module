@@ -196,6 +196,43 @@ class AttendanceDailyLog extends Model
         $this->scheduled_check_in = $metrics['check_in'];
         $this->scheduled_check_out = $metrics['check_out'];
 
+        // ✅ تطبيق استثناءات الجدول الخاصة بالموظف لهذا التاريخ
+        // هذه الاستثناءات تُخزَّن في employee_work_schedule_exceptions
+        // وتأخذ الأولوية على الجدول الأساسي
+        $employeeException = \Athka\Attendance\Models\EmployeeWorkScheduleException::where('employee_id', $this->employee_id)
+            ->whereDate('exception_date', $dateStr)
+            ->first();
+
+        if ($employeeException) {
+            if ($employeeException->exception_type === 'day_off') {
+                // يوم إجازة/إيقاف استثنائي خاص بالموظف
+                $this->scheduled_hours = 0;
+                $this->scheduled_check_in = null;
+                $this->scheduled_check_out = null;
+                if (!$this->check_in_time && $this->attendance_status !== 'on_leave') {
+                    $this->attendance_status = 'day_off';
+                }
+                return;
+            } elseif (in_array($employeeException->exception_type, ['time_override', 'work_day'], true)) {
+                // تعديل ساعات الدوام للموظف لهذا اليوم
+                $startTime = $employeeException->start_time ? substr((string)$employeeException->start_time, 0, 5) : null;
+                $endTime   = $employeeException->end_time   ? substr((string)$employeeException->end_time,   0, 5) : null;
+
+                if ($startTime && $endTime) {
+                    $exStart = \Carbon\Carbon::parse($dateStr . ' ' . $startTime);
+                    $exEnd   = \Carbon\Carbon::parse($dateStr . ' ' . $endTime);
+                    if ($exEnd->lt($exStart)) $exEnd->addDay(); // دعم الوردية الليلية
+
+                    $this->scheduled_hours     = round($exStart->diffInMinutes($exEnd) / 60, 2);
+                    $this->scheduled_check_in  = $exStart;
+                    $this->scheduled_check_out = $exEnd;
+
+                    // إجبار حالة يوم العمل حتى يعمل الوضع التلقائي بشكل صحيح
+                    $metrics['status'] = 'workday';
+                }
+            }
+        }
+
         if ($metrics['status'] === 'holiday' || $metrics['status'] === 'off') {
             if (!$this->check_in_time && $this->attendance_status !== 'on_leave') {
                 $this->attendance_status = 'day_off';

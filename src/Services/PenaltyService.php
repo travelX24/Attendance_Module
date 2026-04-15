@@ -162,9 +162,11 @@ class PenaltyService
             return false;
         }
 
+        /* 
         if (Carbon::parse($log->attendance_date)->diffInDays(now()) > 7) {
             return false;
         }
+        */
 
         $hasPermission = \Athka\Attendance\Models\AttendancePermissionRequest::where('employee_id', $log->employee_id)
             ->where('permission_date', $log->attendance_date)

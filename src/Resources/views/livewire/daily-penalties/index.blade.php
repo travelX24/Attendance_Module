@@ -78,18 +78,16 @@
 
                 {{-- Calculation Mode --}}
                 <div>
-                    <label class="block text-xs font-semibold text-gray-600 mb-1.5">
-                        {{ tr('Calculation Mode') }}
-                    </label>
-
-                    <select
-                        wire:model.live="calculation_mode"
-                        class="w-full h-11 px-3 border border-gray-200 rounded-xl bg-white text-sm focus:ring-2 focus:ring-[color:var(--brand-via)] focus:border-transparent"
-                        @disabled(!auth()->user()->can('attendance.manage'))
-                    >
-                        <option value="single_day">{{ tr('Specific Day') }}</option>
-                        <option value="range">{{ tr('Range') }}</option>
-                    </select>
+                    <x-ui.filter-select
+                        model="calculation_mode"
+                        :label="tr('Calculation Mode')"
+                        :options="[
+                            ['value' => 'single_day', 'label' => tr('Specific Day')],
+                            ['value' => 'range', 'label' => tr('Range')],
+                        ]"
+                        width="full"
+                        :disabled="!auth()->user()->can('attendance.manage')"
+                    />
                 </div>
 
                 @if($calculation_mode === 'single_day')

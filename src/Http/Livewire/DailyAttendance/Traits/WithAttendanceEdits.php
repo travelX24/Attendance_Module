@@ -62,28 +62,31 @@ trait WithAttendanceEdits
         $this->editingEmployeeId = $log->employee->employee_no;
         $this->editingDate = $log->attendance_date->format('Y-m-d');
         
-        // Fetch Schedule for structure
+        // Fetch Schedule structure using the service to account for exceptions
         $companyId = auth()->user()->saas_company_id;
         $date = Carbon::parse($log->attendance_date);
-        $dayName = strtolower($date->format('l'));
+        $dateStr = $date->toDateString();
 
-        $assignment = EmployeeWorkSchedule::where('saas_company_id', $companyId)
-            ->where('employee_id', $log->employee_id)
-            ->where('is_active', true)
-            ->where('start_date', '<=', $date)
-            ->where(function($q) use ($date) {
-                $q->whereNull('end_date')->orWhere('end_date', '>=', $date);
-            })
-            ->with(['workSchedule.periods'])
+        $service = app(\Athka\SystemSettings\Services\WorkScheduleService::class);
+        $ws = $service->getEffectiveSchedule($companyId, $log->employee, $dateStr);
+        $holidays = $service->getHolidays($companyId, $dateStr, $dateStr);
+        $metrics = $service->getMetricsForDate($dateStr, $ws, $holidays, $log->employee);
+
+        // ✅ Check for Employee Specific Exception (Highest Priority)
+        $empExt = \Athka\Attendance\Models\EmployeeWorkScheduleException::where('employee_id', $log->employee_id)
+            ->whereDate('exception_date', $dateStr)
             ->first();
 
         $periodsStructure = [];
-        if ($assignment && $assignment->workSchedule) {
-            $workSchedule = $assignment->workSchedule;
-            $workDays = is_array($workSchedule->work_days) ? $workSchedule->work_days : [];
-
-            if (in_array($dayName, $workDays)) {
-                $periodsStructure = $workSchedule->periods;
+        if ($empExt && in_array($empExt->exception_type, ['time_override', 'work_day'], true)) {
+            $periodsStructure[] = (object)[
+                'start_time' => $empExt->start_time,
+                'end_time' => $empExt->end_time,
+            ];
+        } elseif ($metrics['status'] === 'workday' && !empty($metrics['periods'])) {
+            // Use metrics periods (these include schedule-level exceptions)
+            foreach ($metrics['periods'] as $p) {
+                $periodsStructure[] = (object)$p;
             }
         }
 
@@ -93,27 +96,11 @@ trait WithAttendanceEdits
         // If we have structure, use it to initialize inputs
         if (count($periodsStructure) > 0) {
             foreach ($periodsStructure as $index => $p) {
-                // Determine scheduled times from period configuration
-                $sIn = null;
-                $sOut = null;
-                
-                if (isset($p->start_time)) {
-                    try {
-                        $sIn = Carbon::parse($p->start_time)->format('h:i A');
-                    } catch (\Exception $e) {
-                         $sIn = substr($p->start_time, 0, 5);
-                    }
-                }
-                
-                if (isset($p->end_time)) {
-                    try {
-                         $sOut = Carbon::parse($p->end_time)->format('h:i A');
-                    } catch (\Exception $e) {
-                         $sOut = substr($p->end_time, 0, 5);
-                    }
-                }
+                // Determine scheduled times
+                $sIn = isset($p->start_time) ? Carbon::parse($p->start_time)->format('h:i A') : null;
+                $sOut = isset($p->end_time) ? Carbon::parse($p->end_time)->format('h:i A') : null;
 
-                // Initialize with EMPTY values by default. Do NOT copy main log blindly to all periods.
+                // Initialize with EMPTY values by default
                 $this->editForm['periods'][] = [
                     'check_in_time' => '', 
                     'check_out_time' => '',
@@ -123,31 +110,40 @@ trait WithAttendanceEdits
             }
             
             // Now populate values from existing log data
+            // We prioritize structured check_attempts, otherwise we pull from the detailed pulses table
+            $punches = [];
             if (!empty($log->check_attempts) && is_array($log->check_attempts) && count($log->check_attempts) > 0) {
-                 // We have detailed attempts, map them to periods by index
-                 foreach($log->check_attempts as $i => $attempt) {
-                     if (isset($this->editForm['periods'][$i])) {
-                         $this->editForm['periods'][$i]['check_in_time'] = $attempt['check_in_time'] ?? '';
-                         $this->editForm['periods'][$i]['check_out_time'] = $attempt['check_out_time'] ?? '';
-                     } else {
-                         // Extra attempt beyond schedule structure, add new row
-                         $this->editForm['periods'][] = [
-                             'check_in_time' => $attempt['check_in_time'] ?? '',
-                             'check_out_time' => $attempt['check_out_time'] ?? '',
-                             'scheduled_in' => null,
-                             'scheduled_out' => null,
-                         ];
-                     }
-                 }
+                 $punches = $log->check_attempts;
             } else {
-                 // No structured attempts (legacy or single punch). 
-                 // Map the Main Log In/Out to the FIRST period only.
-                 if ($log->check_in_time || $log->check_out_time) {
-                     if (isset($this->editForm['periods'][0])) {
-                        $this->editForm['periods'][0]['check_in_time'] = $log->check_in_time ? $log->check_in_time->format('H:i') : '';
-                        $this->editForm['periods'][0]['check_out_time'] = $log->check_out_time ? $log->check_out_time->format('H:i') : '';
-                     }
+                 // Load from details table for multi-punch support
+                 $punches = $log->details()->orderBy('check_in_time', 'asc')->get()->map(fn($d) => [
+                     'check_in_time' => $d->start_time ?: ($d->check_in_time ? \Carbon\Carbon::parse($d->check_in_time)->format('H:i') : ''),
+                     'check_out_time' => $d->end_time   ?: ($d->check_out_time ? \Carbon\Carbon::parse($d->check_out_time)->format('H:i') : ''),
+                 ])->toArray();
+
+                 // Fallback to main log if details are empty (legacy or single-punch systems)
+                 if (empty($punches) && ($log->check_in_time || $log->check_out_time)) {
+                     $punches[] = [
+                         'check_in_time' => $log->check_in_time ? $log->check_in_time->format('H:i') : '',
+                         'check_out_time' => $log->check_out_time ? $log->check_out_time->format('H:i') : '',
+                     ];
                  }
+            }
+
+            // Map discovered punches to the period structure
+            foreach($punches as $i => $punch) {
+                if (isset($this->editForm['periods'][$i])) {
+                    $this->editForm['periods'][$i]['check_in_time'] = $punch['check_in_time'] ?? '';
+                    $this->editForm['periods'][$i]['check_out_time'] = $punch['check_out_time'] ?? '';
+                } else {
+                    // Extra punch record beyond schedule structure, add a new row
+                    $this->editForm['periods'][] = [
+                        'check_in_time' => $punch['check_in_time'] ?? '',
+                        'check_out_time' => $punch['check_out_time'] ?? '',
+                        'scheduled_in' => null,
+                        'scheduled_out' => null,
+                    ];
+                }
             }
 
         } else {

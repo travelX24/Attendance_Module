@@ -19,7 +19,16 @@ trait WithDataScoping
     {
         $user = auth()->user();
 
-        // If user can view all, do nothing (full access)
+        // Company admin / primary user: full access to all data
+        if (
+            $user->can('attendance.manage') ||
+            $user->can('settings.attendance.manage') ||
+            $user->can('attendance.manage-all')
+        ) {
+            return $query;
+        }
+
+        // If user can view all records for this specific permission
         if ($user->can($viewAllPerm)) {
             return $query;
         }
@@ -39,8 +48,7 @@ trait WithDataScoping
             }
         }
 
-        // Default: If no specific "view" permission is granted, fall back to empty result or standard restriction
-        // We can return a query that matches nothing if they have neither permission
+        // Default: no matching permission → return empty result
         return $query->whereRaw('1 = 0');
     }
 }
