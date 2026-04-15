@@ -13,6 +13,16 @@ use Carbon\Carbon;
 class PenaltyService
 {
     /**
+     * Run penalty calculation for one specific day.
+     *
+     * @return array{processed:int,created:int}
+     */
+    public function calculateForDate($date, $companyId): array
+    {
+        return $this->calculateForRange($date, $date, $companyId);
+    }
+
+    /**
      * Run penalty calculation for a specific date range.
      *
      * @return array{processed:int,created:int}
@@ -293,7 +303,6 @@ class PenaltyService
             return 0;
         }
 
-        // âœ… Ø§Ù„ØµØ­ÙŠØ­: scheduled -> actual (late)
         return max(0, $s->diffInMinutes($a, false));
     }
 
@@ -306,7 +315,6 @@ class PenaltyService
             return 0;
         }
 
-        // âœ… Ø§Ù„ØµØ­ÙŠØ­: actual -> scheduled (early)
         return max(0, $a->diffInMinutes($s, false));
     }
 
@@ -328,4 +336,3 @@ class PenaltyService
         return Carbon::parse($d->format('Y-m-d') . ' ' . $hm);
     }
 }
-

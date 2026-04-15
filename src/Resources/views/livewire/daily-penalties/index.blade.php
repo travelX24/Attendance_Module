@@ -15,7 +15,6 @@
 
     {{-- Quick Stats --}}
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
-        {{-- Total Calculated --}}
         <x-ui.card hover class="flex items-center gap-4">
             <div class="p-3 bg-red-50 text-red-600 rounded-xl">
                 <i class="fas fa-calculator fa-lg"></i>
@@ -28,7 +27,6 @@
             </div>
         </x-ui.card>
 
-        {{-- Total Exempted --}}
         <x-ui.card hover class="flex items-center gap-4">
             <div class="p-3 bg-yellow-50 text-yellow-600 rounded-xl">
                 <i class="fas fa-hand-holding-usd fa-lg"></i>
@@ -41,7 +39,6 @@
             </div>
         </x-ui.card>
 
-        {{-- Total Net --}}
         <x-ui.card hover class="flex items-center gap-4">
             <div class="p-3 bg-green-50 text-green-600 rounded-xl">
                 <i class="fas fa-file-invoice-dollar fa-lg"></i>
@@ -54,7 +51,6 @@
             </div>
         </x-ui.card>
 
-        {{-- Total Waivers --}}
         <x-ui.card hover class="flex items-center gap-4">
             <div class="p-3 bg-blue-50 text-blue-600 rounded-xl">
                 <i class="fas fa-user-tag fa-lg"></i>
@@ -69,21 +65,79 @@
         </x-ui.card>
     </div>
 
-    {{-- Filters & Table --}}
     <x-ui.card padding="false" class="!overflow-visible">
-        {{-- Filters Toolbar --}}
         <div class="p-3 border-b border-gray-100 bg-gray-50/30">
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 xxl:grid-cols-7 gap-3 items-end">
-                    {{-- Search --}}
-                    <div class="sm:col-span-2 lg:col-span-2">
-                        <x-ui.search-box
-                            model="search"
-                            :placeholder="tr('Search employee...')"
-                            :disabled="!auth()->user()->can('attendance.manage')"
-                        />
-                    </div>
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4 xxl:grid-cols-7 gap-3 items-end">
+                <div class="sm:col-span-2 lg:col-span-2">
+                    <x-ui.search-box
+                        model="search"
+                        :placeholder="tr('Search employee...')"
+                        :disabled="!auth()->user()->can('attendance.manage')"
+                    />
+                </div>
 
-                    {{-- Date From --}}
+                {{-- Calculation Mode --}}
+                <div>
+                    <label class="block text-xs font-semibold text-gray-600 mb-1.5">
+                        {{ tr('Calculation Mode') }}
+                    </label>
+
+                    <select
+                        wire:model.live="calculation_mode"
+                        class="w-full h-11 px-3 border border-gray-200 rounded-xl bg-white text-sm focus:ring-2 focus:ring-[color:var(--brand-via)] focus:border-transparent"
+                        @disabled(!auth()->user()->can('attendance.manage'))
+                    >
+                        <option value="single_day">{{ tr('Specific Day') }}</option>
+                        <option value="range">{{ tr('Range') }}</option>
+                    </select>
+                </div>
+
+                @if($calculation_mode === 'single_day')
+                    {{-- Single Day Navigator --}}
+                    <div class="sm:col-span-2 lg:col-span-2">
+                        <label class="block text-xs font-semibold text-gray-600 mb-1.5">
+                            {{ tr('Date') }}
+                        </label>
+
+                        <div class="flex items-center gap-2">
+                            <button
+                                type="button"
+                                wire:click="goToPreviousDay"
+                                class="h-11 w-11 shrink-0 inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 hover:text-[color:var(--brand-via)] hover:border-[color:var(--brand-via)]/30 transition"
+                                @disabled(!auth()->user()->can('attendance.manage'))
+                                title="{{ tr('Previous day') }}"
+                            >
+                                <i class="fas fa-chevron-left"></i>
+                            </button>
+
+                            <label class="relative flex-1 cursor-pointer">
+                                <input
+                                    type="date"
+                                    wire:model.live="date_from"
+                                    class="absolute inset-0 opacity-0 cursor-pointer z-10"
+                                    @disabled(!auth()->user()->can('attendance.manage'))
+                                >
+
+                                <div class="h-11 px-4 border border-gray-200 rounded-xl bg-white flex items-center justify-center gap-3 shadow-sm">
+                                    <span class="text-sm font-bold text-gray-800">
+                                        {{ $date_from ? \Carbon\Carbon::parse($date_from)->format('Y/m/d') : now()->format('Y/m/d') }}
+                                    </span>
+                                    <i class="fas fa-calendar-alt text-[color:var(--brand-via)] text-sm"></i>
+                                </div>
+                            </label>
+
+                            <button
+                                type="button"
+                                wire:click="goToNextDay"
+                                class="h-11 w-11 shrink-0 inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 hover:text-[color:var(--brand-via)] hover:border-[color:var(--brand-via)]/30 transition"
+                                @disabled(!auth()->user()->can('attendance.manage'))
+                                title="{{ tr('Next day') }}"
+                            >
+                                <i class="fas fa-chevron-right"></i>
+                            </button>
+                        </div>
+                    </div>
+                @else
                     <div>
                         <x-ui.company-date-picker
                             model="date_from"
@@ -92,7 +146,6 @@
                         />
                     </div>
 
-                    {{-- Date To --}}
                     <div>
                         <x-ui.company-date-picker
                             model="date_to"
@@ -100,133 +153,125 @@
                             :disabled="!auth()->user()->can('attendance.manage')"
                         />
                     </div>
+                @endif
 
-                    {{-- Violation --}}
-                    <div>
-                        <x-ui.filter-select
-                            model="violation_type_filter"
-                            :label="tr('Violation')"
-                            :placeholder="tr('All')"
-                            :options="[
-                                ['value' => 'delay', 'label' => tr('Delay')],
-                                ['value' => 'early_departure', 'label' => tr('Early Out')],
-                                ['value' => 'absent', 'label' => tr('Absent')],
-                                ['value' => 'auto_checkout', 'label' => tr('Missing Checkout')],
-                            ]"
-                            width="full"
-                            :disabled="!auth()->user()->can('attendance.manage')"
-                        />
-                    </div>
-
-                    {{-- Status --}}
-                    <div>
-                        <x-ui.filter-select
-                            model="status_filter"
-                            :label="tr('Status')"
-                            :placeholder="tr('All')"
-                            :options="[
-                                ['value' => 'pending', 'label' => tr('Pending')],
-                                ['value' => 'confirmed', 'label' => tr('Confirmed')],
-                                ['value' => 'waived', 'label' => tr('Waived')],
-                            ]"
-                            width="full"
-                            :disabled="!auth()->user()->can('attendance.manage')"
-                        />
-                    </div>
-
-                    {{-- Employee Status --}}
-                    <div>
-                        <x-ui.filter-select
-                            model="status_emp_filter"
-                            :label="tr('Employee Status')"
-                            :placeholder="tr('All')"
-                            :options="[
-                                ['value' => 'ACTIVE', 'label' => tr('Active')],
-                                ['value' => 'SUSPENDED', 'label' => tr('Suspended')],
-                                ['value' => 'TERMINATED', 'label' => tr('Terminated')],
-                            ]"
-                            width="full"
-                            :disabled="!auth()->user()->can('attendance.manage')"
-                        />
-                    </div>
-
-                 {{-- Branch --}}
-                    <div>
-                        <x-ui.filter-select
-                            model="branch_id"
-                            :label="tr('Branch')"
-                            :placeholder="tr('All')"
-                            :options="$branches->map(fn($b) => ['value' => $b->id, 'label' => $b->name])->toArray()"
-                            width="full"
-                            :disabled="!auth()->user()->can('attendance.manage')"
-                        />
-                    </div>
-
-                    {{-- Department --}}
-                    <div>
-                        <x-ui.filter-select
-                            model="department_id"
-                            :label="tr('Department')"
-                            :placeholder="tr('All')"
-                            :options="$departments->map(fn($d) => ['value' => $d->id, 'label' => $d->name])->toArray()"
-                            width="full"
-                            :disabled="!auth()->user()->can('attendance.manage')"
-                        />
-                    </div>
-
-                    {{-- Job Title --}}
-                    <div>
-                        <x-ui.filter-select
-                            model="job_title_id"
-                            :label="tr('Job Title')"
-                            :placeholder="tr('All')"
-                            :options="$jobTitles->map(fn($j) => ['value' => $j->id, 'label' => $j->name])->toArray()"
-                            width="full"
-                            :disabled="!auth()->user()->can('attendance.manage')"
-                        />
-                    </div>
+                <div>
+                    <x-ui.filter-select
+                        model="violation_type_filter"
+                        :label="tr('Violation')"
+                        :placeholder="tr('All')"
+                        :options="[
+                            ['value' => 'delay', 'label' => tr('Delay')],
+                            ['value' => 'early_departure', 'label' => tr('Early Out')],
+                            ['value' => 'absent', 'label' => tr('Absent')],
+                            ['value' => 'auto_checkout', 'label' => tr('Missing Checkout')],
+                        ]"
+                        width="full"
+                        :disabled="!auth()->user()->can('attendance.manage')"
+                    />
                 </div>
 
-                {{-- Clear Filters Button --}}
-                <div
-                    x-data="{
-                        hasFilters() {
-                            return ($wire.search && $wire.search.trim() !== '') ||
-                                   ($wire.date_from && $wire.date_from !== '') ||
-                                   ($wire.date_to && $wire.date_to !== '') ||
-                                   ($wire.violation_type_filter && $wire.violation_type_filter !== 'all') ||
-                                   ($wire.status_filter && $wire.status_filter !== 'all') ||
-                                   ($wire.branch_id && $wire.branch_id !== 'all' && $wire.branch_id !== '') ||
-                                   ($wire.department_id && $wire.department_id !== 'all') ||
-                                   ($wire.job_title_id && $wire.job_title_id !== 'all');
-                        }
-                    }"
-                    x-show="hasFilters()"
-                    x-transition
-                    class="flex items-center justify-end mt-3 mb-1"
+                <div>
+                    <x-ui.filter-select
+                        model="status_filter"
+                        :label="tr('Status')"
+                        :placeholder="tr('All')"
+                        :options="[
+                            ['value' => 'pending', 'label' => tr('Pending')],
+                            ['value' => 'confirmed', 'label' => tr('Confirmed')],
+                            ['value' => 'waived', 'label' => tr('Waived')],
+                        ]"
+                        width="full"
+                        :disabled="!auth()->user()->can('attendance.manage')"
+                    />
+                </div>
+
+                <div>
+                    <x-ui.filter-select
+                        model="status_emp_filter"
+                        :label="tr('Employee Status')"
+                        :placeholder="tr('All')"
+                        :options="[
+                            ['value' => 'ACTIVE', 'label' => tr('Active')],
+                            ['value' => 'SUSPENDED', 'label' => tr('Suspended')],
+                            ['value' => 'TERMINATED', 'label' => tr('Terminated')],
+                        ]"
+                        width="full"
+                        :disabled="!auth()->user()->can('attendance.manage')"
+                    />
+                </div>
+
+                <div>
+                    <x-ui.filter-select
+                        model="branch_id"
+                        :label="tr('Branch')"
+                        :placeholder="tr('All')"
+                        :options="$branches->map(fn($b) => ['value' => $b->id, 'label' => $b->name])->toArray()"
+                        width="full"
+                        :disabled="!auth()->user()->can('attendance.manage')"
+                    />
+                </div>
+
+                <div>
+                    <x-ui.filter-select
+                        model="department_id"
+                        :label="tr('Department')"
+                        :placeholder="tr('All')"
+                        :options="$departments->map(fn($d) => ['value' => $d->id, 'label' => $d->name])->toArray()"
+                        width="full"
+                        :disabled="!auth()->user()->can('attendance.manage')"
+                    />
+                </div>
+
+                <div>
+                    <x-ui.filter-select
+                        model="job_title_id"
+                        :label="tr('Job Title')"
+                        :placeholder="tr('All')"
+                        :options="$jobTitles->map(fn($j) => ['value' => $j->id, 'label' => $j->name])->toArray()"
+                        width="full"
+                        :disabled="!auth()->user()->can('attendance.manage')"
+                    />
+                </div>
+            </div>
+
+            <div
+                x-data="{
+                    hasFilters() {
+                        return ($wire.search && $wire.search.trim() !== '') ||
+                               ($wire.calculation_mode && $wire.calculation_mode !== 'single_day') ||
+                               ($wire.violation_type_filter && $wire.violation_type_filter !== 'all') ||
+                               ($wire.status_filter && $wire.status_filter !== 'all') ||
+                               ($wire.branch_id && $wire.branch_id !== 'all' && $wire.branch_id !== '') ||
+                               ($wire.department_id && $wire.department_id !== 'all') ||
+                               ($wire.job_title_id && $wire.job_title_id !== 'all');
+                    }
+                }"
+                x-show="hasFilters()"
+                x-transition
+                class="flex items-center justify-end mt-3 mb-1"
+            >
+                <button
+                    type="button"
+                    wire:click="clearAllFilters"
+                    wire:loading.attr="disabled"
+                    wire:target="clearAllFilters"
+                    class="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:text-gray-900 transition-colors disabled:opacity-50"
                 >
-                    <button
-                        type="button"
-                        wire:click="clearAllFilters"
-                        wire:loading.attr="disabled"
-                        wire:target="clearAllFilters"
-                        class="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-semibold text-gray-600 hover:text-gray-900 transition-colors disabled:opacity-50"
-                    >
-                        <i class="fas fa-times" wire:loading.remove wire:target="clearAllFilters"></i>
-                        <i class="fas fa-spinner fa-spin" wire:loading wire:target="clearAllFilters"></i>
-                        <span wire:loading.remove wire:target="clearAllFilters">{{ tr('Clear all filters') }}</span>
-                        <span wire:loading wire:target="clearAllFilters">{{ tr('Clearing...') }}</span>
-                    </button>
-                </div>
+                    <i class="fas fa-times" wire:loading.remove wire:target="clearAllFilters"></i>
+                    <i class="fas fa-spinner fa-spin" wire:loading wire:target="clearAllFilters"></i>
+                    <span wire:loading.remove wire:target="clearAllFilters">{{ tr('Clear all filters') }}</span>
+                    <span wire:loading wire:target="clearAllFilters">{{ tr('Clearing...') }}</span>
+                </button>
+            </div>
 
-                {{-- Action Buttons --}}
-                <div class="flex flex-wrap items-center justify-between border-t border-gray-100 pt-3 mt-1">
-                    <div class="flex items-center gap-2">
-                        @if(!empty($selectedPenalties))
-                            <div class="flex items-center gap-2 px-3 py-1.5 bg-[color:var(--brand-via)]/5 rounded-xl border border-[color:var(--brand-via)]/10">
-                                <span class="text-xs font-bold text-[color:var(--brand-via)]">{{ count($selectedPenalties) }} {{ tr('Selected') }}</span>
-                                <div class="w-px h-4 bg-[color:var(--brand-via)]/20 mx-1"></div>
-                                @can('attendance.manage')
+            <div class="flex flex-wrap items-center justify-between border-t border-gray-100 pt-3 mt-1">
+                <div class="flex items-center gap-2">
+                    @if(!empty($selectedPenalties))
+                        <div class="flex items-center gap-2 px-3 py-1.5 bg-[color:var(--brand-via)]/5 rounded-xl border border-[color:var(--brand-via)]/10">
+                            <span class="text-xs font-bold text-[color:var(--brand-via)]">{{ count($selectedPenalties) }} {{ tr('Selected') }}</span>
+                            <div class="w-px h-4 bg-[color:var(--brand-via)]/20 mx-1"></div>
+                            @can('attendance.manage')
                                 <button wire:click="bulkConfirm" class="text-xs font-bold text-green-600 hover:text-green-700 flex items-center gap-1 transition-colors">
                                     <i class="fas fa-check-double"></i>
                                     {{ tr('Confirm All') }}
@@ -235,47 +280,55 @@
                                     <i class="fas fa-trash-alt"></i>
                                     {{ tr('Delete') }}
                                 </button>
-                                @endcan
-                            </div>
+                            @endcan
+                        </div>
+                    @else
+                        <div class="text-[11px] text-gray-400 italic">
+                            <i class="fas fa-info-circle me-1"></i>
+                            {{ tr('Select records to perform bulk actions') }}
+                        </div>
+                    @endif
+                </div>
+
+                <div class="flex items-center gap-2">
+                    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gray-100 text-gray-700 text-xs font-semibold">
+                        <i class="fas fa-layer-group"></i>
+                        @if($calculation_mode === 'single_day')
+                            <span>{{ tr('Mode') }}: {{ tr('Specific Day') }}</span>
                         @else
-                            <div class="text-[11px] text-gray-400 italic">
-                                <i class="fas fa-info-circle me-1"></i>
-                                {{ tr('Select records to perform bulk actions') }}
-                            </div>
+                            <span>{{ tr('Mode') }}: {{ tr('Range') }}</span>
                         @endif
                     </div>
-                    
-                    <div class="flex items-center gap-2">
-                        <x-ui.secondary-button wire:click="refreshData" size="sm" class="!rounded-xl gap-2">
-                            <i class="fas fa-sync text-xs"></i>
-                            <span class="font-bold">{{ tr('Refresh') }}</span>
-                        </x-ui.secondary-button>
 
-                        @can('attendance.manage')
+                    <x-ui.secondary-button wire:click="refreshData" size="sm" class="!rounded-xl gap-2">
+                        <i class="fas fa-sync text-xs"></i>
+                        <span class="font-bold">{{ tr('Refresh') }}</span>
+                    </x-ui.secondary-button>
+
+                    @can('attendance.manage')
                         <x-ui.secondary-button wire:click="exportExcel" size="sm" class="!rounded-xl gap-2">
                             <i class="fas fa-file-excel text-xs"></i>
                             <span class="font-bold">{{ tr('Excel') }}</span>
                         </x-ui.secondary-button>
-                        @endcan
+                    @endcan
 
-                        @can('attendance.manage')
+                    @can('attendance.manage')
                         <x-ui.secondary-button wire:click="exportPdf" size="sm" class="!rounded-xl gap-2">
                             <i class="fas fa-file-pdf text-xs"></i>
                             <span class="font-bold">{{ tr('PDF') }}</span>
                         </x-ui.secondary-button>
-                        @endcan
+                    @endcan
 
-                        @can('attendance.manage')
+                    @can('attendance.manage')
                         <x-ui.primary-button wire:click="runCalculation" size="sm" class="!rounded-xl !px-6 gap-2 shadow-sm">
                             <i class="fas fa-play text-xs text-white"></i>
                             <span class="font-bold">{{ tr('Run Calculation') }}</span>
                         </x-ui.primary-button>
-                        @endcan
-                    </div>
+                    @endcan
                 </div>
             </div>
+        </div>
 
-        {{-- Table --}}
         @php
             $headers = [
                 tr('<div class="flex items-center justify-center"><input type="checkbox" wire:model.live="selectAll" class="w-4 h-4 rounded-md border-gray-300 text-[color:var(--brand-via)] focus:ring-[color:var(--brand-via)] transition-all cursor-pointer" ' . (!auth()->user()->can('attendance.manage') ? 'disabled' : '') . '></div>'),
@@ -295,8 +348,12 @@
         @endphp
 
         <x-ui.table :headers="$headers" :headerAlign="$headerAlign" :enablePagination="false">
+            @php $lastPenaltyDate = null; @endphp
+
             @forelse($penalties as $penalty)
                 @php
+                    $currentPenaltyDate = \Carbon\Carbon::parse($penalty->attendance_date)->format('Y-m-d');
+
                     $violationBadge = match($penalty->violation_type) {
                         'delay' => ['type' => 'warning', 'label' => tr('Delay')],
                         'early_departure' => ['type' => 'orange', 'label' => tr('Early Out')],
@@ -312,10 +369,32 @@
                         default => ['type' => 'default', 'label' => $penalty->status],
                     };
                 @endphp
-                <tr wire:key="penalty-{{ $penalty->id }}" 
+
+                @if($currentPenaltyDate !== $lastPenaltyDate)
+                    <tr class="bg-gray-50/80 border-y border-gray-100">
+                        <td colspan="12" class="px-6 py-2">
+                            <div class="flex items-center gap-2 text-[color:var(--brand-via)]">
+                                <div class="w-8 h-8 rounded-lg bg-[color:var(--brand-via)]/10 flex items-center justify-center">
+                                    <i class="fas fa-calendar-day text-xs"></i>
+                                </div>
+                                <div class="flex flex-col">
+                                    <span class="text-[10px] text-gray-400 font-bold uppercase leading-none mb-0.5">
+                                        {{ \Carbon\Carbon::parse($penalty->attendance_date)->format('l') }}
+                                    </span>
+                                    <span class="text-xs font-black text-gray-800 leading-none">
+                                        {{ company_date($penalty->attendance_date) }}
+                                    </span>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                    @php $lastPenaltyDate = $currentPenaltyDate; @endphp
+                @endif
+
+                <tr wire:key="penalty-{{ $penalty->id }}"
                     class="group transition-all duration-200 hover:bg-[color:var(--brand-via)]/5 @if(in_array($penalty->id, $selectedPenalties)) bg-[color:var(--brand-via)]/10 @endif">
                     <td class="px-6 py-4 text-center">
-                        <input type="checkbox" wire:model.live="selectedPenalties" value="{{ $penalty->id }}" 
+                        <input type="checkbox" wire:model.live="selectedPenalties" value="{{ $penalty->id }}"
                             class="w-4 h-4 rounded-md border-gray-300 text-[color:var(--brand-via)] focus:ring-[color:var(--brand-via)] transition-all cursor-pointer"
                             @cannot('attendance.manage') disabled @endcannot>
                     </td>
@@ -368,28 +447,28 @@
                         <span class="text-sm font-bold text-gray-900">{{ number_format($penalty->net_amount, 2) }}</span>
                     </td>
                     <td class="px-6 py-4 text-center">
-                    <x-ui.badge :type="$statusBadge['type']">{{ $statusBadge['label'] }}</x-ui.badge>
-                    @if($penalty->exemption_attachment)
-                        <a href="{{ asset('storage/'.$penalty->exemption_attachment) }}" target="_blank" class="mt-1 block text-[10px] text-[color:var(--brand-via)] hover:underline">
-                            <i class="fas fa-paperclip me-1"></i> {{ tr('Attachment') }}
-                        </a>
-                    @endif
+                        <x-ui.badge :type="$statusBadge['type']">{{ $statusBadge['label'] }}</x-ui.badge>
+                        @if($penalty->exemption_attachment)
+                            <a href="{{ asset('storage/'.$penalty->exemption_attachment) }}" target="_blank" class="mt-1 block text-[10px] text-[color:var(--brand-via)] hover:underline">
+                                <i class="fas fa-paperclip me-1"></i> {{ tr('Attachment') }}
+                            </a>
+                        @endif
                     </td>
                     <td class="px-6 py-4 text-center">
                         <x-ui.actions-menu>
                             @can('attendance.manage')
-                            <x-ui.dropdown-item wire:click="openExemptionModal({{ $penalty->id }})" :disabled="$penalty->status === 'confirmed'">
-                                <i class="fas fa-gift me-2 text-yellow-500"></i>
-                                <span>{{ tr('Exempt/Waive') }}</span>
-                            </x-ui.dropdown-item>
-                            <x-ui.dropdown-item wire:click="openConfirmModal({{ $penalty->id }})" :disabled="$penalty->status !== 'pending'">
-                                <i class="fas fa-check-circle me-2 text-green-500"></i>
-                                <span>{{ tr('Confirm for Payroll') }}</span>
-                            </x-ui.dropdown-item>
-                            <x-ui.dropdown-item danger wire:click="deletePenalty({{ $penalty->id }})" :disabled="$penalty->status === 'confirmed'">
-                                <i class="fas fa-trash me-2"></i>
-                                <span>{{ tr('Delete') }}</span>
-                            </x-ui.dropdown-item>
+                                <x-ui.dropdown-item wire:click="openExemptionModal({{ $penalty->id }})" :disabled="$penalty->status === 'confirmed'">
+                                    <i class="fas fa-gift me-2 text-yellow-500"></i>
+                                    <span>{{ tr('Exempt/Waive') }}</span>
+                                </x-ui.dropdown-item>
+                                <x-ui.dropdown-item wire:click="openConfirmModal({{ $penalty->id }})" :disabled="$penalty->status !== 'pending'">
+                                    <i class="fas fa-check-circle me-2 text-green-500"></i>
+                                    <span>{{ tr('Confirm for Payroll') }}</span>
+                                </x-ui.dropdown-item>
+                                <x-ui.dropdown-item danger wire:click="deletePenalty({{ $penalty->id }})" :disabled="$penalty->status === 'confirmed'">
+                                    <i class="fas fa-trash me-2"></i>
+                                    <span>{{ tr('Delete') }}</span>
+                                </x-ui.dropdown-item>
                             @else
                                 <span class="text-gray-400 p-2 italic"><i class="fas fa-lock text-[10px] me-1"></i> {{ tr('Read Only') }}</span>
                             @endcan
@@ -412,7 +491,6 @@
         @endif
     </x-ui.card>
 
-    {{-- Exemption Modal --}}
     <x-ui.modal wire:model="showExemptionModal" :title="tr('Apply Exemption/Waiver')">
         <x-slot name="content">
             <div class="space-y-4">
@@ -448,6 +526,7 @@
                     <label class="block text-sm font-medium text-gray-700 mb-1">{{ tr('Reason') }}</label>
                     <textarea wire:model="exemptionForm.details" rows="3" class="w-full border-gray-300 rounded-lg shadow-sm" placeholder="{{ tr('Why is this penalty being waived?') }}" :disabled="!auth()->user()->can('attendance.manage')"></textarea>
                 </div>
+
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">{{ tr('Supporting Documents') }}</label>
                     <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-xl">
@@ -475,12 +554,11 @@
         <x-slot name="footer">
             <x-ui.secondary-button @click="showExemptionModal = false">{{ tr('Cancel') }}</x-ui.secondary-button>
             @can('attendance.manage')
-            <x-ui.primary-button wire:click="saveExemption">{{ tr('Apply Waiver') }}</x-ui.primary-button>
+                <x-ui.primary-button wire:click="saveExemption">{{ tr('Apply Waiver') }}</x-ui.primary-button>
             @endcan
         </x-slot>
     </x-ui.modal>
 
-    {{-- Confirm Modal --}}
     <x-ui.modal wire:model="showConfirmModal" :title="tr('Confirm Penalty')">
         <x-slot name="content">
             <div class="flex flex-col items-center text-center p-4">
@@ -491,7 +569,7 @@
                 <p class="text-sm text-gray-500">
                     {{ tr('This penalty will be sent to the payroll system as a deduction. Once confirmed, it can only be modified by administrators.') }}
                 </p>
-                
+
                 @if($confirmPenaltyId)
                     @php $p = \Athka\Attendance\Models\AttendanceDailyPenalty::find($confirmPenaltyId); @endphp
                     @if($p)
@@ -507,10 +585,8 @@
         <x-slot name="footer">
             <x-ui.secondary-button @click="showConfirmModal = false">{{ tr('Cancel') }}</x-ui.secondary-button>
             @can('attendance.manage')
-            <x-ui.primary-button wire:click="confirmPenalty">{{ tr('Confirm & Send to Payroll') }}</x-ui.primary-button>
+                <x-ui.primary-button wire:click="confirmPenalty">{{ tr('Confirm & Send to Payroll') }}</x-ui.primary-button>
             @endcan
         </x-slot>
     </x-ui.modal>
 </div>
-
-
