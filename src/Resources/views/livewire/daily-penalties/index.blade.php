@@ -118,7 +118,7 @@
 
                                 <div class="h-11 px-4 border border-gray-200 rounded-xl bg-white flex items-center justify-center gap-3 shadow-sm">
                                     <span class="text-sm font-bold text-gray-800">
-                                        {{ $date_from ? \Carbon\Carbon::parse($date_from)->format('Y/m/d') : now()->format('Y/m/d') }}
+                                        {{ company_date($date_from, 'yyyy/MM/dd') }}
                                     </span>
                                     <i class="fas fa-calendar-alt text-[color:var(--brand-via)] text-sm"></i>
                                 </div>
@@ -162,7 +162,7 @@
                             ['value' => 'delay', 'label' => tr('Delay')],
                             ['value' => 'early_departure', 'label' => tr('Early Out')],
                             ['value' => 'absent', 'label' => tr('Absent')],
-                            ['value' => 'auto_checkout', 'label' => tr('Missing Checkout')],
+                            ['value' => 'auto_checkout', 'label' => tr('Auto Checkout (System-generated due to missing manual punch)')],
                         ]"
                         width="full"
                         :disabled="!auth()->user()->can('attendance.manage')"
@@ -356,7 +356,7 @@
                         'delay' => ['type' => 'warning', 'label' => tr('Delay')],
                         'early_departure' => ['type' => 'orange', 'label' => tr('Early Out')],
                         'absent' => ['type' => 'danger', 'label' => tr('Absent')],
-                        'auto_checkout' => ['type' => 'danger', 'label' => tr('Missing Checkout')],
+                        'auto_checkout' => ['type' => 'danger', 'label' => tr('Auto Checkout (System-generated due to missing manual punch)')],
                         default => ['type' => 'default', 'label' => $penalty->violation_type],
                     };
 

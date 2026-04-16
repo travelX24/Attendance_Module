@@ -430,7 +430,7 @@
                             'absent' => ['type' => 'danger', 'label' => tr('Absent')],
                             'on_leave' => ['type' => 'info', 'label' => tr('On Leave')],
                             'early_departure' => ['type' => 'orange', 'label' => tr('Early Out')],
-                            'auto_checkout' => ['type' => 'danger', 'label' => tr('Auto Out')],
+                            'auto_checkout' => ['type' => 'danger', 'label' => tr('Auto Checkout (System-generated due to missing manual punch)')],
                             'day_off' => ['type' => 'default', 'label' => tr('Day Off')],
                             default => ['type' => 'default', 'label' => $log->attendance_status],
                         };

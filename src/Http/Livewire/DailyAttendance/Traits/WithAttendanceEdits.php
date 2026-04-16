@@ -60,7 +60,7 @@ trait WithAttendanceEdits
         $this->editingLogId = $log->id;
         $this->editingEmployeeName = $log->employee->name_ar ?? $log->employee->name_en;
         $this->editingEmployeeId = $log->employee->employee_no;
-        $this->editingDate = $log->attendance_date->format('Y-m-d');
+        $this->editingDate = company_date($log->attendance_date);
         
         // Fetch Schedule structure using the service to account for exceptions
         $companyId = auth()->user()->saas_company_id;
@@ -338,7 +338,7 @@ trait WithAttendanceEdits
              $end = $start->copy()->addDays(31);
          }
          
-         $this->editingMonth = $start->translatedFormat('M Y') . ($start->month != $end->month ? ' - ' . $end->translatedFormat('M Y') : '');
+         $this->editingMonth = company_date($start, 'MMMM yyyy') . ($start->month != $end->month ? ' - ' . company_date($end, 'MMMM yyyy') : '');
 
          // Fetch existing logs
          $existingLogs = AttendanceDailyLog::forCompany($companyId)
