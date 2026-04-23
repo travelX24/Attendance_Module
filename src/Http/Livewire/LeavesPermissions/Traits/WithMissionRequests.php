@@ -121,7 +121,8 @@ trait WithMissionRequests
         $coCol = $this->detectCompanyColumn($table);
 
         $q = AttendanceMissionRequest::query()
-            ->with(['employee'])
+            ->with(['employee', 'approvalTasks.approver'])
+
             ->when($coCol, fn ($qq) => $qq->where($coCol, $this->companyId))
             ->where('status', 'pending');
 
@@ -142,7 +143,8 @@ trait WithMissionRequests
         $coCol = $this->detectCompanyColumn($table);
 
         $q = AttendanceMissionRequest::query()
-            ->with(['employee'])
+            ->with(['employee', 'approvalTasks.approver'])
+
             ->when($coCol, fn ($qq) => $qq->where($coCol, $this->companyId))
             ->where('status', '!=', 'pending');
 

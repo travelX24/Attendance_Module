@@ -70,6 +70,14 @@ class AttendanceLeaveRequest extends Model
     {
         return $this->belongsTo(Employee::class, 'replacement_employee_id');
     }
+
+    public function approvalTasks()
+    {
+        return $this->hasMany(\Athka\SystemSettings\Models\ApprovalTask::class, 'approvable_id')
+            ->where('approvable_type', 'leaves')
+            ->orderBy('position');
+    }
 }
+
 
 

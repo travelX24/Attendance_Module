@@ -64,6 +64,8 @@ class Index extends Component
     public $currentRequest = null;
     public string $currentRequestType = 'leave';
     public string $pendingSubTab = 'leaves';
+    public string $historySubTab = 'leaves';
+
 
     public ?string $employeeBranchColumn = null;
 
@@ -125,10 +127,12 @@ class Index extends Component
         $this->resetPage('historyPermPage');
         $this->resetPage('historyCutPage');
         $this->resetPage('historyMissionPage');
+        $this->resetPage('historyPage'); // activity log
         
         // Clear cache when switching tabs
         $this->cachedProperties = [];
     }
+
 
     // Helper method to cache computed properties
     private function getCachedProperty(string $key, callable $callback)
@@ -154,6 +158,12 @@ class Index extends Component
     {
         $this->pendingSubTab = in_array($subTab, ['leaves', 'permissions', 'cuts', 'missions'], true) ? $subTab : 'leaves';
     }
+
+    public function setHistorySubTab(string $subTab): void
+    {
+        $this->historySubTab = in_array($subTab, ['leaves', 'permissions', 'cuts', 'missions', 'activity'], true) ? $subTab : 'leaves';
+    }
+
 
     public function openWorkflow(string $type, int $id): void
     {
@@ -188,7 +198,7 @@ class Index extends Component
     {
         return $this->getCachedProperty('pendingLeaveRequests', function() {
             $q = AttendanceLeaveRequest::query()
-                ->with(['employee', 'policy'])
+                ->with(['employee', 'policy', 'approvalTasks.approver'])
                 ->where('company_id', $this->companyId)
                 ->where('status', 'pending');
 
@@ -212,7 +222,7 @@ class Index extends Component
         $permCoCol = $this->detectCompanyColumn($permTable);
 
         $q = AttendancePermissionRequest::query()
-            ->with(['employee'])
+            ->with(['employee', 'approvalTasks.approver'])
             ->when($permCoCol, fn ($qq) => $qq->where($permCoCol, $this->companyId))
             ->where('status', 'pending');
 
@@ -288,7 +298,8 @@ class Index extends Component
     public function getPreviousLeaveRequestsProperty()
     {
         $q = AttendanceLeaveRequest::query()
-            ->with(['employee', 'policy'])
+            ->with(['employee', 'policy', 'approvalTasks.approver'])
+
             ->where('company_id', $this->companyId)
             ->where('status', '!=', 'pending');
 
@@ -311,7 +322,8 @@ class Index extends Component
         $permCoCol = $this->detectCompanyColumn($permTable);
 
         $q = AttendancePermissionRequest::query()
-            ->with(['employee'])
+            ->with(['employee', 'approvalTasks.approver'])
+
             ->when($permCoCol, fn ($qq) => $qq->where($permCoCol, $this->companyId))
             ->where('status', '!=', 'pending');
 

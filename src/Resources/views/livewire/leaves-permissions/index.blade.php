@@ -317,10 +317,11 @@
                         <thead class="bg-gray-50 text-gray-600">
                         <tr>
                             <th class="text-start p-3">{{ tr('Employee & Replacement') }}</th>
-                            <th class="text-start p-3">{{ tr('Emp. Status') }}</th>
-                            <th class="text-start p-3">{{ tr('Policy') }}</th>
+                            <th class="text-start p-3">{{ tr('Employee Status') }}</th>
+                            <th class="text-start p-3">{{ tr('Leave Type & Balance') }}</th>
                             <th class="text-start p-3">{{ tr('Period & Duration') }}</th>
                             <th class="text-start p-3">{{ tr('Reason') }}</th>
+                            <th class="text-start p-3">{{ tr('Workflow') }}</th>
                             <th class="text-start p-3">{{ tr('Actions') }}</th>
                         </tr>
                         </thead>
@@ -376,6 +377,18 @@
                                     <div class="font-semibold text-gray-800">
                                         {{ $r->policy?->name ?? tr('Group absence') }}
                                     </div>
+                                    @php
+                                        $balance = \Athka\Attendance\Models\AttendanceLeaveBalance::where('employee_id', $r->employee_id)
+                                                    ->where('leave_policy_id', $r->leave_policy_id)
+                                                    ->where('policy_year_id', $r->policy_year_id)
+                                                    ->first();
+                                        $remaining = $balance ? (float) $balance->remaining_days : 0;
+                                    @endphp
+                                    @if($r->policy)
+                                    <div class="mt-1 text-[10px] text-gray-500 font-bold">
+                                        {{ tr('Remaining Balance') }}: <span class="{{ $remaining > 0 ? 'text-green-600' : 'text-red-600' }}">{{ $smartNumber($remaining) }}</span>
+                                    </div>
+                                    @endif
                                     @if($r->is_exception && $r->exception_status === 'pending_hr')
                                         <div class="mt-1">
                                             <x-ui.badge class="text-[10px] bg-amber-100 text-amber-800 border border-amber-200">
@@ -395,14 +408,41 @@
                                 </td>
 
 
-                          <td class="p-3 text-gray-700">
-                                @php
-                                    $reason = $r->status === 'rejected'
-                                        ? ($r->reject_reason ?? null)
-                                        : ($r->reason ?? null);
-                                @endphp
-                                {{ $reason ?: '—' }}
-                            </td>
+                                <td class="p-3 text-gray-700">
+                                    @php
+                                        $reason = $r->status === 'rejected'
+                                            ? ($r->reject_reason ?? null)
+                                            : ($r->reason ?? null);
+                                    @endphp
+                                    <div class="max-w-[150px] truncate" title="{{ $reason }}">
+                                        {{ $reason ?: '—' }}
+                                    </div>
+                                </td>
+
+                                <td class="p-3">
+                                    <div class="flex flex-col gap-2 min-w-[150px]">
+                                        @foreach(($r->approvalTasks ?? []) as $task)
+                                            @php
+                                                $color = 'gray';
+                                                $icon = 'clock';
+                                                if($task->status === 'approved') { $color = 'green'; $icon = 'check'; }
+                                                elseif($task->status === 'rejected') { $color = 'red'; $icon = 'times'; }
+                                            @endphp
+                                            <div class="flex items-start gap-1.5">
+                                                <div class="mt-0.5 inline-block h-4 w-4 rounded-full bg-{{ $color }}-100 flex items-center justify-center text-{{ $color }}-600 shrink-0">
+                                                    <i class="fas fa-{{ $icon }} text-[8px]"></i>
+                                                </div>
+                                                <div class="text-[10px] leading-tight">
+                                                    <div class="font-bold text-gray-800">{{ $task->approver?->name ?? tr('Approver') }}</div>
+                                                    <div class="text-{{ $color }}-600">{{ tr($task->status) }}</div>
+                                                    @if($task->comment)
+                                                        <div class="text-gray-500 italic mt-0.5 whitespace-normal break-words max-w-[150px]">«{{ $task->comment }}»</div>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </td>
 
 
                                 <td class="p-3">
@@ -505,9 +545,10 @@
                         <thead class="bg-gray-50 text-gray-600">
                         <tr>
                             <th class="text-start p-3">{{ tr('Employee') }}</th>
-                            <th class="text-start p-3">{{ tr('Status') }}</th>
+                            <th class="text-start p-3">{{ tr('Employee Status') }}</th>
                             <th class="text-start p-3">{{ tr('Date & Time') }}</th>
-                            <th class="text-start p-3">{{ tr('Duration') }}</th>
+                            <th class="text-start p-3">{{ tr('Reason') }}</th>
+                            <th class="text-start p-3">{{ tr('Workflow') }}</th>
                             <th class="text-start p-3">{{ tr('Actions') }}</th>
                         </tr>
                         </thead>
@@ -547,6 +588,38 @@
                                 <td class="p-3 font-bold text-gray-900">
                                     {{ (int) $r->minutes }} {{ tr('min') }}
                                 </td>
+
+                                <td class="p-3 text-gray-700">
+                                    <div class="max-w-[150px] truncate" title="{{ $r->reason }}">
+                                        {{ $r->reason ?: '—' }}
+                                    </div>
+                                </td>
+
+                                <td class="p-3">
+                                    <div class="flex flex-col gap-2 min-w-[150px]">
+                                        @foreach(($r->approvalTasks ?? []) as $task)
+                                            @php
+                                                $color = 'gray';
+                                                $icon = 'clock';
+                                                if($task->status === 'approved') { $color = 'green'; $icon = 'check'; }
+                                                elseif($task->status === 'rejected') { $color = 'red'; $icon = 'times'; }
+                                            @endphp
+                                            <div class="flex items-start gap-1.5">
+                                                <div class="mt-0.5 inline-block h-4 w-4 rounded-full bg-{{ $color }}-100 flex items-center justify-center text-{{ $color }}-600 shadow-sm shrink-0">
+                                                    <i class="fas fa-{{ $icon }} text-[8px]"></i>
+                                                </div>
+                                                <div class="text-[10px] leading-tight">
+                                                    <div class="font-bold text-gray-800">{{ $task->approver?->name ?? tr('Approver') }}</div>
+                                                    <div class="text-{{ $color }}-600 font-medium">{{ tr($task->status) }}</div>
+                                                    @if($task->comment)
+                                                        <div class="text-gray-500 italic mt-0.5 max-w-[120px] whitespace-normal">«{{ $task->comment }}»</div>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </td>
+
 
                                 <td class="p-3">
                                     <div class="flex flex-wrap items-center gap-1.5">
@@ -632,9 +705,9 @@
                         <thead class="bg-gray-50 text-gray-600">
                         <tr>
                             <th class="text-start p-3">{{ tr('Employee') }}</th>
-                            <th class="text-start p-3">{{ tr('Status') }}</th>
+                            <th class="text-start p-3">{{ tr('Employee Status') }}</th>
                             <th class="text-start p-3">{{ tr('Original Period') }}</th>
-                            <th class="text-start p-3">{{ tr('Cut End') }}</th>
+                            <th class="text-start p-3">{{ tr('Workflow') }}</th>
                             <th class="text-start p-3">{{ tr('Actions') }}</th>
                         </tr>
                         </thead>
@@ -670,6 +743,31 @@
 
                                 <td class="p-3 font-bold text-gray-900">
                                     {{ company_date($row->cut_end_date) }}
+                                </td>
+
+                                <td class="p-3">
+                                    <div class="flex flex-col gap-2 min-w-[150px]">
+                                        @foreach(($row->approvalTasks ?? []) as $task)
+                                            @php
+                                                $color = 'gray';
+                                                $icon = 'clock';
+                                                if($task->status === 'approved') { $color = 'green'; $icon = 'check'; }
+                                                elseif($task->status === 'rejected') { $color = 'red'; $icon = 'times'; }
+                                            @endphp
+                                            <div class="flex items-start gap-1.5">
+                                                <div class="mt-0.5 inline-block h-4 w-4 rounded-full bg-{{ $color }}-100 flex items-center justify-center text-{{ $color }}-600 shadow-sm shrink-0">
+                                                    <i class="fas fa-{{ $icon }} text-[8px]"></i>
+                                                </div>
+                                                <div class="text-[10px] leading-tight">
+                                                    <div class="font-bold text-gray-800">{{ $task->approver?->name ?? tr('Approver') }}</div>
+                                                    <div class="text-{{ $color }}-600 font-medium">{{ tr($task->status) }}</div>
+                                                    @if($task->comment)
+                                                        <div class="text-gray-500 italic mt-0.5 max-w-[120px] whitespace-normal">«{{ $task->comment }}»</div>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
                                 </td>
 
                                 <td class="p-3">
@@ -733,12 +831,13 @@
                         <thead class="bg-gray-50 text-gray-600">
                         <tr>
                             <th class="text-start p-3">{{ tr('Employee') }}</th>
-                            <th class="text-start p-3">{{ tr('Status') }}</th>
+                            <th class="text-start p-3">{{ tr('Employee Status') }}</th>
                             <th class="text-start p-3">{{ tr('Type') }}</th>
-                            <th class="text-start p-3">{{ tr('Dates') }}</th>
+                            <th class="text-start p-3">{{ tr('Date') }}</th>
                             <th class="text-start p-3">{{ tr('Duration') }}</th>
                             <th class="text-start p-3">{{ tr('Destination') }}</th>
                             <th class="text-start p-3">{{ tr('Reason') }}</th>
+                            <th class="text-start p-3">{{ tr('Workflow') }}</th>
                             <th class="text-start p-3">{{ tr('Actions') }}</th>
                         </tr>
                         </thead>
@@ -786,6 +885,31 @@
 
                                 <td class="p-3 text-gray-700">
                                     {{ $r->reason ?: '—' }}
+                                </td>
+
+                                <td class="p-3">
+                                    <div class="flex flex-col gap-2 min-w-[150px]">
+                                        @foreach(($r->approvalTasks ?? []) as $task)
+                                            @php
+                                                $color = 'gray';
+                                                $icon = 'clock';
+                                                if($task->status === 'approved') { $color = 'green'; $icon = 'check'; }
+                                                elseif($task->status === 'rejected') { $color = 'red'; $icon = 'times'; }
+                                            @endphp
+                                            <div class="flex items-start gap-1.5">
+                                                <div class="mt-0.5 inline-block h-4 w-4 rounded-full bg-{{ $color }}-100 flex items-center justify-center text-{{ $color }}-600 shrink-0">
+                                                    <i class="fas fa-{{ $icon }} text-[8px]"></i>
+                                                </div>
+                                                <div class="text-[10px] leading-tight">
+                                                    <div class="font-bold text-gray-800">{{ $task->approver?->name ?? tr('Approver') }}</div>
+                                                    <div class="text-{{ $color }}-600">{{ tr($task->status) }}</div>
+                                                    @if($task->comment)
+                                                        <div class="text-gray-500 italic mt-0.5 whitespace-normal break-words max-w-[150px]">«{{ $task->comment }}»</div>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
                                 </td>
 
                                 <td class="p-3">
@@ -877,8 +1001,8 @@
                     <thead class="bg-gray-50 text-gray-600">
                     <tr>
                         <th class="text-start p-3">{{ tr('Employee') }}</th>
-                        <th class="text-start p-3">{{ tr('Status') }}</th>
-                        <th class="text-start p-3">{{ tr('Policy') }}</th>
+                        <th class="text-start p-3">{{ tr('Employee Status') }}</th>
+                        <th class="text-start p-3">{{ tr('Leave Type & Balance') }}</th>
                         <th class="text-start p-3">{{ tr('Entitled') }}</th>
                         <th class="text-start p-3">{{ tr('Taken') }}</th>
                         <th class="text-start p-3">{{ tr('Remaining') }}</th>
@@ -969,10 +1093,43 @@
 
     {{-- History (Previous Operations) --}}
     @if($tab === 'history')
-        <div class="grid grid-cols-1 xl:grid-cols-2 gap-4">
+        <div class="space-y-6">
+            {{-- History Sub Tabs --}}
+            <div class="flex items-center gap-6 border-b border-gray-200 overflow-x-auto">
+                <button wire:click="setHistorySubTab('leaves')" 
+                    onclick="showTabLoadingBar()"
+                    class="pb-3 text-sm font-bold transition-all relative whitespace-nowrap {{ $historySubTab === 'leaves' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600' }}">
+                    <span>{{ tr('Previous Leave Requests') }}</span>
+                    @if($historySubTab === 'leaves') <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full"></div> @endif
+                </button>
+
+                <button wire:click="setHistorySubTab('permissions')" 
+                    onclick="showTabLoadingBar()"
+                    class="pb-3 text-sm font-bold transition-all relative whitespace-nowrap {{ $historySubTab === 'permissions' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600' }}">
+                    <span>{{ tr('Previous Permissions') }}</span>
+                    @if($historySubTab === 'permissions') <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full"></div> @endif
+                </button>
+
+                <button wire:click="setHistorySubTab('missions')" 
+                    onclick="showTabLoadingBar()"
+                    class="pb-3 text-sm font-bold transition-all relative whitespace-nowrap {{ $historySubTab === 'missions' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600' }}">
+                    <span>{{ tr('Previous Mission Requests') }}</span>
+                    @if($historySubTab === 'missions') <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full"></div> @endif
+                </button>
+
+                <button wire:click="setHistorySubTab('activity')" 
+                    onclick="showTabLoadingBar()"
+                    class="pb-3 text-sm font-bold transition-all relative whitespace-nowrap {{ $historySubTab === 'activity' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600' }}">
+                    <span>{{ tr('Activity Log') }}</span>
+                    @if($historySubTab === 'activity') <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full"></div> @endif
+                </button>
+            </div>
+
+            <div class="grid grid-cols-1 gap-6">
 
             {{-- Previous Leave Requests --}}
-            <x-ui.card class="overflow-hidden border border-gray-200 rounded-2xl bg-white">
+            @if($historySubTab === 'leaves')
+            <x-ui.card class="overflow-hidden border border-gray-200 rounded-2xl bg-white shadow-sm">
                 <div class="p-4 border-b border-gray-100 flex items-center justify-between">
                     <div class="font-extrabold text-gray-900">{{ tr('Previous Leave Requests') }}</div>
                     <x-ui.badge class="text-xs">{{ ($previousLeaveRequests ?? $history)->total() }}</x-ui.badge>
@@ -983,11 +1140,12 @@
                         <thead class="bg-gray-50 text-gray-600">
                         <tr>
                             <th class="text-start p-3">{{ tr('Employee & Replacement') }}</th>
-                            <th class="text-start p-3">{{ tr('Emp. Status') }}</th>
-                            <th class="text-start p-3">{{ tr('Policy') }}</th>
-                            <th class="text-start p-3">{{ tr('Dates') }}</th>
+                            <th class="text-start p-3">{{ tr('Employee Status') }}</th>
+                            <th class="text-start p-3">{{ tr('Leave Type & Balance') }}</th>
+                            <th class="text-start p-3">{{ tr('Date') }}</th>
                             <th class="text-start p-3">{{ tr('Duration') }}</th>
                             <th class="text-start p-3">{{ tr('Reason') }}</th>
+                            <th class="text-start p-3">{{ tr('Workflow') }}</th>
                             <th class="text-start p-3">{{ tr('Status') }}</th>
                             <th class="text-start p-3">{{ tr('Actions') }}</th>
                         </tr>
@@ -1026,25 +1184,26 @@
                                 </td>
 
                                 <td class="p-3">
-                                    @php
-                                        $empStatus = strtoupper($r->employee->status ?? 'ACTIVE');
-                                        $empStatusColor = 'green';
-                                        if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
-                                        elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
-                                    @endphp
-                                    <div class="flex items-center gap-1.5">
-                                        <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
-                                        <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
+                                    <div class="font-semibold text-gray-800">
+                                        {{ $r->policy?->name ?? tr('Group absence') }}
                                     </div>
-                                </td>
-
-                                <td class="p-3 font-semibold text-gray-800">
-                                    {{ $r->policy?->name ?? tr('Group absence') }}
+                                    @php
+                                        $balance = \Athka\Attendance\Models\AttendanceLeaveBalance::where('employee_id', $r->employee_id)
+                                                    ->where('leave_policy_id', $r->leave_policy_id)
+                                                    ->where('policy_year_id', $r->policy_year_id)
+                                                    ->first();
+                                        $remaining = $balance ? (float) $balance->remaining_days : 0;
+                                    @endphp
+                                    @if($r->policy)
+                                        <div class="mt-1 text-[10px] text-gray-500 font-bold">
+                                            {{ tr('Remaining Balance') }}: <span class="{{ $remaining > 0 ? 'text-green-600' : 'text-red-600' }}">{{ $smartNumber($remaining) }}</span>
+                                        </div>
+                                    @endif
                                 </td>
 
                                 <td class="p-3 text-gray-700">
-                                    <div class="font-mono text-xs">
-                                        {{ company_date($r->start_date) }} → {{ company_date($r->end_date) }}
+                                    <div class="font-mono text-[10px] whitespace-nowrap">
+                                        {{ company_date($r->start_date) }}<br/>→ {{ company_date($r->end_date) }}
                                     </div>
                                 </td>
 
@@ -1059,120 +1218,39 @@
                                             ? ($r->reject_reason ?? null)
                                             : ($r->reason ?? null);
                                     @endphp
-                                    {{ $reason ?: '—' }}
+                                    <div class="max-w-[150px] truncate" title="{{ $reason }}">
+                                        {{ $reason ?: '—' }}
+                                    </div>
+                                </td>
+
+                                <td class="p-3">
+                                    <div class="flex flex-col gap-2 min-w-[150px]">
+                                        @foreach(($r->approvalTasks ?? []) as $task)
+                                            @php
+                                                $color = 'gray';
+                                                $icon = 'clock';
+                                                if($task->status === 'approved') { $color = 'green'; $icon = 'check'; }
+                                                elseif($task->status === 'rejected') { $color = 'red'; $icon = 'times'; }
+                                            @endphp
+                                            <div class="flex items-start gap-1.5">
+                                                <div class="mt-0.5 inline-block h-4 w-4 rounded-full bg-{{ $color }}-100 flex items-center justify-center text-{{ $color }}-600 shrink-0">
+                                                    <i class="fas fa-{{ $icon }} text-[8px]"></i>
+                                                </div>
+                                                <div class="text-[10px] leading-tight">
+                                                    <div class="font-bold text-gray-800">{{ $task->approver?->name ?? tr('Approver') }}</div>
+                                                    <div class="text-{{ $color }}-600">{{ tr($task->status) }}</div>
+                                                    @if($task->comment)
+                                                        <div class="text-gray-500 italic mt-0.5 whitespace-normal break-words max-w-[150px]">«{{ $task->comment }}»</div>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
                                 </td>
 
                                 <td class="p-3">
                                     <x-ui.badge class="text-xs">
-                                        {{ $r->status }}
-                                    </x-ui.badge>
-                                </td>
-
-                                <td class="p-3">
-                                    <div class="flex items-center gap-1.5">
-                                        @if($r->attachment_path)
-                                            <a href="{{ asset('storage/' . $r->attachment_path) }}" target="_blank"
-                                               class="p-2 text-xs font-bold bg-white text-blue-600 border border-blue-100 rounded-lg shadow-sm hover:bg-blue-50 transition-all"
-                                               title="{{ $r->attachment_name ?: tr('View Attachment') }}">
-                                                <i class="fas fa-paperclip"></i>
-                                            </a>
-                                        @endif
-
-                                        {{-- Cancel allowed only if salary not processed --}}
-                                        @if(!$r->salary_processed_at && in_array($r->status, ['approved','pending'], true))
-                                            @can('attendance.manage')
-                                            <x-ui.secondary-button
-                                                type="button"
-                                                wire:click="cancelLeave({{ $r->id }})"
-                                                onclick="return confirm('Are you sure?')"
-                                                class="px-3 py-1.5 text-xs font-bold bg-white text-red-500 border-red-100 hover:bg-red-50 !rounded-lg"
-                                            >
-                                                {{ tr('Cancel') }}
-                                            </x-ui.secondary-button>
-                                            @else
-                                                <span class="text-xs text-gray-400 italic">{{ tr('Locked') }}</span>
-                                            @endcan
-                                        @else
-                                            <span class="text-xs text-gray-400">—</span>
-                                        @endif
-                                    </div>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="8" class="p-4 text-center text-gray-500">
-                                    {{ tr('No previous leave requests') }}
-                                </td>
-                            </tr>
-                        @endforelse
-                        </tbody>
-                    </x-ui.table>
-                </div>
-
-                <div class="p-3 border-t border-gray-100">
-                    {{ ($previousLeaveRequests ?? null)?->links() }}
-                </div>
-            </x-ui.card>
-
-            {{-- Previous Permission Requests --}}
-            <x-ui.card class="overflow-hidden border border-gray-200 rounded-2xl bg-white">
-                <div class="p-4 border-b border-gray-100 flex items-center justify-between">
-                    <div class="font-extrabold text-gray-900">{{ tr('Previous Permissions') }}</div>
-                    <x-ui.badge class="text-xs">{{ ($previousPermissionRequests ?? $history)->total() }}</x-ui.badge>
-                </div>
-
-                <div class="overflow-x-auto">
-                    <x-ui.table class="min-w-full text-sm">
-                        <thead class="bg-gray-50 text-gray-600">
-                        <tr>
-                            <th class="text-start p-3">{{ tr('Employee') }}</th>
-                            <th class="text-start p-3">{{ tr('Emp. Status') }}</th>
-                            <th class="text-start p-3">{{ tr('Date') }}</th>
-                            <th class="text-start p-3">{{ tr('Time') }}</th>
-                            <th class="text-start p-3">{{ tr('Minutes') }}</th>
-                            <th class="text-start p-3">{{ tr('Status') }}</th>
-                            <th class="text-start p-3">{{ tr('Actions') }}</th>
-                        </tr>
-                        </thead>
-
-                        <tbody class="divide-y divide-gray-100">
-                        @forelse(($previousPermissionRequests ?? []) as $r)
-                            <tr>
-                                <td class="p-3">
-                                    <div class="font-bold text-gray-900">
-                                        {{ $r->employee->name_ar ?? $r->employee->name_en ?? $r->employee->name ?? $r->employee->full_name ?? ('#' . $r->employee_id) }}
-                                    </div>
-                                    <div class="text-xs text-gray-400">#{{ $r->employee_id }}</div>
-                                </td>
-
-                                <td class="p-3">
-                                    @php
-                                        $empStatus = strtoupper($r->employee->status ?? 'ACTIVE');
-                                        $empStatusColor = 'green';
-                                        if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
-                                        elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
-                                    @endphp
-                                    <div class="flex items-center gap-1.5">
-                                        <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
-                                        <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
-                                    </div>
-                                </td>
-
-                                <td class="p-3 text-gray-700 font-mono text-xs">
-                                    {{ company_date($r->permission_date) }}
-                                </td>
-
-                                <td class="p-3 text-gray-700 font-mono text-xs">
-                                    {{ $r->from_time ?? '--:--' }} → {{ $r->to_time ?? '--:--' }}
-                                </td>
-
-                                <td class="p-3 font-bold text-gray-900">
-                                    {{ (int) $r->minutes }}
-                                </td>
-
-                                <td class="p-3">
-                                    <x-ui.badge class="text-xs">
-                                        {{ $r->status }}
+                                        {{ tr($r->status) }}
                                     </x-ui.badge>
                                 </td>
 
@@ -1207,8 +1285,11 @@
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="7" class="p-4 text-center text-gray-500">
-                                    {{ tr('No previous permissions') }}
+                                <td colspan="9" class="p-12 text-center text-gray-400">
+                                    <div class="flex flex-col items-center gap-3">
+                                        <i class="fas fa-history text-3xl opacity-20"></i>
+                                        <span class="italic">{{ tr('No previous leave requests found') }}</span>
+                                    </div>
                                 </td>
                             </tr>
                         @endforelse
@@ -1217,12 +1298,141 @@
                 </div>
 
                 <div class="p-3 border-t border-gray-100">
-                    {{ ($previousPermissionRequests ?? null)?->links() }}
+                    {{ $previousLeaveRequests?->links() }}
                 </div>
             </x-ui.card>
+            @endif
+
+            {{-- Previous Permissions --}}
+            @if($historySubTab === 'permissions')
+            <x-ui.card class="overflow-hidden border border-gray-200 rounded-2xl bg-white shadow-sm">
+                <div class="p-4 border-b border-gray-100 flex items-center justify-between">
+                    <div class="font-extrabold text-gray-900">{{ tr('Previous Permissions') }}</div>
+                    <x-ui.badge class="text-xs">{{ $previousPermissionRequests->total() }}</x-ui.badge>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <x-ui.table class="min-w-full text-sm">
+                        <thead class="bg-gray-50 text-gray-600">
+                        <tr>
+                            <th class="text-start p-3">{{ tr('Employee') }}</th>
+                            <th class="text-start p-3">{{ tr('Employee Status') }}</th>
+                            <th class="text-start p-3">{{ tr('Date & Time') }}</th>
+                            <th class="text-start p-3">{{ tr('Reason') }}</th>
+                            <th class="text-start p-3">{{ tr('Workflow') }}</th>
+                            <th class="text-start p-3">{{ tr('Status') }}</th>
+                            <th class="text-start p-3">{{ tr('Actions') }}</th>
+                        </tr>
+                        </thead>
+
+                        <tbody class="divide-y divide-gray-100">
+                        @forelse($previousPermissionRequests as $r)
+                            <tr>
+                                <td class="p-3">
+                                    <div class="font-bold text-gray-900">
+                                        {{ $r->employee->name_ar ?? $r->employee->name_en ?? $r->employee->name ?? $r->employee->full_name ?? ('#' . $r->employee_id) }}
+                                    </div>
+                                    <div class="text-xs text-gray-400">#{{ $r->employee_id }}</div>
+                                </td>
+
+                                <td class="p-3">
+                                    @php
+                                        $empStatus = strtoupper($r->employee->status ?? 'ACTIVE');
+                                        $empStatusColor = 'green';
+                                        if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
+                                        elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
+                                    @endphp
+                                    <div class="flex items-center gap-1.5">
+                                        <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
+                                        <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
+                                    </div>
+                                </td>
+
+                                <td class="p-3">
+                                    <div class="text-xs text-gray-600">
+                                        {{ company_date($r->permission_date) }}
+                                    </div>
+                                    <div class="mt-1 font-mono text-xs text-gray-800 font-bold">
+                                        {{ $r->from_time ?? '--:--' }} → {{ $r->to_time ?? '--:--' }}
+                                    </div>
+                                    <div class="mt-1 text-[10px] font-bold text-gray-400">
+                                        {{ (int) $r->minutes }} {{ tr('min') }}
+                                    </div>
+                                </td>
+
+                                <td class="p-3 text-gray-700">
+                                    <div class="max-w-[150px] truncate" title="{{ $r->reason }}">
+                                        {{ $r->reason ?: '—' }}
+                                    </div>
+                                </td>
+
+                                <td class="p-3">
+                                    <div class="flex flex-col gap-2 min-w-[150px]">
+                                        @foreach(($r->approvalTasks ?? []) as $task)
+                                            @php
+                                                $color = 'gray';
+                                                $icon = 'clock';
+                                                if($task->status === 'approved') { $color = 'green'; $icon = 'check'; }
+                                                elseif($task->status === 'rejected') { $color = 'red'; $icon = 'times'; }
+                                            @endphp
+                                            <div class="flex items-start gap-1.5">
+                                                <div class="mt-0.5 inline-block h-4 w-4 rounded-full bg-{{ $color }}-100 flex items-center justify-center text-{{ $color }}-600 shadow-sm shrink-0">
+                                                    <i class="fas fa-{{ $icon }} text-[8px]"></i>
+                                                </div>
+                                                <div class="text-[10px] leading-tight">
+                                                    <div class="font-bold text-gray-800">{{ $task->approver?->name ?? tr('Approver') }}</div>
+                                                    <div class="text-{{ $color }}-600 font-medium">{{ tr($task->status) }}</div>
+                                                    @if($task->comment)
+                                                        <div class="text-gray-500 italic mt-0.5 max-w-[120px] whitespace-normal">«{{ $task->comment }}»</div>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </td>
+
+                                <td class="p-3">
+                                    <x-ui.badge class="text-xs">
+                                        {{ tr($r->status) }}
+                                    </x-ui.badge>
+                                </td>
+
+                                <td class="p-3">
+                                    <div class="flex items-center gap-1.5">
+                                        @if($r->attachment_path)
+                                            <a href="{{ asset('storage/' . $r->attachment_path) }}" target="_blank"
+                                               class="p-2 text-xs font-bold bg-white text-blue-600 border border-blue-100 rounded-lg shadow-sm hover:bg-blue-50 transition-all font-mono"
+                                               title="{{ $r->attachment_name ?: tr('View Attachment') }}">
+                                                <i class="fas fa-paperclip"></i>
+                                            </a>
+                                        @endif
+                                        <span class="text-xs text-gray-400">—</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="7" class="p-12 text-center text-gray-400">
+                                    <div class="flex flex-col items-center gap-3">
+                                        <i class="fas fa-history text-3xl opacity-20"></i>
+                                        <span class="italic">{{ tr('No previous permissions found') }}</span>
+                                    </div>
+                                </td>
+                            </tr>
+                        @endforelse
+                        </tbody>
+                    </x-ui.table>
+                </div>
+
+                <div class="p-3 border-t border-gray-100">
+                    {{ $previousPermissionRequests?->links() }}
+                </div>
+            </x-ui.card>
+            @endif
 
             {{-- Previous Mission Requests --}}
-            <x-ui.card class="overflow-hidden border border-gray-200 rounded-2xl bg-white xl:col-span-2">
+            @if($historySubTab === 'missions')
+            <x-ui.card class="overflow-hidden border border-gray-200 rounded-2xl bg-white xl:col-span-2 shadow-sm">
                 <div class="p-4 border-b border-gray-100 flex items-center justify-between">
                     <div class="font-extrabold text-gray-900">{{ tr('Previous Mission Requests') }}</div>
                     <x-ui.badge class="text-xs">{{ $previousMissionRequests->total() }}</x-ui.badge>
@@ -1233,10 +1443,12 @@
                         <thead class="bg-gray-50 text-gray-600">
                         <tr>
                             <th class="text-start p-3">{{ tr('Employee') }}</th>
-                            <th class="text-start p-3">{{ tr('Emp. Status') }}</th>
+                            <th class="text-start p-3">{{ tr('Employee Status') }}</th>
                             <th class="text-start p-3">{{ tr('Type') }}</th>
-                            <th class="text-start p-3">{{ tr('Dates') }}</th>
+                            <th class="text-start p-3">{{ tr('Date') }}</th>
                             <th class="text-start p-3">{{ tr('Duration') }}</th>
+                            <th class="text-start p-3">{{ tr('Reason') }}</th>
+                            <th class="text-start p-3">{{ tr('Workflow') }}</th>
                             <th class="text-start p-3">{{ tr('Status') }}</th>
                             <th class="text-start p-3">{{ tr('Actions') }}</th>
                         </tr>
@@ -1279,9 +1491,40 @@
                                     {{ $formatMissionDuration($r) }}
                                 </td>
 
+                                <td class="p-3 text-gray-700">
+                                    <div class="max-w-[150px] truncate" title="{{ $r->reason }}">
+                                        {{ $r->reason ?: '—' }}
+                                    </div>
+                                </td>
+
+                                <td class="p-3">
+                                    <div class="flex flex-col gap-2 min-w-[150px]">
+                                        @foreach(($r->approvalTasks ?? []) as $task)
+                                            @php
+                                                $color = 'gray';
+                                                $icon = 'clock';
+                                                if($task->status === 'approved') { $color = 'green'; $icon = 'check'; }
+                                                elseif($task->status === 'rejected') { $color = 'red'; $icon = 'times'; }
+                                            @endphp
+                                            <div class="flex items-start gap-1.5">
+                                                <div class="mt-0.5 inline-block h-4 w-4 rounded-full bg-{{ $color }}-100 flex items-center justify-center text-{{ $color }}-600 shrink-0">
+                                                    <i class="fas fa-{{ $icon }} text-[8px]"></i>
+                                                </div>
+                                                <div class="text-[10px] leading-tight">
+                                                    <div class="font-bold text-gray-800">{{ $task->approver?->name ?? tr('Approver') }}</div>
+                                                    <div class="text-{{ $color }}-600">{{ tr($task->status) }}</div>
+                                                    @if($task->comment)
+                                                        <div class="text-gray-500 italic mt-0.5 whitespace-normal break-words max-w-[150px]">«{{ $task->comment }}»</div>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                </td>
+
                                 <td class="p-3">
                                     <x-ui.badge class="text-xs">
-                                        {{ $r->status }}
+                                        {{ tr($r->status) }}
                                     </x-ui.badge>
                                 </td>
 
@@ -1314,80 +1557,90 @@
                     {{ $previousMissionRequests?->links() }}
                 </div>
             </x-ui.card>
+            @endif
 
-        </div>
+            {{-- Activity Log --}}
+            @if($historySubTab === 'activity')
+            <x-ui.card class="overflow-hidden border border-gray-200 rounded-2xl bg-white shadow-sm">
+                <div class="p-4 border-b border-gray-100 flex items-center justify-between">
+                    <div class="font-extrabold text-gray-900">{{ tr('Activity Log') }}</div>
+                    <x-ui.badge class="text-xs">{{ $history->total() }}</x-ui.badge>
+                </div>
 
-        {{-- Optional: keep Activity Log below if you still want it --}}
-        <x-ui.card class="overflow-hidden border border-gray-200 rounded-2xl bg-white mt-4">
-            <div class="p-4 border-b border-gray-100 flex items-center justify-between">
-                <div class="font-extrabold text-gray-900">{{ tr('Activity Log') }}</div>
-                <x-ui.badge class="text-xs">{{ $history->total() }}</x-ui.badge>
-            </div>
-
-            <div class="overflow-x-auto">
-                <x-ui.table class="min-w-full text-sm">
-                    <thead class="bg-gray-50 text-gray-600">
-                    <tr>
-                        <th class="text-start p-3">{{ tr('When') }}</th>
-                        <th class="text-start p-3">{{ tr('Actor') }}</th>
-                        <th class="text-start p-3">{{ tr('Employee') }}</th>
-                        <th class="text-start p-3">{{ tr('Emp. Status') }}</th>
-                        <th class="text-start p-3">{{ tr('Type') }}</th>
-                        <th class="text-start p-3">{{ tr('Action') }}</th>
-                    </tr>
-                    </thead>
-
-                    <tbody class="divide-y divide-gray-100">
-                    @forelse($history as $h)
+                <div class="overflow-x-auto">
+                    <x-ui.table class="min-w-full text-sm">
+                        <thead class="bg-gray-50 text-gray-600">
                         <tr>
-                                <td class="p-3 text-xs font-mono text-gray-600">
-                                    {{ company_date($h->created_at, 'Y-m-d H:i') }}
+                            <th class="text-start p-3">{{ tr('When') }}</th>
+                            <th class="text-start p-3">{{ tr('Approved By') == 'Approved By' ? 'المعتمد' : tr('Approved By') }}</th>
+                            <th class="text-start p-3">{{ tr('Employee') }}</th>
+                            <th class="text-start p-3">{{ tr('Employee Status') }}</th>
+                            <th class="text-start p-3">{{ tr('Type') }}</th>
+                            <th class="text-start p-3">{{ tr('Action') }}</th>
+                        </tr>
+                        </thead>
+
+                        <tbody class="divide-y divide-gray-100">
+                        @forelse($history as $h)
+                            <tr>
+                                    <td class="p-3 text-xs font-mono text-gray-600">
+                                        {{ company_date($h->created_at, 'Y-m-d H:i') }}
+                                    </td>
+
+                                <td class="p-3 text-gray-800 font-semibold">
+                                    {{ $h->actor->name ?? ('#' . ($h->actor_user_id ?? '-')) }}
                                 </td>
 
-                            <td class="p-3 text-gray-800 font-semibold">
-                                {{ $h->actor->name ?? ('#' . ($h->actor_user_id ?? '-')) }}
-                            </td>
+                                <td class="p-3 text-gray-800">
+                                    {{ $h->employee->name_ar ?? $h->employee->name_en ?? $h->employee->name ?? $h->employee->full_name ?? ($h->employee_id ? '#' . $h->employee_id : '-') }}
+                                </td>
 
-                            <td class="p-3 text-gray-800">
-                                {{ $h->employee->name_ar ?? $h->employee->name_en ?? $h->employee->name ?? $h->employee->full_name ?? ($h->employee_id ? '#' . $h->employee_id : '-') }}
-                            </td>
+                                <td class="p-3">
+                                    @if($h->employee)
+                                        @php
+                                            $empStatus = strtoupper($h->employee->status ?? 'ACTIVE');
+                                            $empStatusColor = 'green';
+                                            if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
+                                            elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
+                                        @endphp
+                                        <div class="flex items-center gap-1.5">
+                                            <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
+                                            <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
+                                        </div>
+                                    @else
+                                        <span class="text-xs text-gray-400">—</span>
+                                    @endif
+                                </td>
 
-                            <td class="p-3">
-                                @if($h->employee)
+                                <td class="p-3 text-gray-700">
                                     @php
-                                        $empStatus = strtoupper($h->employee->status ?? 'ACTIVE');
-                                        $empStatusColor = 'green';
-                                        if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
-                                        elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
+                                        $type = strtolower($h->subject_type);
+                                        $typeMap = ['leave' => 'إجازة', 'permission' => 'إذن', 'mission' => 'مهمة'];
                                     @endphp
-                                    <div class="flex items-center gap-1.5">
-                                        <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
-                                        <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
-                                    </div>
-                                @else
-                                    <span class="text-xs text-gray-400">—</span>
-                                @endif
-                            </td>
+                                    {{ $typeMap[$type] ?? tr($h->subject_type) }}
+                                </td>
 
-                            <td class="p-3 text-gray-700">{{ $h->subject_type }}</td>
+                                <td class="p-3 text-gray-900 font-bold">{{ tr($h->action) }}</td>
+                            </tr>
+                        @empty
+                            <tr>
+                                <td colspan="6" class="p-4 text-center text-gray-500">
+                                    {{ tr('No history yet') }}
+                                </td>
+                            </tr>
+                        @endforelse
+                        </tbody>
+                    </x-ui.table>
+                </div>
 
-                            <td class="p-3 text-gray-900 font-bold">{{ $h->action }}</td>
-                        </tr>
-                    @empty
-                        <tr>
-                            <td colspan="6" class="p-4 text-center text-gray-500">
-                                {{ tr('No history yet') }}
-                            </td>
-                        </tr>
-                    @endforelse
-                    </tbody>
-                </x-ui.table>
+                <div class="p-3 border-t border-gray-100">
+                    {{ $history?->links() }}
+                </div>
+            </x-ui.card>
+            @endif
+
             </div>
-
-            <div class="p-3 border-t border-gray-100">
-                {{ $history?->links() }}
-            </div>
-        </x-ui.card>
+        </div>
     @endif
 
     {{-- Create Leave Modal --}}

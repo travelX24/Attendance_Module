@@ -44,6 +44,14 @@ class AttendancePermissionRequest extends Model
     {
         return $this->belongsTo(Employee::class, 'employee_id');
     }
+
+    public function approvalTasks()
+    {
+        return $this->hasMany(\Athka\SystemSettings\Models\ApprovalTask::class, 'approvable_id')
+            ->where('approvable_type', 'permissions')
+            ->orderBy('position');
+    }
 }
+
 
 

@@ -50,6 +50,14 @@ class AttendanceMissionRequest extends Model
     {
         return $this->belongsTo(\App\Models\User::class, 'requested_by');
     }
+
+    public function approvalTasks()
+    {
+        return $this->hasMany(\Athka\SystemSettings\Models\ApprovalTask::class, 'approvable_id')
+            ->where('approvable_type', 'missions')
+            ->orderBy('position');
+    }
 }
+
 
 
