@@ -335,7 +335,7 @@ class Index extends Component
                     'en_US@calendar=islamic-umalqura',
                     \IntlDateFormatter::NONE,
                     \IntlDateFormatter::NONE,
-                    'UTC',
+                    config('app.timezone', 'UTC'),
                     \IntlDateFormatter::TRADITIONAL,
                     'MM/dd'
                 );

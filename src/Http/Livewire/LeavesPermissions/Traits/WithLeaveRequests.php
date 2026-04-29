@@ -451,6 +451,16 @@ trait WithLeaveRequests
         $exceptionStatus = null;
         
         if ($requestedDays > $remaining) {
+            $settings = (array) ($policy->settings ?? []);
+            $deductionPolicy = (string) ($settings['deduction_policy'] ?? 'balance_only');
+
+            if ($deductionPolicy === 'balance_only') {
+                $msg = tr('Your balance is insufficient and the policy does not allow exceeding it.');
+                $this->addError('start_date', $msg);
+                $this->addError('end_date', $msg);
+                return;
+            }
+
             $isException = true;
             $exceptionStatus = 'pending_hr';
         }
@@ -565,9 +575,9 @@ trait WithLeaveRequests
         $unit = (string) data_get($settings, 'duration_unit', 'full_day');
         $unit = in_array($unit, ['full_day', 'half_day', 'hours'], true) ? $unit : 'full_day';
 
-        $noteText = (string) data_get($settings, 'note.text', '');
-        $noteRequired = (bool) data_get($settings, 'note.required', false);
-        $noteAckRequired = (bool) data_get($settings, 'note.ack_required', false);
+        $noteText = (string) data_get($settings, 'note_text', '');
+        $noteRequired = (bool) data_get($settings, 'note_required', false);
+        $noteAckRequired = (bool) data_get($settings, 'note_ack_required', false);
 
         $types = data_get($settings, 'attachments.types', ['pdf', 'jpg', 'jpeg', 'png']);
         $types = is_array($types) ? array_values($types) : ['pdf', 'jpg', 'png'];

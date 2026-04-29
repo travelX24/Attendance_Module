@@ -105,7 +105,7 @@
                                 @disabled(!auth()->user()->can('attendance.manage'))
                                 title="{{ tr('Previous day') }}"
                             >
-                                <i class="fas fa-chevron-left"></i>
+                                <i class="fas fa-chevron-{{ $isRtl ? 'right' : 'left' }}"></i>
                             </button>
 
                             <label class="relative flex-1 cursor-pointer">
@@ -131,7 +131,7 @@
                                 @disabled(!auth()->user()->can('attendance.manage'))
                                 title="{{ tr('Next day') }}"
                             >
-                                <i class="fas fa-chevron-right"></i>
+                                <i class="fas fa-chevron-{{ $isRtl ? 'left' : 'right' }}"></i>
                             </button>
                         </div>
                     </div>

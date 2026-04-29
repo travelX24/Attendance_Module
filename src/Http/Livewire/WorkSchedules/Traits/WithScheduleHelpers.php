@@ -155,7 +155,7 @@ private function normalizeCompanyDateToGregorian(?string $value, int $companyId)
         $hm = (int) $m[2];
         $hd = (int) $m[3];
 
-        $tz  = \IntlTimeZone::createTimeZone('UTC');
+        $tz  = \IntlTimeZone::createTimeZone(config('app.timezone', 'UTC'));
         $cal = \IntlCalendar::createInstance($tz, 'en_US@calendar=islamic-umalqura');
 
         $cal->set($hy, $hm - 1, $hd, 0, 0, 0);
@@ -193,7 +193,7 @@ public function formatCompanyDate(?string $gregorianYmd, int $companyId): string
         'en_US@calendar=islamic-umalqura',
         \IntlDateFormatter::NONE,
         \IntlDateFormatter::NONE,
-        'UTC',
+        config('app.timezone', 'UTC'),
         \IntlDateFormatter::TRADITIONAL,
         'yyyy-MM-dd'
     );
@@ -216,7 +216,7 @@ public function formatCompanyMonthYear(Carbon $date, int $companyId): string
         'en_US@calendar=islamic-umalqura',
         \IntlDateFormatter::NONE,
         \IntlDateFormatter::NONE,
-        'UTC',
+        config('app.timezone', 'UTC'),
         \IntlDateFormatter::TRADITIONAL,
         'MMMM yyyy'
     );

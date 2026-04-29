@@ -801,8 +801,23 @@ public function generateSchedulePreview(): void
         'previewForm.to'   => 'required|date|after_or_equal:previewForm.from',
     ]);
 
-    $from = Carbon::parse($this->previewForm['from'])->startOfDay();
-    $to   = Carbon::parse($this->previewForm['to'])->startOfDay();
+    $fromYmd = $this->normalizeDateInputToGregorianYmd($this->previewForm['from']);
+    $toYmd   = $this->normalizeDateInputToGregorianYmd($this->previewForm['to']);
+
+    if (!$fromYmd) {
+        throw ValidationException::withMessages([
+            'previewForm.from' => tr('Invalid date format.'),
+        ]);
+    }
+    
+    if (!$toYmd) {
+        throw ValidationException::withMessages([
+            'previewForm.to' => tr('Invalid date format.'),
+        ]);
+    }
+
+    $from = Carbon::parse($fromYmd)->startOfDay();
+    $to   = Carbon::parse($toYmd)->startOfDay();
 
     if ($from->diffInDays($to) > 31) {
         throw ValidationException::withMessages([
