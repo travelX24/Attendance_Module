@@ -1142,6 +1142,14 @@ trait WithLeaveRequests
                 ->orWhereBetween('end_date', [$start->toDateString(), $end->toDateString()]))
             ->get();
 
+        $wsService = class_exists(\Athka\SystemSettings\Services\WorkScheduleService::class) 
+            ? app(\Athka\SystemSettings\Services\WorkScheduleService::class) : null;
+            
+        $employee = null;
+        if (!empty($this->employee_id)) {
+            $employee = \Athka\Employees\Models\Employee::find($this->employee_id);
+        }
+
         $days = 0.0;
         $cursor = $start->copy();
 
@@ -1151,7 +1159,29 @@ trait WithLeaveRequests
                 continue;
             }
 
-            if ($weekendPolicy === 'include' || in_array((int)$cursor->dayOfWeek, $workingDays, true)) $days += 1;
+            $isWorkday = false;
+            if ($weekendPolicy === 'include') {
+                $isWorkday = true;
+            } else {
+                if ($wsService && $employee) {
+                    $schedule = $wsService->getEffectiveSchedule((int)$this->companyId, $employee, $cursor->toDateString());
+                    if ($schedule) {
+                        $raw = $schedule->work_days ?? [];
+                        $workDaysArr = is_string($raw) ? json_decode($raw, true) : $raw;
+                        $workDaysArr = is_array($workDaysArr) ? array_map('strtolower', $workDaysArr) : [];
+                        $dayNameStr = strtolower($cursor->englishDayOfWeek);
+                        $isWorkday = in_array($dayNameStr, $workDaysArr, true);
+                    } else {
+                        $isWorkday = in_array((int)$cursor->dayOfWeek, $workingDays, true);
+                    }
+                } else {
+                    $isWorkday = in_array((int)$cursor->dayOfWeek, $workingDays, true);
+                }
+            }
+
+            if ($isWorkday) {
+                $days += 1;
+            }
             $cursor->addDay();
         }
 

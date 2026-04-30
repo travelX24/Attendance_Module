@@ -24,20 +24,7 @@
             return tr('Half day');
         }
 
-        // For full day leaves, if requested_days is in the DB, use it.
-        // But if it's 0 or missing, we can try to calculate it from dates.
         $days = (float) ($r->requested_days ?? 0);
-        
-        // If it's a full day leave and requested_days is 0, or if it looks like a calculation error (end-start+1)
-        // we might want to be careful. However, to stay consistent with HR rules:
-        if ($unit === 'full_day' && $days <= 0 && $r->start_date && $r->end_date) {
-             $start = \Carbon\Carbon::parse($r->start_date);
-             $end = \Carbon\Carbon::parse($r->end_date);
-             if ($end->gte($start)) {
-                 $days = $start->diffInDays($end) + 1;
-             }
-        }
-
         return $smartNumber($days, 2) . ' ' . tr('Days');
     };
 
@@ -391,10 +378,9 @@
                                         {{ $r->policy?->name ?? tr('Group absence') }}
                                     </div>
                                     @php
-                                        $yearId = $r->policy_year_id ?: $selectedYearId;
                                         $balance = \Athka\Attendance\Models\AttendanceLeaveBalance::where('employee_id', $r->employee_id)
                                                     ->where('leave_policy_id', $r->leave_policy_id)
-                                                    ->where('policy_year_id', $yearId)
+                                                    ->where('policy_year_id', $r->policy_year_id)
                                                     ->first();
                                         $remaining = $balance ? (float) $balance->remaining_days : 0;
                                     @endphp
@@ -433,22 +419,7 @@
                                     </div>
                                 </td>
 
-                                <td class="p-3">
-                                    <div class="flex items-center gap-2">
-                                        <div class="flex -space-x-2 overflow-hidden">
-                                            @foreach($r->approvalTasks as $task)
-                                                <div class="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm transition-all hover:scale-110 hover:z-10
-                                                    {{ $task->status === 'approved' ? 'bg-green-500' : ($task->status === 'rejected' ? 'bg-red-500' : ($task->status === 'pending' ? 'bg-blue-500 animate-pulse' : 'bg-gray-300')) }}"
-                                                    title="{{ ($task->approver?->name ?? $task->approver_name) . ': ' . tr($task->status) }}">
-                                                    {{ mb_substr($task->approver?->name ?? $task->approver_name ?? '?', 0, 1) }}
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                        <button wire:click="openWorkflow('leave', {{ $r->id }})" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="{{ tr('View sequence') }}">
-                                            <i class="fas fa-route text-base"></i>
-                                        </button>
-                                    </div>
-                                </td>
+                                <!-- placeholder_workflow_btn -->
 
 
                                 <td class="p-3">
@@ -489,7 +460,14 @@
                                                 <i class="fas fa-check me-2"></i> {{ tr('Approve') }}
                                             </x-ui.primary-button>
 
-                                            
+                                            <x-ui.secondary-button
+                                                type="button"
+                                                wire:click="openWorkflow('leave', {{ $r->id }})"
+                                                class="p-2 text-xs font-bold bg-white text-blue-600 border border-blue-100 hover:bg-blue-50 !rounded-lg transition-all"
+                                                title="{{ tr('Workflow') }}"
+                                            >
+                                                <i class="fas fa-route"></i>
+                                            </x-ui.secondary-button>
 
                                             <x-ui.secondary-button
                                                 type="button"
@@ -499,7 +477,14 @@
                                                 <i class="fas fa-times me-2"></i> {{ tr('Reject') }}
                                             </x-ui.secondary-button>
                                         @else
-                                            
+                                            <x-ui.secondary-button
+                                                type="button"
+                                                wire:click="openWorkflow('leave', {{ $r->id }})"
+                                                class="p-2 text-xs font-bold bg-white text-blue-600 border border-blue-100 hover:bg-blue-50 !rounded-lg"
+                                                title="{{ tr('Workflow') }}"
+                                            >
+                                                <i class="fas fa-route"></i>
+                                            </x-ui.secondary-button>
                                         @endif
                                     </div>
                                 </td>
@@ -587,22 +572,7 @@
                                     </div>
                                 </td>
 
-                                <td class="p-3">
-                                    <div class="flex items-center gap-2">
-                                        <div class="flex -space-x-2 overflow-hidden">
-                                            @foreach($r->approvalTasks as $task)
-                                                <div class="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm transition-all hover:scale-110 hover:z-10
-                                                    {{ $task->status === 'approved' ? 'bg-green-500' : ($task->status === 'rejected' ? 'bg-red-500' : ($task->status === 'pending' ? 'bg-blue-500 animate-pulse' : 'bg-gray-300')) }}"
-                                                    title="{{ ($task->approver?->name ?? $task->approver_name) . ': ' . tr($task->status) }}">
-                                                    {{ mb_substr($task->approver?->name ?? $task->approver_name ?? '?', 0, 1) }}
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                        <button wire:click="openWorkflow('permission', {{ $r->id }})" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="{{ tr('View sequence') }}">
-                                            <i class="fas fa-route text-base"></i>
-                                        </button>
-                                    </div>
-                                </td>
+                                <!-- placeholder_workflow_btn -->
 
 
                                 <td class="p-3">
@@ -627,7 +597,14 @@
                                                 <i class="fas fa-check me-2"></i> {{ tr('Approve') }}
                                             </x-ui.primary-button>
 
-                                            
+                                            <x-ui.secondary-button
+                                                type="button"
+                                                wire:click="openWorkflow('permission', {{ $r->id }})"
+                                                class="p-2 text-xs font-bold bg-white text-blue-600 border border-blue-100 hover:bg-blue-50 !rounded-lg"
+                                                title="{{ tr('Workflow') }}"
+                                            >
+                                                <i class="fas fa-route"></i>
+                                            </x-ui.secondary-button>
 
                                             <x-ui.secondary-button
                                                 type="button"
@@ -637,7 +614,14 @@
                                                 <i class="fas fa-times me-2"></i> {{ tr('Reject') }}
                                             </x-ui.secondary-button>
                                         @else
-                                            
+                                            <x-ui.secondary-button
+                                                type="button"
+                                                wire:click="openWorkflow('permission', {{ $r->id }})"
+                                                class="p-2 text-xs font-bold bg-white text-blue-600 border border-blue-100 hover:bg-blue-50 !rounded-lg"
+                                                title="{{ tr('Workflow') }}"
+                                            >
+                                                <i class="fas fa-route"></i>
+                                            </x-ui.secondary-button>
                                         @endif
                                     </div>
                                 </td>
@@ -715,22 +699,7 @@
                                     {{ company_date($row->cut_end_date) }}
                                 </td>
 
-                                <td class="p-3">
-                                    <div class="flex items-center gap-2">
-                                        <div class="flex -space-x-2 overflow-hidden">
-                                            @foreach($row->approvalTasks as $task)
-                                                <div class="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm transition-all hover:scale-110 hover:z-10
-                                                    {{ $task->status === 'approved' ? 'bg-green-500' : ($task->status === 'rejected' ? 'bg-red-500' : ($task->status === 'pending' ? 'bg-blue-500 animate-pulse' : 'bg-gray-300')) }}"
-                                                    title="{{ ($task->approver?->name ?? $task->approver_name) . ': ' . tr($task->status) }}">
-                                                    {{ mb_substr($task->approver?->name ?? $task->approver_name ?? '?', 0, 1) }}
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                        <button wire:click="openWorkflow('cut', {{ $row->id }})" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="{{ tr('View sequence') }}">
-                                            <i class="fas fa-route text-base"></i>
-                                        </button>
-                                    </div>
-                                </td>
+                                <!-- placeholder_workflow_btn -->
 
                                 <td class="p-3">
                                     <div class="flex items-center gap-2">
@@ -849,22 +818,7 @@
                                     {{ $r->reason ?: '—' }}
                                 </td>
 
-                                <td class="p-3">
-                                    <div class="flex items-center gap-2">
-                                        <div class="flex -space-x-2 overflow-hidden">
-                                            @foreach($r->approvalTasks as $task)
-                                                <div class="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm transition-all hover:scale-110 hover:z-10
-                                                    {{ $task->status === 'approved' ? 'bg-green-500' : ($task->status === 'rejected' ? 'bg-red-500' : ($task->status === 'pending' ? 'bg-blue-500 animate-pulse' : 'bg-gray-300')) }}"
-                                                    title="{{ ($task->approver?->name ?? $task->approver_name) . ': ' . tr($task->status) }}">
-                                                    {{ mb_substr($task->approver?->name ?? $task->approver_name ?? '?', 0, 1) }}
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                        <button wire:click="openWorkflow('mission', {{ $r->id }})" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="{{ tr('View sequence') }}">
-                                            <i class="fas fa-route text-base"></i>
-                                        </button>
-                                    </div>
-                                </td>
+                                <!-- placeholder_workflow_btn -->
 
                                 <td class="p-3">
                                     <div class="flex flex-wrap items-center gap-1.5">
@@ -889,7 +843,14 @@
                                                 {{ tr('Approve') }}
                                             </x-ui.primary-button>
 
-                                            
+                                            <x-ui.secondary-button
+                                                type="button"
+                                                wire:click="openWorkflow('mission', {{ $r->id }})"
+                                                class="p-2 text-xs font-bold bg-white text-blue-600 border border-blue-100 hover:bg-blue-50 !rounded-lg transition-all"
+                                                title="{{ tr('Workflow') }}"
+                                            >
+                                                <i class="fas fa-route"></i>
+                                            </x-ui.secondary-button>
 
                                             <x-ui.secondary-button
                                                 type="button"
@@ -900,7 +861,14 @@
                                                 {{ tr('Reject') }}
                                             </x-ui.secondary-button>
                                         @else
-                                            
+                                            <x-ui.secondary-button
+                                                type="button"
+                                                wire:click="openWorkflow('mission', {{ $r->id }})"
+                                                class="p-2 text-xs font-bold bg-white text-blue-600 border border-blue-100 hover:bg-blue-50 !rounded-lg"
+                                                title="{{ tr('Workflow') }}"
+                                            >
+                                                <i class="fas fa-route"></i>
+                                            </x-ui.secondary-button>
                                         @endif
                                     </div>
                                 </td>
@@ -1057,13 +1025,6 @@
                     @if($historySubTab === 'missions') <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full"></div> @endif
                 </button>
 
-                <button wire:click="setHistorySubTab('cuts')" 
-                    onclick="showTabLoadingBar()"
-                    class="pb-3 text-sm font-bold transition-all relative whitespace-nowrap {{ $historySubTab === 'cuts' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600' }}">
-                    <span>{{ tr('Previous Cut Requests') }}</span>
-                    @if($historySubTab === 'cuts') <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full"></div> @endif
-                </button>
-
                 <button wire:click="setHistorySubTab('activity')" 
                     onclick="showTabLoadingBar()"
                     class="pb-3 text-sm font-bold transition-all relative whitespace-nowrap {{ $historySubTab === 'activity' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600' }}">
@@ -1135,10 +1096,9 @@
                                         {{ $r->policy?->name ?? tr('Group absence') }}
                                     </div>
                                     @php
-                                        $yearId = $r->policy_year_id ?: $selectedYearId;
                                         $balance = \Athka\Attendance\Models\AttendanceLeaveBalance::where('employee_id', $r->employee_id)
                                                     ->where('leave_policy_id', $r->leave_policy_id)
-                                                    ->where('policy_year_id', $yearId)
+                                                    ->where('policy_year_id', $r->policy_year_id)
                                                     ->first();
                                         $remaining = $balance ? (float) $balance->remaining_days : 0;
                                     @endphp
@@ -1171,22 +1131,7 @@
                                     </div>
                                 </td>
 
-                                <td class="p-3">
-                                    <div class="flex items-center gap-2">
-                                        <div class="flex -space-x-2 overflow-hidden">
-                                            @foreach($r->approvalTasks as $task)
-                                                <div class="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm transition-all hover:scale-110 hover:z-10
-                                                    {{ $task->status === 'approved' ? 'bg-green-500' : ($task->status === 'rejected' ? 'bg-red-500' : ($task->status === 'pending' ? 'bg-blue-500 animate-pulse' : 'bg-gray-300')) }}"
-                                                    title="{{ ($task->approver?->name ?? $task->approver_name) . ': ' . tr($task->status) }}">
-                                                    {{ mb_substr($task->approver?->name ?? $task->approver_name ?? '?', 0, 1) }}
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                        <button wire:click="openWorkflow('leave', {{ $r->id }})" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="{{ tr('View sequence') }}">
-                                            <i class="fas fa-route text-base"></i>
-                                        </button>
-                                    </div>
-                                </td>
+                                <!-- placeholder_workflow_btn -->
 
                                 <td class="p-3">
                                     <x-ui.badge class="text-xs">
@@ -1306,22 +1251,7 @@
                                     </div>
                                 </td>
 
-                                <td class="p-3">
-                                    <div class="flex items-center gap-2">
-                                        <div class="flex -space-x-2 overflow-hidden">
-                                            @foreach($r->approvalTasks as $task)
-                                                <div class="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm transition-all hover:scale-110 hover:z-10
-                                                    {{ $task->status === 'approved' ? 'bg-green-500' : ($task->status === 'rejected' ? 'bg-red-500' : ($task->status === 'pending' ? 'bg-blue-500 animate-pulse' : 'bg-gray-300')) }}"
-                                                    title="{{ ($task->approver?->name ?? $task->approver_name) . ': ' . tr($task->status) }}">
-                                                    {{ mb_substr($task->approver?->name ?? $task->approver_name ?? '?', 0, 1) }}
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                        <button wire:click="openWorkflow('permission', {{ $r->id }})" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="{{ tr('View sequence') }}">
-                                            <i class="fas fa-route text-base"></i>
-                                        </button>
-                                    </div>
-                                </td>
+                                <!-- placeholder_workflow_btn -->
 
                                 <td class="p-3">
                                     <x-ui.badge class="text-xs">
@@ -1358,102 +1288,6 @@
 
                 <div class="p-3 border-t border-gray-100">
                     {{ $previousPermissionRequests?->links() }}
-                </div>
-            </x-ui.card>
-            @endif
-
-            @if($historySubTab === 'cuts')
-            <x-ui.card class="overflow-hidden border border-gray-200 rounded-2xl bg-white shadow-sm">
-                <div class="p-4 border-b border-gray-100 flex items-center justify-between">
-                    <div class="font-extrabold text-gray-900">{{ tr('Previous Leave Cut Requests') }}</div>
-                    <x-ui.badge class="text-xs">{{ $previousCutLeaveRequests->total() }}</x-ui.badge>
-                </div>
-
-                <div class="overflow-x-auto">
-                    <x-ui.table class="min-w-full text-sm">
-                        <thead class="bg-gray-50 text-gray-600">
-                        <tr>
-                            <th class="text-start p-3">{{ tr('Employee') }}</th>
-                            <th class="text-start p-3">{{ tr('Employee Status') }}</th>
-                            <th class="text-start p-3">{{ tr('Original Period') }}</th>
-                            <th class="text-start p-3">{{ tr('Cut End Date') }}</th>
-                            <th class="text-start p-3">{{ tr('Workflow') }}</th>
-                            <th class="text-start p-3">{{ tr('Status') }}</th>
-                        </tr>
-                        </thead>
-
-                        <tbody class="divide-y divide-gray-100">
-                        @forelse($previousCutLeaveRequests as $row)
-                            <tr>
-                                <td class="p-3">
-                                    <div class="font-bold text-gray-900">
-                                        {{ $row->employee->name_ar ?? $row->employee->name_en ?? $row->employee->name ?? $row->employee->full_name ?? ('#' . $row->employee_id) }}
-                                    </div>
-                                    <div class="text-xs text-gray-400">#{{ $row->employee_id }}</div>
-                                </td>
-    
-                                <td class="p-3">
-                                    @php
-                                        $empStatus = strtoupper($row->employee->status ?? 'ACTIVE');
-                                        $empStatusColor = 'green';
-                                        if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
-                                        elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
-                                    @endphp
-                                    <div class="flex items-center gap-1.5">
-                                        <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
-                                        <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
-                                    </div>
-                                </td>
-
-                                <td class="p-3 text-gray-700">
-                                    <div class="font-mono text-xs">
-                                        {{ company_date($row->original_start_date) }} → {{ company_date($row->original_end_date) }}
-                                    </div>
-                                </td>
-
-                                <td class="p-3 font-bold text-gray-900">
-                                    {{ company_date($row->cut_end_date) }}
-                                </td>
-
-                                <td class="p-3">
-                                    <div class="flex items-center gap-2">
-                                        <div class="flex -space-x-2 overflow-hidden">
-                                            @foreach($row->approvalTasks as $task)
-                                                <div class="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm transition-all hover:scale-110 hover:z-10
-                                                    {{ $task->status === 'approved' ? 'bg-green-500' : ($task->status === 'rejected' ? 'bg-red-500' : ($task->status === 'pending' ? 'bg-blue-500 animate-pulse' : 'bg-gray-300')) }}"
-                                                    title="{{ ($task->approver?->name ?? $task->approver_name) . ': ' . tr($task->status) }}">
-                                                    {{ mb_substr($task->approver?->name ?? $task->approver_name ?? '?', 0, 1) }}
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                        <button wire:click="openWorkflow('cut', {{ $row->id }})" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="{{ tr('View sequence') }}">
-                                            <i class="fas fa-route text-base"></i>
-                                        </button>
-                                    </div>
-                                </td>
-
-                                <td class="p-3">
-                                    <x-ui.badge class="text-xs">
-                                        {{ tr($row->status) }}
-                                    </x-ui.badge>
-                                </td>
-                            </tr>
-                        @empty
-                            <tr>
-                                <td colspan="6" class="p-12 text-center text-gray-400">
-                                    <div class="flex flex-col items-center gap-3">
-                                        <i class="fas fa-history text-3xl opacity-20"></i>
-                                        <span class="italic">{{ tr('No previous cut requests found') }}</span>
-                                    </div>
-                                </td>
-                            </tr>
-                        @endforelse
-                        </tbody>
-                    </x-ui.table>
-                </div>
-
-                <div class="p-3 border-t border-gray-100">
-                    {{ $previousCutLeaveRequests?->links() }}
                 </div>
             </x-ui.card>
             @endif
@@ -1525,22 +1359,7 @@
                                     </div>
                                 </td>
 
-                                <td class="p-3">
-                                    <div class="flex items-center gap-2">
-                                        <div class="flex -space-x-2 overflow-hidden">
-                                            @foreach($r->approvalTasks as $task)
-                                                <div class="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm transition-all hover:scale-110 hover:z-10
-                                                    {{ $task->status === 'approved' ? 'bg-green-500' : ($task->status === 'rejected' ? 'bg-red-500' : ($task->status === 'pending' ? 'bg-blue-500 animate-pulse' : 'bg-gray-300')) }}"
-                                                    title="{{ ($task->approver?->name ?? $task->approver_name) . ': ' . tr($task->status) }}">
-                                                    {{ mb_substr($task->approver?->name ?? $task->approver_name ?? '?', 0, 1) }}
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                        <button wire:click="openWorkflow('mission', {{ $r->id }})" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="{{ tr('View sequence') }}">
-                                            <i class="fas fa-route text-base"></i>
-                                        </button>
-                                    </div>
-                                </td>
+                                <!-- placeholder_workflow_btn -->
 
                                 <td class="p-3">
                                     <x-ui.badge class="text-xs">

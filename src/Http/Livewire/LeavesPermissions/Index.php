@@ -168,18 +168,27 @@ class Index extends Component
     public function openWorkflow(string $type, int $id): void
     {
         $this->currentRequestType = $type;
-        $this->currentRequest = $type === 'leave' 
-            ? AttendanceLeaveRequest::with('employee')->find($id)
-            : ($type === 'permission'
-                ? AttendancePermissionRequest::with('employee')->find($id)
-                : \Athka\Attendance\Models\AttendanceMissionRequest::with('employee')->find($id));
+        $this->currentRequest = match($type) {
+            'leave' => AttendanceLeaveRequest::with('employee')->find($id),
+            'permission' => AttendancePermissionRequest::with('employee')->find($id),
+            'mission' => \Athka\Attendance\Models\AttendanceMissionRequest::with('employee')->find($id),
+            'cut' => AttendanceLeaveCutRequest::with('employee')->find($id),
+            default => null
+        };
 
         if (!$this->currentRequest) return;
+
+        $approvableType = match($type) {
+            'leave', 'cut' => 'leaves',
+            'permission' => 'permissions',
+            'mission' => 'missions',
+            default => 'leaves'
+        };
 
         // Fetch approval tasks logic
         $this->currentWorkflowTasks = \Athka\SystemSettings\Models\ApprovalTask::query()
             ->with('approver')
-            ->where('approvable_type', $type === 'leave' ? 'leaves' : ($type === 'permission' ? 'permissions' : 'missions'))
+            ->where('approvable_type', $approvableType)
             ->where('approvable_id', $id)
             ->orderBy('position')
             ->get();
@@ -838,10 +847,30 @@ private function allowedBranchIds(): array
 }
     protected function applyApprovalTaskFilter($q, $type)
     {
-        $employeeId = auth()->user()->employee_id;
+        $user = auth()->user();
+
+        // ✅ HR / Admins should see ALL pending requests, not just their tasks
+        if (
+            $user->can('attendance.manage') ||
+            $user->can('settings.attendance.manage') ||
+            $user->can('attendance.manage-all')
+        ) {
+            // But we still want to ensure tasks exist for them to see in the list (workflow info)
+            try {
+                $approvalService = app(\Athka\SystemSettings\Services\Approvals\ApprovalService::class);
+                $src = $approvalService->getRequestSource($type);
+                if ($src) {
+                    $approvalService->ensureTasksForPendingRequests($src, $this->companyId);
+                }
+            } catch (\Throwable $e) {}
+
+            return $q;
+        }
+
+        $employeeId = $user->employee_id;
         if (!$employeeId) return $q;
 
-        // ✅ NEW: Ensure tasks exist for all pending requests of this type
+        // ✅ Ensure tasks exist for the current manager's pending items
         try {
             $approvalService = app(\Athka\SystemSettings\Services\Approvals\ApprovalService::class);
             $src = $approvalService->getRequestSource($type);
