@@ -27,7 +27,7 @@
                 </div>
             @else
                 <x-ui.table
-                    :headers="[tr('Schedule'), tr('Start'), tr('End'), tr('Period'), tr('Status'), tr('Action')]"
+                    :headers="[tr('Schedule'), tr('Start'), tr('End'), app()->isLocale('ar') ? 'نوع التعيين' : 'Assignment Type', tr('Status'), tr('Action')]"
                     :enablePagination="false"
                     :headerAlign="['start','start','start','start','start','end']"
                 >
@@ -62,8 +62,8 @@
                                 @php
                                     $isPerm = empty($r['end_date']) || $r['end_date'] === '-';
                                 @endphp
-                                <x-ui.badge :type="$isPerm ? 'success' : 'info'" size="xs" outline>
-                                    {{ $isPerm ? tr('Permanent') : tr('Limited Duration') }}
+                                <x-ui.badge :type="$isPerm ? 'success' : 'warning'" size="xs" outline>
+                                    {{ $isPerm ? tr('Permanent') : tr('Temporary') }}
                                 </x-ui.badge>
                             </td>
                             <td class="py-3 px-6">

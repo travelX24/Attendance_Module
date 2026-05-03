@@ -440,9 +440,14 @@
                     <td class="px-6 py-4">
                         <div class="flex flex-wrap items-center gap-2">
                             @if($employee->current_schedule_name)
-                                <x-ui.badge type="info">
-                                    {{ $employee->current_schedule_name }}
-                                </x-ui.badge>
+                                <div class="flex items-center gap-1.5">
+                                    <x-ui.badge type="info">
+                                        {{ $employee->current_schedule_name }}
+                                    </x-ui.badge>
+                                    <x-ui.badge :type="$employee->current_schedule_end ? 'warning' : 'success'" size="xs" outline>
+                                        {{ $employee->current_schedule_end ? tr('Temporary') : tr('Permanent') }}
+                                    </x-ui.badge>
+                                </div>
                             @else
                                 <span class="text-xs text-gray-400 italic">{{ tr('No schedule') }}</span>
                             @endif

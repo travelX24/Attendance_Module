@@ -61,12 +61,15 @@
                                         </x-ui.badge>
                                     </div>
                                     <div class="flex items-center gap-3">
-                                        <span class="text-[10px] font-mono text-gray-400 bg-white px-2 py-1 rounded border border-gray-100 shadow-sm" title="{{ tr('Exact Timestamp') }}">
-                                            {{ $log->created_at->format('Y-m-d H:i') }}
-                                        </span>
-                                        <span class="text-xs text-gray-600 font-bold flex items-center bg-white px-2 py-1 rounded-md border border-gray-100 shadow-sm min-w-[120px] justify-center">
-                                            <i class="far fa-calendar-alt me-1.5 text-blue-400"></i>
-                                            {{ company_date($log->created_at) }}
+                                        <span class="text-xs text-gray-600 font-bold flex items-center gap-3 bg-white px-3 py-1.5 rounded-xl border border-gray-100 shadow-sm">
+                                            <div class="flex items-center">
+                                                <i class="far fa-calendar-alt me-2 text-blue-400"></i>
+                                                {{ company_date($log->created_at) }}
+                                            </div>
+                                            <div class="flex items-center border-s border-gray-200 ps-3">
+                                                <i class="far fa-clock me-2 text-[color:var(--brand-via)]"></i>
+                                                {{ company_time($log->created_at) }}
+                                            </div>
                                         </span>
                                     </div>
                                 </div>
@@ -145,12 +148,6 @@
                                             {{ $log->actor ? ($log->actor->name ?: $log->actor->username) : tr('System') }}
                                         </span>
                                     </div>
-                                    @if($log->ip)
-                                        <div class="flex items-center gap-1.5 text-gray-400 font-mono bg-white px-2 py-0.5 rounded border border-gray-100">
-                                            <i class="fas fa-laptop text-[10px]"></i>
-                                            {{ $log->ip }}
-                                        </div>
-                                    @endif
                                 </div>
                             </x-ui.card>
                         </div>
