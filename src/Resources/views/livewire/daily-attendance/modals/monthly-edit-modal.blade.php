@@ -100,7 +100,7 @@
                                             @if(!empty($day['scheduled_periods']))
                                                 @foreach($day['scheduled_periods'] as $sp)
                                                     <div class="whitespace-nowrap px-1 bg-gray-50 rounded border border-gray-100/50">
-                                                        {{ $sp['start'] }} - {{ $sp['end'] }}
+                                                        {{ company_time($sp['start']) }} - {{ company_time($sp['end']) }}
                                                     </div>
                                                 @endforeach
                                             @else

@@ -97,8 +97,8 @@ trait WithAttendanceEdits
         if (count($periodsStructure) > 0) {
             foreach ($periodsStructure as $index => $p) {
                 // Determine scheduled times
-                $sIn = isset($p->start_time) ? Carbon::parse($p->start_time)->format('h:i A') : null;
-                $sOut = isset($p->end_time) ? Carbon::parse($p->end_time)->format('h:i A') : null;
+                $sIn = isset($p->start_time) ? company_time($p->start_time) : null;
+                $sOut = isset($p->end_time) ? company_time($p->end_time) : null;
 
                 // Initialize with EMPTY values by default
                 $this->editForm['periods'][] = [
@@ -117,15 +117,15 @@ trait WithAttendanceEdits
             } else {
                  // Load from details table for multi-punch support
                  $punches = $log->details()->orderBy('check_in_time', 'asc')->get()->map(fn($d) => [
-                     'check_in_time' => $d->start_time ?: ($d->check_in_time ? \Carbon\Carbon::parse($d->check_in_time)->format('H:i') : ''),
-                     'check_out_time' => $d->end_time   ?: ($d->check_out_time ? \Carbon\Carbon::parse($d->check_out_time)->format('H:i') : ''),
+                     'check_in_time' => $d->start_time ?: ($d->check_in_time ? company_time($d->check_in_time) : ''),
+                     'check_out_time' => $d->end_time   ?: ($d->check_out_time ? company_time($d->check_out_time) : ''),
                  ])->toArray();
 
                  // Fallback to main log if details are empty (legacy or single-punch systems)
                  if (empty($punches) && ($log->check_in_time || $log->check_out_time)) {
                      $punches[] = [
-                         'check_in_time' => $log->check_in_time ? $log->check_in_time->format('H:i') : '',
-                         'check_out_time' => $log->check_out_time ? $log->check_out_time->format('H:i') : '',
+                         'check_in_time' => $log->check_in_time ? company_time($log->check_in_time) : '',
+                         'check_out_time' => $log->check_out_time ? company_time($log->check_out_time) : '',
                      ];
                  }
             }
@@ -414,8 +414,8 @@ trait WithAttendanceEdits
                           if (in_array($dayName, is_array($ws->work_days) ? $ws->work_days : [])) {
                               foreach ($ws->periods as $p) {
                                   $schedPeriods[] = [
-                                      'start' => $p->start_time ? Carbon::parse($p->start_time)->format('H:i') : '--:--',
-                                      'end' => $p->end_time ? Carbon::parse($p->end_time)->format('H:i') : '--:--',
+                                      'start' => $p->start_time ? company_time($p->start_time) : '--:--',
+                                      'end' => $p->end_time ? company_time($p->end_time) : '--:--',
                                   ];
                               }
                           }
@@ -451,12 +451,12 @@ trait WithAttendanceEdits
                           'scheduled_periods' => $schedPeriods,
                           'periods' => $log->details->isNotEmpty() ? $log->details->map(fn($d) => [
                               'id' => $d->id,
-                              'check_in' => $d->check_in_time ? \Carbon\Carbon::parse($d->check_in_time)->format('H:i') : '',
-                              'check_out' => $d->check_out_time ? \Carbon\Carbon::parse($d->check_out_time)->format('H:i') : '',
+                              'check_in' => $d->check_in_time ? company_time($d->check_in_time) : '',
+                              'check_out' => $d->check_out_time ? company_time($d->check_out_time) : '',
                           ])->toArray() : [[
                               'id' => null,
-                              'check_in' => $log->check_in_time ? $log->check_in_time->format('H:i') : '',
-                              'check_out' => $log->check_out_time ? $log->check_out_time->format('H:i') : '',
+                              'check_in' => $log->check_in_time ? company_time($log->check_in_time) : '',
+                              'check_out' => $log->check_out_time ? company_time($log->check_out_time) : '',
                           ]],
                           'scheduled_hours' => $log->scheduled_hours,
                           'actual_hours' => $log->actual_hours,

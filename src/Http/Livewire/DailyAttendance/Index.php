@@ -277,8 +277,7 @@ class Index extends Component
 
     public function timeToHm($value)
     {
-        if (!$value) return '-';
-        return Carbon::parse($value)->format('H:i');
+        return company_time($value) ?: '-';
     }
 
     public function render()

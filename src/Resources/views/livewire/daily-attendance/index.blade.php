@@ -573,13 +573,13 @@
                                 <div class="flex flex-col items-center gap-0.5">
                                     @foreach($log->details as $detail)
                                         <span class="text-sm font-bold {{ $statusColor === 'green' ? 'text-green-700' : ($statusColor === 'yellow' ? 'text-yellow-700' : ($statusColor === 'red' ? 'text-red-700' : 'text-gray-700')) }}">
-                                            {{ $detail->check_in_time ? \Carbon\Carbon::parse($detail->check_in_time)->format('H:i') : '-' }}
+                                            {{ company_time($detail->check_in_time) ?: '-' }}
                                         </span>
                                     @endforeach
                                 </div>
                             @elseif($log->check_in_time)
                                 <span class="text-sm font-bold {{ $statusColor === 'green' ? 'text-green-700' : ($statusColor === 'yellow' ? 'text-yellow-700' : ($statusColor === 'red' ? 'text-red-700' : 'text-gray-700')) }}">
-                                    {{ $log->check_in_hm ?? '-' }}
+                                    {{ company_time($log->check_in_time) ?: '-' }}
                                 </span>
                             @else
                                 <span class="text-xs text-gray-400">-</span>
@@ -598,7 +598,7 @@
                                 </div>
                             @elseif($log->check_out_time)
                                 <span class="text-sm font-bold {{ $statusColor === 'green' ? 'text-green-700' : ($statusColor === 'yellow' ? 'text-yellow-700' : ($statusColor === 'red' ? 'text-red-700' : 'text-gray-700')) }}">
-                                    {{ $log->check_out_hm ?? '-' }}
+                                    {{ company_time($log->check_out_time) ?: '-' }}
                                 </span>
                             @else
                                 @if($log->attendance_status === 'auto_checkout')

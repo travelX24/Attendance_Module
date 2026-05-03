@@ -276,7 +276,7 @@ class AttendanceDailyLog extends Model
             return null;
         }
         if ($value instanceof \DateTimeInterface) {
-            return Carbon::instance($value)->format('H:i');
+            return company_time($value);
         }
         $str = (string) $value;
         return strlen($str) >= 5 ? substr($str, 0, 5) : $str;
