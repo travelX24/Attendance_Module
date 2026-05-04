@@ -66,6 +66,7 @@ class Index extends Component
             'schedule_type' => ['except' => ''],
             'work_schedule_id' => ['except' => 'all'],
             'status' => ['except' => 'all'],
+            'contract_type' => ['except' => 'all'],
         ];
 
 
@@ -150,6 +151,7 @@ class Index extends Component
         $companyId = $this->getCompanyId();
         $query = Employee::forCompany($companyId)
             ->when($this->status !== 'all', fn($q) => $q->where('status', (string)$this->status))
+            ->when($this->contract_type !== 'all', fn($q) => $q->where('contract_type', (string)$this->contract_type))
             ->with(['department', 'jobTitle']);
 
         // âœ… Data scoping

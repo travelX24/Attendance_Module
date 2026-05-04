@@ -20,6 +20,7 @@ trait WithScheduleFilters
     public $work_schedule_id = 'all';
 
     public $status = 'all';
+    public $contract_type = 'all';
     public $filterWarning = 'all'; 
 
 
@@ -113,6 +114,11 @@ trait WithScheduleFilters
         $this->resetPage();
         $this->loadStats();
     }
+    public function updatedContractType()
+    {
+        $this->resetPage();
+        $this->loadStats();
+    }
 
     public function clearAllFilters()
     {
@@ -121,6 +127,7 @@ trait WithScheduleFilters
         $this->schedule_type = 'all';
         $this->work_schedule_id = 'all';
         $this->status = 'all';
+        $this->contract_type = 'all';
         $this->filterWarning = 'all';
 
         // Reset location if forced or default

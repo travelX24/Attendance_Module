@@ -277,6 +277,21 @@
                     />
                 </div>
 
+                {{-- Contract Type --}}
+                <div class="">
+                    <x-ui.filter-select
+                        model="contract_type"
+                        :label="tr('Contract Type')"
+                        :placeholder="tr('All Types')"
+                        :options="array_merge([['value' => 'all', 'label' => tr('All')]], array_map(fn($t) => ['value' => (string)$t, 'label' => tr($t)], $contractTypes))"
+                        width="full"
+                        :defer="false"
+                        :applyOnChange="true"
+                        class="w-full"
+                        :disabled="!auth()->user()->can('attendance.manage')"
+                    />
+                </div>
+
                 {{-- Warnings --}}
                 <div class="">
                     <x-ui.filter-select
@@ -308,6 +323,7 @@
                                        $wire.schedule_type !== 'all' ||
                                        $wire.work_schedule_id !== 'all' ||
                                        $wire.status !== 'all' ||
+                                       $wire.contract_type !== 'all' ||
                                        $wire.filterWarning !== 'all' ||
                                        ($wire.location_id !== 'all' && $wire.location_id != '{{ auth()->user()->branch_id ?: 0 }}');
                             }
@@ -389,6 +405,7 @@
                 '', // Checkbox
                 tr('Employee'),
                 tr('Department & Title'),
+                tr('Contract Type'),
                 tr('Work Schedule'),
                 tr('Effective Date'),
                 tr('Expiry Date'),
@@ -396,7 +413,7 @@
                 tr('Current Status'),
                 tr('Control'),
             ];
-            $headerAlign = ['start', 'start', 'start', 'start', 'start', 'start', 'start', 'center'];
+            $headerAlign = ['start', 'start', 'start', 'start', 'start', 'start', 'start', 'start', 'center'];
         @endphp
 
         <x-ui.table :headers="$headers" :headerAlign="$headerAlign" :enablePagination="false">
@@ -435,6 +452,16 @@
                     <td class="px-6 py-4">
                         <p class="text-sm text-gray-700">{{ $employee->department ? $employee->department->name : '-' }}</p>
                         <p class="text-xs text-gray-500">{{ $employee->jobTitle ? $employee->jobTitle->title_ar : '' }}</p>
+                    </td>
+
+                    <td class="px-6 py-4">
+                        @if($employee->contract_type)
+                            <x-ui.badge type="neutral" size="sm" outline>
+                                {{ tr($employee->contract_type) }}
+                            </x-ui.badge>
+                        @else
+                            <span class="text-xs text-gray-400 italic">{{ tr('N/A') }}</span>
+                        @endif
                     </td>
 
                     <td class="px-6 py-4">
