@@ -352,7 +352,7 @@ class Index extends Component
     public function getPendingCutLeaveRequestsProperty()
     {
         $q = AttendanceLeaveCutRequest::query()
-            ->with(['employee', 'policy'])
+            ->with(['employee', 'policy', 'approvalTasks.approver'])
             ->where('company_id', $this->companyId)
             ->where('status', 'pending');
 

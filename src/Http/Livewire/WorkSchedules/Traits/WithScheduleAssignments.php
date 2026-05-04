@@ -122,7 +122,19 @@ trait WithScheduleAssignments
             $rules['bulkFormData.end_date'] = 'required|date|after_or_equal:bulkFormData.start_date';
         }
 
-        $this->validate($rules);
+        $messages = [
+            'bulkFormData.end_date.after_or_equal' => app()->getLocale() === 'ar' 
+                ? 'لا يمكن أن يكون تاريخ النهاية قبل تاريخ البداية' 
+                : 'The end date cannot be before the start date.',
+            'bulkFormData.work_schedule_id.required' => app()->getLocale() === 'ar'
+                ? 'يرجى اختيار الجدول الزمني'
+                : 'Please select a work schedule.',
+            'bulkFormData.rotation_work_schedule_id.required' => app()->getLocale() === 'ar'
+                ? 'يرجى اختيار الجدول الزمني البديل'
+                : 'Please select an alternate work schedule.',
+        ];
+
+        $this->validate($rules, $messages);
 
 
         $companyId = $this->getCompanyId();
@@ -1018,24 +1030,23 @@ private function buildSchedulePreview($employeeOrId, int $companyId, Carbon $fro
             if (!$inDate) return false;
 
             // Scoping logic
-            $applyOn = $ce->apply_on ?: 'everyone';
-            if ($applyOn === 'everyone') return true;
+            $scopeType = $ce->scope_type ?: 'all';
+            if ($scopeType === 'all') return true;
 
             $include = is_array($ce->include) ? $ce->include : (json_decode($ce->include, true) ?: []);
             
-            // Fixed: If apply_on is 'employees' OR 'absence' (ghieb), check the 'employees' list
-            if ($applyOn === 'employees' || $applyOn === 'absence') {
+            if ($scopeType === 'employees') {
                 $targetIds = $include['employees'] ?? [];
                 if (in_array((string)$employeeObj->id, $targetIds)) return true;
             }
             
-            if ($applyOn === 'departments') {
+            if ($scopeType === 'departments') {
                 $targetIds = $include['departments'] ?? [];
                 if (in_array((string)$employeeObj->department_id, $targetIds)) return true;
             }
 
             $locCol = $this->resolveEmployeeLocationColumn();
-            if ($applyOn === 'locations' && $locCol) {
+            if (($scopeType === 'branches' || $scopeType === 'locations') && $locCol) {
                 $targetIds = $include['branches'] ?? $include['locations'] ?? [];
                 if (in_array((string)$employeeObj->{$locCol}, $targetIds)) return true;
             }

@@ -440,12 +440,15 @@
                                                 <div class="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm transition-all hover:scale-110 hover:z-10
                                                     {{ $task->status === 'approved' ? 'bg-green-500' : ($task->status === 'rejected' ? 'bg-red-500' : ($task->status === 'pending' ? 'bg-blue-500 animate-pulse' : 'bg-gray-300')) }}"
                                                     title="{{ ($task->approver?->name ?? $task->approver_name) . ': ' . tr($task->status) }}">
-                                                    {{ mb_substr($task->approver?->name ?? $task->approver_name ?? '?', 0, 1) }}
+                                                    @if($task->status === 'approved') <i class="fas fa-check"></i>
+                                                    @elseif($task->status === 'rejected') <i class="fas fa-times"></i>
+                                                    @elseif($task->status === 'pending') <i class="fas fa-hourglass-half"></i>
+                                                    @else <i class="fas fa-minus"></i> @endif
                                                 </div>
                                             @endforeach
                                         </div>
                                         <button wire:click="openWorkflow('leave', {{ $r->id }})" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="{{ tr('View sequence') }}">
-                                            <i class="fas fa-route text-base"></i>
+                                            <i class="fas fa-project-diagram text-base"></i>
                                         </button>
                                     </div>
                                 </td>
@@ -461,7 +464,12 @@
                                             </a>
                                         @endif
 
-                                        @if($r->replacement_employee_id == auth()->user()->employee_id && $r->replacement_status === 'pending')
+                                        @php
+                                            $currentEmpId = auth()->user()->employee_id;
+                                            $isMyTask = $currentEmpId && $r->approvalTasks->where('status', 'pending')->where('approver_employee_id', $currentEmpId)->isNotEmpty();
+                                        @endphp
+
+                                        @if($r->replacement_employee_id == $currentEmpId && $r->replacement_status === 'pending')
                                             <x-ui.primary-button
                                                 type="button"
                                                 wire:click.prevent="respondToReplacementRequest({{ $r->id }}, 'approve')"
@@ -477,7 +485,7 @@
                                             >
                                                 {{ tr('Reject Coverage') }}
                                             </x-ui.secondary-button>
-                                        @elseif(auth()->user()->can('attendance.manage') || $tab === 'pending')
+                                        @elseif($isMyTask)
                                             <x-ui.primary-button
                                                 type="button"
                                                 wire:click.prevent="approveLeave({{ $r->id }})"
@@ -489,8 +497,6 @@
                                                 <i class="fas fa-check me-2"></i> {{ tr('Approve') }}
                                             </x-ui.primary-button>
 
-                                            
-
                                             <x-ui.secondary-button
                                                 type="button"
                                                 wire:click.prevent="openReject('leave', {{ $r->id }})"
@@ -498,8 +504,6 @@
                                             >
                                                 <i class="fas fa-times me-2"></i> {{ tr('Reject') }}
                                             </x-ui.secondary-button>
-                                        @else
-                                            
                                         @endif
                                     </div>
                                 </td>
@@ -594,12 +598,15 @@
                                                 <div class="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm transition-all hover:scale-110 hover:z-10
                                                     {{ $task->status === 'approved' ? 'bg-green-500' : ($task->status === 'rejected' ? 'bg-red-500' : ($task->status === 'pending' ? 'bg-blue-500 animate-pulse' : 'bg-gray-300')) }}"
                                                     title="{{ ($task->approver?->name ?? $task->approver_name) . ': ' . tr($task->status) }}">
-                                                    {{ mb_substr($task->approver?->name ?? $task->approver_name ?? '?', 0, 1) }}
+                                                    @if($task->status === 'approved') <i class="fas fa-check"></i>
+                                                    @elseif($task->status === 'rejected') <i class="fas fa-times"></i>
+                                                    @elseif($task->status === 'pending') <i class="fas fa-hourglass-half"></i>
+                                                    @else <i class="fas fa-minus"></i> @endif
                                                 </div>
                                             @endforeach
                                         </div>
                                         <button wire:click="openWorkflow('permission', {{ $r->id }})" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="{{ tr('View sequence') }}">
-                                            <i class="fas fa-route text-base"></i>
+                                            <i class="fas fa-project-diagram text-base"></i>
                                         </button>
                                     </div>
                                 </td>
@@ -615,7 +622,12 @@
                                             </a>
                                         @endif
 
-                                        @if(auth()->user()->can('attendance.manage') || $tab === 'pending')
+                                        @php
+                                            $currentEmpId = auth()->user()->employee_id;
+                                            $isMyTask = $currentEmpId && $r->approvalTasks->where('status', 'pending')->where('approver_employee_id', $currentEmpId)->isNotEmpty();
+                                        @endphp
+                                        
+                                        @if($isMyTask)
                                             <x-ui.primary-button
                                                 type="button"
                                                 wire:click.prevent="approvePermission({{ $r->id }})"
@@ -627,8 +639,6 @@
                                                 <i class="fas fa-check me-2"></i> {{ tr('Approve') }}
                                             </x-ui.primary-button>
 
-                                            
-
                                             <x-ui.secondary-button
                                                 type="button"
                                                 wire:click.prevent="openReject('permission', {{ $r->id }})"
@@ -636,8 +646,6 @@
                                             >
                                                 <i class="fas fa-times me-2"></i> {{ tr('Reject') }}
                                             </x-ui.secondary-button>
-                                        @else
-                                            
                                         @endif
                                     </div>
                                 </td>
@@ -722,19 +730,27 @@
                                                 <div class="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm transition-all hover:scale-110 hover:z-10
                                                     {{ $task->status === 'approved' ? 'bg-green-500' : ($task->status === 'rejected' ? 'bg-red-500' : ($task->status === 'pending' ? 'bg-blue-500 animate-pulse' : 'bg-gray-300')) }}"
                                                     title="{{ ($task->approver?->name ?? $task->approver_name) . ': ' . tr($task->status) }}">
-                                                    {{ mb_substr($task->approver?->name ?? $task->approver_name ?? '?', 0, 1) }}
+                                                    @if($task->status === 'approved') <i class="fas fa-check"></i>
+                                                    @elseif($task->status === 'rejected') <i class="fas fa-times"></i>
+                                                    @elseif($task->status === 'pending') <i class="fas fa-hourglass-half"></i>
+                                                    @else <i class="fas fa-minus"></i> @endif
                                                 </div>
                                             @endforeach
                                         </div>
                                         <button wire:click="openWorkflow('cut', {{ $row->id }})" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="{{ tr('View sequence') }}">
-                                            <i class="fas fa-route text-base"></i>
+                                            <i class="fas fa-project-diagram text-base"></i>
                                         </button>
                                     </div>
                                 </td>
 
                                 <td class="p-3">
                                     <div class="flex items-center gap-2">
-                                        @if(auth()->user()->can('attendance.manage') || $tab === 'pending')
+                                        @php
+                                            $currentEmpId = auth()->user()->employee_id;
+                                            $isMyTask = $currentEmpId && $row->approvalTasks->where('status', 'pending')->where('approver_employee_id', $currentEmpId)->isNotEmpty();
+                                        @endphp
+
+                                        @if($isMyTask)
                                             <x-ui.primary-button
                                                 type="button"
                                                 wire:click.prevent="approveCutLeave({{ (int) $row->id }})"
@@ -754,8 +770,6 @@
                                             >
                                                 {{ tr('Reject') }}
                                             </x-ui.secondary-button>
-                                        @else
-                                            <span class="text-xs text-gray-400 italic">{{ tr('Read Only') }}</span>
                                         @endif
                                     </div>
                                 </td>
@@ -856,12 +870,15 @@
                                                 <div class="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm transition-all hover:scale-110 hover:z-10
                                                     {{ $task->status === 'approved' ? 'bg-green-500' : ($task->status === 'rejected' ? 'bg-red-500' : ($task->status === 'pending' ? 'bg-blue-500 animate-pulse' : 'bg-gray-300')) }}"
                                                     title="{{ ($task->approver?->name ?? $task->approver_name) . ': ' . tr($task->status) }}">
-                                                    {{ mb_substr($task->approver?->name ?? $task->approver_name ?? '?', 0, 1) }}
+                                                    @if($task->status === 'approved') <i class="fas fa-check"></i>
+                                                    @elseif($task->status === 'rejected') <i class="fas fa-times"></i>
+                                                    @elseif($task->status === 'pending') <i class="fas fa-hourglass-half"></i>
+                                                    @else <i class="fas fa-minus"></i> @endif
                                                 </div>
                                             @endforeach
                                         </div>
                                         <button wire:click="openWorkflow('mission', {{ $r->id }})" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="{{ tr('View sequence') }}">
-                                            <i class="fas fa-route text-base"></i>
+                                            <i class="fas fa-project-diagram text-base"></i>
                                         </button>
                                     </div>
                                 </td>
@@ -876,7 +893,12 @@
                                             </a>
                                         @endif
 
-                                        @if(auth()->user()->can('attendance.manage') || $tab === 'pending')
+                                        @php
+                                            $currentEmpId = auth()->user()->employee_id;
+                                            $isMyTask = $currentEmpId && $r->approvalTasks->where('status', 'pending')->where('approver_employee_id', $currentEmpId)->isNotEmpty();
+                                        @endphp
+
+                                        @if($isMyTask)
                                             <x-ui.primary-button
                                                 type="button"
                                                 wire:click.prevent="approveMission({{ $r->id }})"
@@ -889,8 +911,6 @@
                                                 {{ tr('Approve') }}
                                             </x-ui.primary-button>
 
-                                            
-
                                             <x-ui.secondary-button
                                                 type="button"
                                                 wire:click.prevent="openReject('mission', {{ $r->id }})"
@@ -899,8 +919,6 @@
                                                 <i class="fas fa-times me-2"></i>
                                                 {{ tr('Reject') }}
                                             </x-ui.secondary-button>
-                                        @else
-                                            
                                         @endif
                                     </div>
                                 </td>
@@ -1178,12 +1196,15 @@
                                                 <div class="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm transition-all hover:scale-110 hover:z-10
                                                     {{ $task->status === 'approved' ? 'bg-green-500' : ($task->status === 'rejected' ? 'bg-red-500' : ($task->status === 'pending' ? 'bg-blue-500 animate-pulse' : 'bg-gray-300')) }}"
                                                     title="{{ ($task->approver?->name ?? $task->approver_name) . ': ' . tr($task->status) }}">
-                                                    {{ mb_substr($task->approver?->name ?? $task->approver_name ?? '?', 0, 1) }}
+                                                    @if($task->status === 'approved') <i class="fas fa-check"></i>
+                                                    @elseif($task->status === 'rejected') <i class="fas fa-times"></i>
+                                                    @elseif($task->status === 'pending') <i class="fas fa-hourglass-half"></i>
+                                                    @else <i class="fas fa-minus"></i> @endif
                                                 </div>
                                             @endforeach
                                         </div>
                                         <button wire:click="openWorkflow('leave', {{ $r->id }})" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="{{ tr('View sequence') }}">
-                                            <i class="fas fa-route text-base"></i>
+                                            <i class="fas fa-project-diagram text-base"></i>
                                         </button>
                                     </div>
                                 </td>
@@ -1208,8 +1229,7 @@
                                             @can('attendance.manage')
                                             <x-ui.secondary-button
                                                 type="button"
-                                                wire:click="cancelPermission({{ $r->id }})"
-                                                onclick="return confirm('Are you sure?')"
+                                                onclick="$dispatch('open-confirm-cancel-leave-dialog', { id: {{ $r->id }} })"
                                                 class="px-3 py-1.5 text-xs font-bold bg-white text-red-500 border-red-100 hover:bg-red-50 !rounded-lg shadow-sm transition-all"
                                             >
                                                 {{ tr('Cancel') }}
@@ -1313,12 +1333,15 @@
                                                 <div class="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm transition-all hover:scale-110 hover:z-10
                                                     {{ $task->status === 'approved' ? 'bg-green-500' : ($task->status === 'rejected' ? 'bg-red-500' : ($task->status === 'pending' ? 'bg-blue-500 animate-pulse' : 'bg-gray-300')) }}"
                                                     title="{{ ($task->approver?->name ?? $task->approver_name) . ': ' . tr($task->status) }}">
-                                                    {{ mb_substr($task->approver?->name ?? $task->approver_name ?? '?', 0, 1) }}
+                                                    @if($task->status === 'approved') <i class="fas fa-check"></i>
+                                                    @elseif($task->status === 'rejected') <i class="fas fa-times"></i>
+                                                    @elseif($task->status === 'pending') <i class="fas fa-hourglass-half"></i>
+                                                    @else <i class="fas fa-minus"></i> @endif
                                                 </div>
                                             @endforeach
                                         </div>
                                         <button wire:click="openWorkflow('permission', {{ $r->id }})" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="{{ tr('View sequence') }}">
-                                            <i class="fas fa-route text-base"></i>
+                                            <i class="fas fa-project-diagram text-base"></i>
                                         </button>
                                     </div>
                                 </td>
@@ -1422,12 +1445,15 @@
                                                 <div class="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm transition-all hover:scale-110 hover:z-10
                                                     {{ $task->status === 'approved' ? 'bg-green-500' : ($task->status === 'rejected' ? 'bg-red-500' : ($task->status === 'pending' ? 'bg-blue-500 animate-pulse' : 'bg-gray-300')) }}"
                                                     title="{{ ($task->approver?->name ?? $task->approver_name) . ': ' . tr($task->status) }}">
-                                                    {{ mb_substr($task->approver?->name ?? $task->approver_name ?? '?', 0, 1) }}
+                                                    @if($task->status === 'approved') <i class="fas fa-check"></i>
+                                                    @elseif($task->status === 'rejected') <i class="fas fa-times"></i>
+                                                    @elseif($task->status === 'pending') <i class="fas fa-hourglass-half"></i>
+                                                    @else <i class="fas fa-minus"></i> @endif
                                                 </div>
                                             @endforeach
                                         </div>
                                         <button wire:click="openWorkflow('cut', {{ $row->id }})" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="{{ tr('View sequence') }}">
-                                            <i class="fas fa-route text-base"></i>
+                                            <i class="fas fa-project-diagram text-base"></i>
                                         </button>
                                     </div>
                                 </td>
@@ -1532,12 +1558,15 @@
                                                 <div class="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm transition-all hover:scale-110 hover:z-10
                                                     {{ $task->status === 'approved' ? 'bg-green-500' : ($task->status === 'rejected' ? 'bg-red-500' : ($task->status === 'pending' ? 'bg-blue-500 animate-pulse' : 'bg-gray-300')) }}"
                                                     title="{{ ($task->approver?->name ?? $task->approver_name) . ': ' . tr($task->status) }}">
-                                                    {{ mb_substr($task->approver?->name ?? $task->approver_name ?? '?', 0, 1) }}
+                                                    @if($task->status === 'approved') <i class="fas fa-check"></i>
+                                                    @elseif($task->status === 'rejected') <i class="fas fa-times"></i>
+                                                    @elseif($task->status === 'pending') <i class="fas fa-hourglass-half"></i>
+                                                    @else <i class="fas fa-minus"></i> @endif
                                                 </div>
                                             @endforeach
                                         </div>
                                         <button wire:click="openWorkflow('mission', {{ $r->id }})" class="p-1.5 text-indigo-600 hover:bg-indigo-50 rounded-lg transition-all" title="{{ tr('View sequence') }}">
-                                            <i class="fas fa-route text-base"></i>
+                                            <i class="fas fa-project-diagram text-base"></i>
                                         </button>
                                     </div>
                                 </td>
@@ -2790,4 +2819,13 @@
             }, 1000);
         }
     </script>
+
+    <x-ui.confirm-dialog
+        id="cancel-leave-dialog"
+        title="{{ tr('Cancel Leave Request') }}"
+        message="{{ tr('Are you sure you want to cancel this leave request? This action cannot be undone if the month is closed.') }}"
+        confirmText="{{ tr('Yes, Cancel') }}"
+        confirmAction="wire:cancelLeave(__ID__)"
+        type="danger"
+    />
 </div>

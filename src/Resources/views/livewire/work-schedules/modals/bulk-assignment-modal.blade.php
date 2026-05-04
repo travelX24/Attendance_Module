@@ -203,10 +203,6 @@
                         @endforeach
                     </x-ui.select>
 
-                    @error('bulkFormData.work_schedule_id')
-                        <span class="text-red-500 text-xs mt-1">{{ $message }}</span>
-                    @enderror
-
                 </div>
 
                 @if($isRotationMode)
@@ -222,10 +218,6 @@
                                 </option>
                             @endforeach
                         </x-ui.select>
-
-                        @error('bulkFormData.rotation_work_schedule_id')
-                            <span class="text-red-500 text-xs mt-1">{{ $message }}</span>
-                        @enderror
                     </div>
                 @endif
 

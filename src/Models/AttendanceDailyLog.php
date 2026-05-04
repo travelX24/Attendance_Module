@@ -393,27 +393,34 @@ class AttendanceDailyLog extends Model
 
         // --- Start: Auto-Checkout Logic ---
         $effectiveCheckOut = $this->check_out_time;
+        $openDetail = $this->details()->whereNull('check_out_time')->orderBy('check_in_time', 'desc')->first();
+        
         if (!$effectiveCheckOut) {
-            $lastDetail = $this->details()->whereNotNull('check_out_time')->orderBy('check_out_time', 'desc')->first();
-            $effectiveCheckOut = $lastDetail?->check_out_time;
+            if ($openDetail) {
+                $effectiveCheckOut = null; // Still working in an open session
+            } else {
+                $lastDetail = $this->details()->whereNotNull('check_out_time')->orderBy('check_out_time', 'desc')->first();
+                $effectiveCheckOut = $lastDetail?->check_out_time;
+            }
         }
 
-        if (!$effectiveCheckOut && $this->check_in_time && $this->scheduled_check_out) {
-            $autoCheckoutHours = (int)($grace->auto_checkout_after_minutes ?? 0);
-            if ($autoCheckoutHours > 0) {
-                 $scheduledOut = Carbon::parse($dateStr . " " . $this->formatTimeHm($this->scheduled_check_out));
-                 $limit = $scheduledOut->copy()->addHours($autoCheckoutHours);
-                 
+        if (!$effectiveCheckOut && ($this->check_in_time || $openDetail) && $this->scheduled_check_out) {
+            // Note: auto_checkout_after_minutes stores value in HOURS (UI label is 'hours')
+            $autoCheckoutAfterHours = (int)($grace->auto_checkout_after_minutes ?? 0);
+            if ($autoCheckoutAfterHours > 0) {
+                 $scheduledOut = Carbon::parse($dateStr . ' ' . $this->formatTimeHm($this->scheduled_check_out));
+                 // limit = scheduled end + grace hours configured by company
+                 $limit = $scheduledOut->copy()->addHours($autoCheckoutAfterHours);
+
                  if (now()->greaterThan($limit)) {
-                     // Perform auto-checkout: set time to scheduled out and update status
-                     $this->check_out_time = $this->scheduled_check_out;
+                     $this->check_out_time = $limit;
                      $this->attendance_status = 'auto_checkout';
-                     
+
                      // Close open sessions in secondary details table
                      $this->details()->whereNull('check_out_time')->update([
-                         'check_out_time' => $this->formatTimeHm($this->scheduled_check_out)
+                         'check_out_time' => $limit->format('H:i:s')
                      ]);
-                     
+
                      return; // Skip remaining status calculations
                  }
             }
@@ -431,6 +438,13 @@ class AttendanceDailyLog extends Model
             } elseif ($delayMinutes > $lateGrace) {
                 $newStatus = 'late';
             }
+        }
+
+        // Re-evaluate effectiveCheckOut for status calculation
+        // If there's an open session, we definitely haven't departed early yet.
+        if ($this->details()->whereNull('check_out_time')->exists()) {
+             $this->attendance_status = $newStatus;
+             return;
         }
 
         $effectiveCheckOut = $this->check_out_time;
