@@ -301,9 +301,21 @@ trait WithLeaveRequests
         // ✅ Check Workflow existence
         if (class_exists(\Athka\SystemSettings\Services\Approvals\ApprovalService::class)) {
             $approvalService = app(\Athka\SystemSettings\Services\Approvals\ApprovalService::class);
-            if (!$approvalService->hasApproversForEmployee('leaves', (int) $employee->id, (int) $this->companyId)) {
-                $this->addError('start_date', 'لا يمكن تقديم الطلب، يرجى التواصل مع الإدارة لتعيين تسلسل موافقات (سير عمل) خاص بك.');
-                return;
+            $hasWorkflow = $approvalService->hasApproversForEmployee('leaves', (int) $employee->id, (int) $this->companyId);
+            $hasPolicies = $approvalService->hasActivePolicies('leaves', (int) $this->companyId);
+
+            if ($hasPolicies) {
+                if (!$hasWorkflow) {
+                    $this->addError('start_date', 'أنت غير مخول للتقديم على هذا النوع من الإجازات حسب سياسات الموافقات الحالية لهذا الموظف.');
+                    return;
+                }
+            } else {
+                // No policies at all, fallback to check if at least something (manager) is available
+                $hasManager = $approvalService->resolveDirectManagerId((int) $employee->id) > 0;
+                if (!$hasWorkflow && !$hasManager) {
+                    $this->addError('start_date', 'لا يمكن تقديم الطلب، يرجى التواصل مع الإدارة لتعيين تسلسل موافقات (سير عمل) خاص بك.');
+                    return;
+                }
             }
         }
 

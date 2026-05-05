@@ -239,9 +239,21 @@ trait WithPermissionRequests
         // ✅ Check Workflow existence (only if approval is required)
         if ($approvalRequired && class_exists(\Athka\SystemSettings\Services\Approvals\ApprovalService::class)) {
             $approvalService = app(\Athka\SystemSettings\Services\Approvals\ApprovalService::class);
-            if (!$approvalService->hasApproversForEmployee('permissions', (int) $employee->id, (int) $this->companyId)) {
-                $this->addError('permission_date', 'لا يمكن تقديم الطلب، يرجى التواصل مع الإدارة لتعيين تسلسل موافقات (سير عمل) خاص بك.');
-                return;
+            $hasWorkflow = $approvalService->hasApproversForEmployee('permissions', (int) $employee->id, (int) $this->companyId);
+            $hasPolicies = $approvalService->hasActivePolicies('permissions', (int) $this->companyId);
+
+            if ($hasPolicies) {
+                if (!$hasWorkflow) {
+                    $this->addError('permission_date', 'أنت غير مخول للتقديم على هذا النوع من الأذونات حسب سياسات الموافقات الحالية.');
+                    return;
+                }
+            } else {
+                // No policies at all, fallback to check if at least something (manager) is available
+                $hasManager = $approvalService->resolveDirectManagerId((int) $employee->id) > 0;
+                if (!$hasWorkflow && !$hasManager) {
+                    $this->addError('permission_date', 'لا يمكن تقديم الطلب، يرجى التواصل مع الإدارة لتعيين تسلسل موافقات (سير عمل) خاص بك.');
+                    return;
+                }
             }
         }
 
