@@ -235,6 +235,14 @@ class AttendanceDailyLog extends Model
         // --- Start: Auto-Checkout Logic ---
         $openDetail = $this->details()->whereNull('check_out_time')->orderBy('check_in_time', 'desc')->first();
         
+        // Self-healing: If no open detail, check if the last one was an auto-checkout that needs correction
+        if (!$openDetail) {
+            $lastDetail = $this->details()->orderBy('check_in_time', 'desc')->first();
+            if ($lastDetail && $lastDetail->attendance_status === 'auto_checkout') {
+                $openDetail = $lastDetail;
+            }
+        }
+        
         if ($openDetail) {
             $service = app(\Athka\SystemSettings\Services\WorkScheduleService::class);
             $dateStr = $this->attendance_date->toDateString();
