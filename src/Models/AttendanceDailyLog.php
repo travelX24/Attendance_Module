@@ -332,20 +332,20 @@ class AttendanceDailyLog extends Model
         $totalScheduledMinutes = (float)$this->scheduled_hours * 60;
         $lateMinutes = 0;
         $earlyMinutes = 0;
-        $dateStr = Carbon::parse($this->attendance_date)->toDateString();
+        $dateStr = $this->parseLocalizedCarbon($this->attendance_date)->toDateString();
 
         if ($this->scheduled_check_in && $this->check_in_time) {
-            $sIn = Carbon::parse($dateStr . " " . $this->formatTimeHm($this->scheduled_check_in));
-            $aIn = Carbon::parse($dateStr . " " . $this->formatTimeHm($this->check_in_time));
-            if ($aIn->gt($sIn)) {
+            $sIn = $this->parseLocalizedCarbon($dateStr . " " . $this->formatTimeHm($this->scheduled_check_in));
+            $aIn = $this->parseLocalizedCarbon($dateStr . " " . $this->formatTimeHm($this->check_in_time));
+            if ($aIn && $sIn && $aIn->gt($sIn)) {
                 $lateMinutes = $aIn->diffInMinutes($sIn);
             }
         }
 
         if ($this->scheduled_check_out && $this->check_out_time) {
-            $sOut = Carbon::parse($dateStr . " " . $this->formatTimeHm($this->scheduled_check_out));
-            $aOut = Carbon::parse($dateStr . " " . $this->formatTimeHm($this->check_out_time));
-            if ($aOut->lt($sOut)) {
+            $sOut = $this->parseLocalizedCarbon($dateStr . " " . $this->formatTimeHm($this->scheduled_check_out));
+            $aOut = $this->parseLocalizedCarbon($dateStr . " " . $this->formatTimeHm($this->check_out_time));
+            if ($aOut && $sOut && $aOut->lt($sOut)) {
                 $earlyMinutes = $sOut->diffInMinutes($aOut);
             }
         }
@@ -362,11 +362,11 @@ class AttendanceDailyLog extends Model
             $totalMinutes = 0;
             foreach ($details as $detail) {
                 if ($detail->check_in_time && $detail->check_out_time) {
-                    try {
-                        $in = Carbon::parse($detail->check_in_time);
-                        $out = Carbon::parse($detail->check_out_time);
+                    $in = $this->parseLocalizedCarbon($detail->check_in_time);
+                    $out = $this->parseLocalizedCarbon($detail->check_out_time);
+                    if ($in && $out) {
                         $totalMinutes += $out->diffInMinutes($in);
-                    } catch (\Exception $e) {}
+                    }
                 }
             }
             $this->actual_hours = round($totalMinutes / 60, 2);
@@ -378,9 +378,9 @@ class AttendanceDailyLog extends Model
             return;
         }
 
-        $checkIn = Carbon::parse($this->check_in_time);
-        $checkOut = Carbon::parse($this->check_out_time);
-        $this->actual_hours = round($checkOut->diffInMinutes($checkIn) / 60, 2);
+        $checkIn = $this->parseLocalizedCarbon($this->check_in_time);
+        $checkOut = $this->parseLocalizedCarbon($this->check_out_time);
+        $this->actual_hours = ($checkIn && $checkOut) ? round($checkOut->diffInMinutes($checkIn) / 60, 2) : 0;
     }
 
     public function calculateStatus(): void
