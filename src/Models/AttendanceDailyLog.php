@@ -389,59 +389,70 @@ class AttendanceDailyLog extends Model
 
         $lateGrace = $grace->late_grace_minutes ?? 15;
         $earlyGrace = $grace->early_leave_grace_minutes ?? 15;
-        $dateStr = Carbon::parse($this->attendance_date)->toDateString();
 
         // --- Start: Auto-Checkout Logic ---
-        $effectiveCheckOut = $this->check_out_time;
         $openDetail = $this->details()->whereNull('check_out_time')->orderBy('check_in_time', 'desc')->first();
         
-        if (!$effectiveCheckOut) {
-            if ($openDetail) {
-                $effectiveCheckOut = null; // Still working in an open session
-            } else {
-                $lastDetail = $this->details()->whereNotNull('check_out_time')->orderBy('check_out_time', 'desc')->first();
-                $effectiveCheckOut = $lastDetail?->check_out_time;
-            }
-        }
-
-        if (!$effectiveCheckOut && ($this->check_in_time || $openDetail) && $this->scheduled_check_out) {
-            // Note: auto_checkout_after_minutes stores value in HOURS (UI label is 'hours')
+        if ($openDetail) {
             $autoCheckoutAfterHours = (int)($grace->auto_checkout_after_minutes ?? 0);
             if ($autoCheckoutAfterHours > 0) {
-                 $scheduledOut = Carbon::parse($dateStr . ' ' . $this->formatTimeHm($this->scheduled_check_out));
-                 // limit = scheduled end + grace hours configured by company
+                 // Try to get the specific end time of the matched period, otherwise fallback to daily schedule end
+                 $periodEndTime = null;
+                 if ($openDetail->work_schedule_period_id) {
+                     $periodEndTime = \Illuminate\Support\Facades\DB::table('work_schedule_periods')
+                        ->where('id', $openDetail->work_schedule_period_id)
+                        ->value('end_time');
+                 }
+                 
+                 $referenceEnd = $periodEndTime ?: $this->formatTimeHm($this->scheduled_check_out);
+                 
+                 // Handle date crossing for the period end
+                 $scheduledOut = Carbon::parse($this->attendance_date)->setTimeFromTimeString($referenceEnd);
+                 if ($this->scheduled_check_in && $scheduledOut->lessThan(Carbon::parse($this->scheduled_check_in))) {
+                     $scheduledOut->addDay();
+                 }
+
                  $limit = $scheduledOut->copy()->addHours($autoCheckoutAfterHours);
 
                  if (now()->greaterThan($limit)) {
-                     $this->check_out_time = $limit;
-                     $this->attendance_status = 'auto_checkout';
-
-                     // Close open sessions in secondary details table
-                     $this->details()->whereNull('check_out_time')->update([
-                         'check_out_time' => $limit->format('H:i:s')
+                     // Update the detail first
+                     $this->details()->where('id', $openDetail->id)->update([
+                         'check_out_time' => $limit->format('H:i:s'),
+                         'attendance_status' => 'auto_checkout'
                      ]);
 
-                     return; // Skip remaining status calculations
+                     // Update the main log
+                     $this->check_out_time = $limit;
+                     $this->attendance_status = 'auto_checkout';
+                     
+                     return; 
                  }
             }
         }
         // --- End: Auto-Checkout Logic ---
 
         if ($this->scheduled_check_in && $effectiveCheckIn) {
-            $scheduledIn = Carbon::parse($dateStr . " " . $this->formatTimeHm($this->scheduled_check_in));
-            $actualIn = Carbon::parse($dateStr . " " . $this->formatTimeHm($effectiveCheckIn));
+            $sVal = str_replace(['ص', 'م'], ['AM', 'PM'], (string)$this->scheduled_check_in);
+            $scheduledIn = Carbon::parse($sVal);
+            
+            $aVal = str_replace(['ص', 'م'], ['AM', 'PM'], (string)$effectiveCheckIn);
+            $actualIn = Carbon::parse($aVal);
             
             $delayMinutes = $scheduledIn->diffInMinutes($actualIn, false);
             
-            if ($delayMinutes >= 60) {
-                $newStatus = 'absent';
-            } elseif ($delayMinutes > $lateGrace) {
+            if ($delayMinutes > $lateGrace) {
                 $newStatus = 'late';
             }
         }
 
-        // Re-evaluate effectiveCheckOut for status calculation
-        // If there's an open session, we definitely haven't departed early yet.
+        // --- Aggregation from Multi-Period Sessions ---
+        // If the daily status is still 'present' or 'early_departure', check if any individual session was late.
+        if ($newStatus !== 'late') {
+            if ($this->details()->where('attendance_status', 'late')->exists()) {
+                $newStatus = 'late';
+            }
+        }
+
         if ($this->details()->whereNull('check_out_time')->exists()) {
              $this->attendance_status = $newStatus;
              return;
@@ -454,12 +465,24 @@ class AttendanceDailyLog extends Model
         }
 
         if ($this->scheduled_check_out && $effectiveCheckOut) {
-            $scheduledOut = Carbon::parse($dateStr . " " . $this->formatTimeHm($this->scheduled_check_out));
-            $actualOut = Carbon::parse($dateStr . " " . $this->formatTimeHm($effectiveCheckOut));
+            $sVal = str_replace(['ص', 'م'], ['AM', 'PM'], (string)$this->scheduled_check_out);
+            $scheduledOut = Carbon::parse($sVal);
+            
+            $aVal = str_replace(['ص', 'م'], ['AM', 'PM'], (string)$effectiveCheckOut);
+            $actualOut = Carbon::parse($aVal);
+            
             if ($actualOut->lessThan($scheduledOut->copy()->subMinutes($earlyGrace))) {
                 if ($newStatus !== 'late') $newStatus = 'early_departure';
             }
         }
+
+        // Final check for early departure in any session
+        if ($newStatus === 'present') {
+            if ($this->details()->where('attendance_status', 'early_departure')->exists()) {
+                $newStatus = 'early_departure';
+            }
+        }
+        
         $this->attendance_status = $newStatus;
     }
 }
