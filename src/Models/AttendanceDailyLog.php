@@ -417,32 +417,42 @@ class AttendanceDailyLog extends Model
                      $periodEndTime = \Illuminate\Support\Facades\DB::table('work_schedule_periods')
                         ->where('id', $openDetail->work_schedule_period_id)
                         ->value('end_time');
-                 }
-                 
-                 $referenceEnd = $periodEndTime ?: $this->formatTimeHm($this->scheduled_check_out);
-                 
-                 // Handle date crossing for the period end
-                 $scheduledOut = Carbon::parse($this->attendance_date)->setTimeFromTimeString($referenceEnd);
-                 $sIn = $this->parseLocalizedCarbon($this->scheduled_check_in);
-                 if ($sIn && $scheduledOut->lessThan($sIn)) {
-                     $scheduledOut->addDay();
-                 }
+        if ($this->work_schedule_id) {
+            $openDetail = $this->details()->whereNull('check_out_time')->orderBy('check_in_time', 'desc')->first();
+            
+            if ($openDetail) {
+                $p = null;
+                foreach ($metrics['periods'] as $periodItem) {
+                    if (isset($periodItem['id']) && $periodItem['id'] == $openDetail->work_schedule_period_id) {
+                        $p = (object)$periodItem;
+                        break;
+                    }
+                }
 
-                 $limit = $scheduledOut->copy()->addHours($autoCheckoutAfterHours);
+                if (!$p && isset($metrics['periods'][$openDetail->work_schedule_period_id - 1])) {
+                        $p = (object)$metrics['periods'][$openDetail->work_schedule_period_id - 1];
+                }
 
-                 if (now()->greaterThan($limit)) {
-                     // Update the detail first
-                     $this->details()->where('id', $openDetail->id)->update([
-                         'check_out_time' => $limit->format('H:i:s'),
-                         'attendance_status' => 'auto_checkout'
-                     ]);
+                if ($p && isset($p->end_time)) {
+                    $end = Carbon::parse($this->attendance_date->toDateString() . ' ' . $p->end_time);
+                    if ($p->is_night_shift ?? false) {
+                        $end->addDay();
+                    }
 
-                     // Update the main log
-                     $this->check_out_time = $limit;
-                     $this->attendance_status = 'auto_checkout';
-                     
-                     return; 
-                 }
+                    $setting = \Illuminate\Support\Facades\DB::table('attendance_grace_settings')->where('saas_company_id', $this->saas_company_id)->first();
+                    $limit = $end->copy()->addMinutes((int)($setting->auto_checkout_after_minutes ?? 120));
+
+                    if (now()->greaterThan($limit)) {
+                        $openDetail->update([
+                            'check_out_time' => $limit->format('H:i:s'),
+                            'attendance_status' => 'auto_checkout'
+                        ]);
+
+                        $this->check_out_time = $limit;
+                        $this->attendance_status = 'auto_checkout';
+                        return; 
+                    }
+                }
             }
         }
         // --- End: Auto-Checkout Logic ---
