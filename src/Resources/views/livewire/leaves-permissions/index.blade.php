@@ -1229,7 +1229,7 @@
                                             @can('attendance.manage')
                                             <x-ui.secondary-button
                                                 type="button"
-                                                onclick="$dispatch('open-confirm-cancel-leave-dialog', { id: {{ $r->id }} })"
+                                                @click.prevent="$dispatch('open-confirm-cancel-leave-dialog', { id: {{ $r->id }} })"
                                                 class="px-3 py-1.5 text-xs font-bold bg-white text-red-500 border-red-100 hover:bg-red-50 !rounded-lg shadow-sm transition-all"
                                             >
                                                 {{ tr('Cancel') }}

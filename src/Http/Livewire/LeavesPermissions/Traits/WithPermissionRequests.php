@@ -239,19 +239,24 @@ trait WithPermissionRequests
         // ✅ Check Workflow existence (only if approval is required)
         if ($approvalRequired && class_exists(\Athka\SystemSettings\Services\Approvals\ApprovalService::class)) {
             $approvalService = app(\Athka\SystemSettings\Services\Approvals\ApprovalService::class);
-            $hasWorkflow = $approvalService->hasApproversForEmployee('permissions', (int) $employee->id, (int) $this->companyId);
+            $workflowReason = null;
+            $hasWorkflow = $approvalService->hasApproversForEmployee('permissions', (int) $employee->id, (int) $this->companyId, $workflowReason);
             $hasPolicies = $approvalService->hasActivePolicies('permissions', (int) $this->companyId);
 
             if ($hasPolicies) {
                 if (!$hasWorkflow) {
-                    $this->addError('permission_date', 'أنت غير مخول للتقديم على هذا النوع من الأذونات حسب سياسات الموافقات الحالية.');
+                    $msg = tr('You are not authorized to apply for this permission as per current approval policies.');
+                    if ($workflowReason === 'missing_direct_manager') {
+                        $msg = tr('Cannot submit request: Your direct manager is not assigned in the system.');
+                    }
+                    $this->addError('permission_date', $msg);
                     return;
                 }
             } else {
                 // No policies at all, fallback to check if at least something (manager) is available
                 $hasManager = $approvalService->resolveDirectManagerId((int) $employee->id) > 0;
                 if (!$hasWorkflow && !$hasManager) {
-                    $this->addError('permission_date', 'لا يمكن تقديم الطلب، يرجى التواصل مع الإدارة لتعيين تسلسل موافقات (سير عمل) خاص بك.');
+                    $this->addError('permission_date', tr('Cannot submit request, please contact administration to assign an approval workflow.'));
                     return;
                 }
             }
