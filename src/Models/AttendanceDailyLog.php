@@ -302,6 +302,21 @@ class AttendanceDailyLog extends Model
         return $this->formatTimeHm($this->scheduled_check_out);
     }
 
+    /**
+     * Parse a date/time string that might contain Arabic AM/PM characters (ص/م).
+     */
+    private function parseLocalizedCarbon($value)
+    {
+        if (!$value) return null;
+        if ($value instanceof \DateTimeInterface) return Carbon::instance($value);
+        $clean = str_replace(['ص', 'م'], ['AM', 'PM'], (string)$value);
+        try {
+            return Carbon::parse($clean);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
     public function calculateCompliance(): void
     {
         if (!$this->scheduled_hours || (float)$this->scheduled_hours <= 0) {
@@ -408,7 +423,8 @@ class AttendanceDailyLog extends Model
                  
                  // Handle date crossing for the period end
                  $scheduledOut = Carbon::parse($this->attendance_date)->setTimeFromTimeString($referenceEnd);
-                 if ($this->scheduled_check_in && $scheduledOut->lessThan(Carbon::parse($this->scheduled_check_in))) {
+                 $sIn = $this->parseLocalizedCarbon($this->scheduled_check_in);
+                 if ($sIn && $scheduledOut->lessThan($sIn)) {
                      $scheduledOut->addDay();
                  }
 
@@ -432,16 +448,15 @@ class AttendanceDailyLog extends Model
         // --- End: Auto-Checkout Logic ---
 
         if ($this->scheduled_check_in && $effectiveCheckIn) {
-            $sVal = str_replace(['ص', 'م'], ['AM', 'PM'], (string)$this->scheduled_check_in);
-            $scheduledIn = Carbon::parse($sVal);
+            $scheduledIn = $this->parseLocalizedCarbon($this->scheduled_check_in);
+            $actualIn = $this->parseLocalizedCarbon($effectiveCheckIn);
             
-            $aVal = str_replace(['ص', 'م'], ['AM', 'PM'], (string)$effectiveCheckIn);
-            $actualIn = Carbon::parse($aVal);
-            
-            $delayMinutes = $scheduledIn->diffInMinutes($actualIn, false);
-            
-            if ($delayMinutes > $lateGrace) {
-                $newStatus = 'late';
+            if ($scheduledIn && $actualIn) {
+                $delayMinutes = $scheduledIn->diffInMinutes($actualIn, false);
+                
+                if ($delayMinutes > $lateGrace) {
+                    $newStatus = 'late';
+                }
             }
         }
 
@@ -458,21 +473,14 @@ class AttendanceDailyLog extends Model
              return;
         }
 
-        $effectiveCheckOut = $this->check_out_time;
-        if (!$effectiveCheckOut) {
-            $lastDetail = $this->details()->whereNotNull('check_out_time')->orderBy('check_out_time', 'desc')->first();
-            $effectiveCheckOut = $lastDetail?->check_out_time;
-        }
-
         if ($this->scheduled_check_out && $effectiveCheckOut) {
-            $sVal = str_replace(['ص', 'م'], ['AM', 'PM'], (string)$this->scheduled_check_out);
-            $scheduledOut = Carbon::parse($sVal);
+            $scheduledOut = $this->parseLocalizedCarbon($this->scheduled_check_out);
+            $actualOut = $this->parseLocalizedCarbon($effectiveCheckOut);
             
-            $aVal = str_replace(['ص', 'م'], ['AM', 'PM'], (string)$effectiveCheckOut);
-            $actualOut = Carbon::parse($aVal);
-            
-            if ($actualOut->lessThan($scheduledOut->copy()->subMinutes($earlyGrace))) {
-                if ($newStatus !== 'late') $newStatus = 'early_departure';
+            if ($scheduledOut && $actualOut) {
+                if ($actualOut->lessThan($scheduledOut->copy()->subMinutes($earlyGrace))) {
+                    if ($newStatus !== 'late') $newStatus = 'early_departure';
+                }
             }
         }
 

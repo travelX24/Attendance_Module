@@ -240,7 +240,7 @@
                             wire:model.live="compliance_from"
                             class="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[color:var(--brand-via)] focus:border-transparent"
                             placeholder="0"
-                            :disabled="!auth()->user()->can('attendance.manage')"
+                            @disabled(!auth()->user()->can('attendance.manage'))
                         >
                     </div>
 
@@ -254,7 +254,7 @@
                             wire:model.live="compliance_to"
                             class="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[color:var(--brand-via)] focus:border-transparent"
                             placeholder="100"
-                            :disabled="!auth()->user()->can('attendance.manage')"
+                            @disabled(!auth()->user()->can('attendance.manage'))
                         >
                     </div>
 
@@ -392,7 +392,7 @@
                             type="checkbox" 
                             wire:model.live="selectAll" 
                             class="w-4 h-4 text-[color:var(--brand-via)] border-gray-300 rounded focus:ring-[color:var(--brand-via)]"
-                            @cannot('attendance.manage') disabled @endcannot
+                            @disabled(!auth()->user()->can('attendance.manage'))
                         >
                     </td>
                     <td colspan="10" class="px-6 py-3">
@@ -474,7 +474,7 @@
                                 wire:model.live="selectedLogs" 
                                 value="{{ $log->id }}" 
                                 class="w-4 h-4 text-[color:var(--brand-via)] border-gray-300 rounded focus:ring-[color:var(--brand-via)]"
-                                @cannot('attendance.manage') disabled @endcannot
+                                @disabled(!auth()->user()->can('attendance.manage'))
                             >
                         </td>
     
