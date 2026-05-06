@@ -232,54 +232,74 @@ class AttendanceDailyLog extends Model
         $grace = AttendanceGraceSetting::where('saas_company_id', $this->saas_company_id)->first()
                  ?? AttendanceGraceSetting::getGlobalDefault();
 
-        // --- Start: Auto-Checkout Logic ---
-        $openDetail = $this->details()->whereNull('check_out_time')->orderBy('check_in_time', 'desc')->first();
+        // --- Start: Aggressive Auto-Checkout Logic ---
+        $foundDetail = $this->details()->whereNull('check_out_time')->orderBy('check_in_time', 'desc')->first();
         
-        // Self-healing: If no open detail, check if the last one was an auto-checkout that needs correction
-        if (!$openDetail) {
-            $lastDetail = $this->details()->orderBy('check_in_time', 'desc')->first();
-            if ($lastDetail && $lastDetail->attendance_status === 'auto_checkout') {
-                $openDetail = $lastDetail;
+        // If no open detail, we check if the last one is an auto_checkout that might need correction
+        if (!$foundDetail) {
+            $lastD = $this->details()->orderBy('check_in_time', 'desc')->first();
+            if ($lastD && $lastD->attendance_status === 'auto_checkout') {
+                $foundDetail = $lastD;
             }
         }
         
-        if ($openDetail) {
-            $service = app(\Athka\SystemSettings\Services\WorkScheduleService::class);
-            $dateStr = $this->attendance_date->toDateString();
-            $ws = $service->getEffectiveSchedule($this->saas_company_id, $this->employee, $dateStr);
-            $holidays = $service->getHolidays($this->saas_company_id, $dateStr, $dateStr);
-            $metrics = $service->getMetricsForDate($dateStr, $ws, $holidays, $this->employee);
+        if ($foundDetail) {
+            $scheduleService = app(\Athka\SystemSettings\Services\WorkScheduleService::class);
+            $logDateStr = $this->attendance_date->toDateString();
+            $effectiveWs = $scheduleService->getEffectiveSchedule($this->saas_company_id, $this->employee, $logDateStr);
+            $dayHolidays = $scheduleService->getHolidays($this->saas_company_id, $logDateStr, $logDateStr);
+            $dayMetrics = $scheduleService->getMetricsForDate($logDateStr, $effectiveWs, $dayHolidays, $this->employee);
 
-            $p = null;
-            foreach ($metrics['periods'] as $periodItem) {
-                if (isset($periodItem['id']) && $periodItem['id'] == $openDetail->work_schedule_period_id) {
-                    $p = (object)$periodItem;
+            $matchedP = null;
+            foreach ($dayMetrics['periods'] as $pItem) {
+                if (isset($pItem['id']) && $pItem['id'] == $foundDetail->work_schedule_period_id) {
+                    $matchedP = (object)$pItem;
                     break;
                 }
             }
 
-            if (!$p && isset($metrics['periods'][$openDetail->work_schedule_period_id - 1])) {
-                $p = (object)$metrics['periods'][$openDetail->work_schedule_period_id - 1];
+            // Fallback to index-based if ID doesn't match
+            if (!$matchedP && isset($dayMetrics['periods'][$foundDetail->work_schedule_period_id - 1])) {
+                $matchedP = (object)$dayMetrics['periods'][$foundDetail->work_schedule_period_id - 1];
             }
 
-            if ($p && isset($p->end_time)) {
-                $end = Carbon::parse($dateStr . ' ' . $p->end_time);
-                if ($p->is_night_shift ?? false) $end->addDay();
+            if ($matchedP && isset($matchedP->end_time)) {
+                $baseEnd = Carbon::parse($logDateStr . ' ' . $matchedP->end_time);
+                if ($matchedP->is_night_shift ?? false) $baseEnd->addDay();
 
-                $limit = $end->copy()->addHours((int)($grace->auto_checkout_after_minutes ?? 2));
+                $hoursToAdd = (int)($grace->auto_checkout_after_minutes ?? 2);
+                $checkoutLimit = $baseEnd->copy()->addHours($hoursToAdd);
 
-                if (now()->greaterThan($limit)) {
-                    $openDetail->update([
-                        'check_out_time' => $limit->format('H:i:s'),
-                        'attendance_status' => 'auto_checkout'
-                    ]);
-                    $this->check_out_time = $limit;
-                    $this->attendance_status = 'auto_checkout';
-                    return; 
+                // If now is past the limit, we apply auto-checkout
+                if (now()->greaterThan($checkoutLimit)) {
+                    $formattedLimit = $checkoutLimit->format('H:i:s');
+                    
+                    // Only update if it's missing or an incorrect auto_checkout
+                    if ($foundDetail->check_out_time === null || ($foundDetail->attendance_status === 'auto_checkout' && $foundDetail->check_out_time !== $formattedLimit)) {
+                        $foundDetail->update([
+                            'check_out_time' => $formattedLimit,
+                            'attendance_status' => 'auto_checkout'
+                        ]);
+                        
+                        $this->check_out_time = $formattedLimit;
+                        $this->attendance_status = 'auto_checkout';
+                        
+                        // Debugging: store calculation info
+                        $meta = $this->meta_data ?? [];
+                        $meta['auto_checkout_debug'] = [
+                            'base_end' => $baseEnd->toDateTimeString(),
+                            'hours_added' => $hoursToAdd,
+                            'final_limit' => $formattedLimit,
+                            'calculated_at' => now()->toDateTimeString()
+                        ];
+                        $this->meta_data = $meta;
+                        
+                        return; 
+                    }
                 }
             }
         }
-        // --- End: Auto-Checkout Logic ---
+        // --- End: Aggressive Auto-Checkout Logic ---
 
         $lateGrace = $grace->late_grace_minutes ?? 15;
         $earlyGrace = $grace->early_leave_grace_minutes ?? 15;
