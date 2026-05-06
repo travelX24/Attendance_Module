@@ -258,7 +258,7 @@ class AttendanceDailyLog extends Model
                 $end = Carbon::parse($dateStr . ' ' . $p->end_time);
                 if ($p->is_night_shift ?? false) $end->addDay();
 
-                $limit = $end->copy()->addMinutes((int)($grace->auto_checkout_after_minutes ?? 120));
+                $limit = $end->copy()->addHours((int)($grace->auto_checkout_after_minutes ?? 2));
 
                 if (now()->greaterThan($limit)) {
                     $openDetail->update([
