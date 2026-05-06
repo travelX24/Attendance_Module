@@ -110,24 +110,20 @@ trait WithAttendanceEdits
             }
             
             // Now populate values from existing log data
-            // We prioritize structured check_attempts, otherwise we pull from the detailed pulses table
+            // We prioritize structured check_attempts, otherwise we pull from the detailed pulses table            // Map discovered punches to the period structure
             $punches = [];
-            if (!empty($log->check_attempts) && is_array($log->check_attempts) && count($log->check_attempts) > 0) {
-                 $punches = $log->check_attempts;
-            } else {
-                 // Load from details table for multi-punch support
-                 $punches = $log->details()->orderBy('check_in_time', 'asc')->get()->map(fn($d) => [
-                     'check_in_time' => $d->start_time ?: ($d->check_in_time ? company_time($d->check_in_time) : ''),
-                     'check_out_time' => $d->end_time   ?: ($d->check_out_time ? company_time($d->check_out_time) : ''),
-                 ])->toArray();
+            // Load from details table for multi-punch support
+            $punches = $log->details()->orderBy('check_in_time', 'asc')->get()->map(fn($d) => [
+                'check_in_time' => $d->check_in_time ? Carbon::parse($d->check_in_time)->format('H:i') : '',
+                'check_out_time' => $d->check_out_time ? Carbon::parse($d->check_out_time)->format('H:i') : '',
+            ])->toArray();
 
-                 // Fallback to main log if details are empty (legacy or single-punch systems)
-                 if (empty($punches) && ($log->check_in_time || $log->check_out_time)) {
-                     $punches[] = [
-                         'check_in_time' => $log->check_in_time ? company_time($log->check_in_time) : '',
-                         'check_out_time' => $log->check_out_time ? company_time($log->check_out_time) : '',
-                     ];
-                 }
+            // Fallback to main log if details are empty
+            if (empty($punches) && ($log->check_in_time || $log->check_out_time)) {
+                $punches[] = [
+                    'check_in_time' => $log->check_in_time ? Carbon::parse($log->check_in_time)->format('H:i') : '',
+                    'check_out_time' => $log->check_out_time ? Carbon::parse($log->check_out_time)->format('H:i') : '',
+                ];
             }
 
             // Map discovered punches to the period structure
@@ -149,17 +145,13 @@ trait WithAttendanceEdits
         } else {
             // No schedule structure found
              $defaultPeriod = [
-                'check_in_time' => $log->check_in_hm ?? '',
-                'check_out_time' => $log->check_out_hm ?? '',
+                'check_in_time' => $log->check_in_time ? Carbon::parse($log->check_in_time)->format('H:i') : '',
+                'check_out_time' => $log->check_out_time ? Carbon::parse($log->check_out_time)->format('H:i') : '',
                 'scheduled_in' => null,
                 'scheduled_out' => null,
             ];
             
-            if (!empty($log->check_attempts) && is_array($log->check_attempts)) {
-                $this->editForm['periods'] = $log->check_attempts;
-            } else {
-                $this->editForm['periods'] = [$defaultPeriod];
-            }
+            $this->editForm['periods'] = [$defaultPeriod];
         }
 
         // Fetch History

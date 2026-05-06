@@ -372,9 +372,10 @@ trait WithAttendanceActions
         $existingLogs = $existingQ->get();
         
         foreach ($existingLogs as $log) {
-            // Only trigger save if it looks incomplete or we want to be sure
-            // A simple save() triggers our model's booted logic.
-            if ($log->scheduled_hours <= 0 || ($log->check_in_time && !$log->check_out_time) || $log->attendance_status === 'absent' || $log->attendance_status === 'on_leave') {
+            // Trigger save to run our model's auto-checkout and status logic
+            // We do this for logs that look incomplete or have open periods
+            $hasOpenPeriod = $log->details()->whereNull('check_out_time')->exists();
+            if ($log->scheduled_hours <= 0 || $hasOpenPeriod || $log->attendance_status === 'absent' || $log->attendance_status === 'on_leave') {
                 $log->save();
             }
         }
