@@ -443,12 +443,12 @@ trait WithAttendanceEdits
                           'scheduled_periods' => $schedPeriods,
                           'periods' => $log->details->isNotEmpty() ? $log->details->map(fn($d) => [
                               'id' => $d->id,
-                              'check_in' => $d->check_in_time ? company_time($d->check_in_time) : '',
-                              'check_out' => $d->check_out_time ? company_time($d->check_out_time) : '',
+                              'check_in' => $d->check_in_time ? Carbon::parse($d->check_in_time)->format('H:i') : '',
+                              'check_out' => $d->check_out_time ? Carbon::parse($d->check_out_time)->format('H:i') : '',
                           ])->toArray() : [[
                               'id' => null,
-                              'check_in' => $log->check_in_time ? company_time($log->check_in_time) : '',
-                              'check_out' => $log->check_out_time ? company_time($log->check_out_time) : '',
+                              'check_in' => $log->check_in_time ? Carbon::parse($log->check_in_time)->format('H:i') : '',
+                              'check_out' => $log->check_out_time ? Carbon::parse($log->check_out_time)->format('H:i') : '',
                           ]],
                           'scheduled_hours' => $log->scheduled_hours,
                           'actual_hours' => $log->actual_hours,
