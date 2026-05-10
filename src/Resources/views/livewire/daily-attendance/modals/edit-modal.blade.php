@@ -42,7 +42,7 @@
                     </div>
 
                     @foreach($editForm['periods'] as $index => $period)
-                        <div class="group relative grid grid-cols-2 gap-6 p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
+                        <div class="group relative grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
                             
                             {{-- Remove Button (absolute) --}}
                             @if(count($editForm['periods']) > 1)

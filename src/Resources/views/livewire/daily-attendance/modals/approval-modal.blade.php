@@ -88,7 +88,7 @@
                                     <span class="text-[11px] font-bold text-gray-600">{{ tr('Shift Comparison') }}</span>
                                     <span class="text-[10px] font-mono text-gray-400">{{ $approvalPreview['schedule_name'] ?? '-' }}</span>
                                 </div>
-                                <div class="p-4 grid grid-cols-2 gap-8 relative">
+                                <div class="p-4 grid grid-cols-2 gap-4 sm:gap-8 relative">
                                     {{-- Connector Arrow --}}
                                     <div class="absolute inset-0 flex items-center justify-center pointer-events-none opacity-20">
                                         <i class="fas fa-exchange-alt fa-2x text-gray-300"></i>
@@ -177,16 +177,18 @@
         </x-slot>
 
         <x-slot name="footer">
-            <div class="flex items-center justify-between w-full">
-                <x-ui.secondary-button wire:click="$set('showApprovalModal', false)">
-                    {{ tr('Close') }}
-                </x-ui.secondary-button>
-                <div class="flex gap-3">
+            <div class="flex flex-col-reverse sm:flex-row sm:items-center justify-between w-full gap-3 sm:gap-0">
+                <div class="w-full sm:w-auto">
+                    <x-ui.secondary-button wire:click="$set('showApprovalModal', false)" class="w-full sm:w-auto justify-center">
+                        {{ tr('Close') }}
+                    </x-ui.secondary-button>
+                </div>
+                <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                      @can('attendance.manage')
-                     <x-ui.secondary-button wire:click="openRejectModal({{ $approvingLogId }})" class="!bg-red-50 !text-red-600 !border-red-100 hover:!bg-red-100">
+                     <x-ui.secondary-button wire:click="openRejectModal({{ $approvingLogId }})" class="w-full sm:w-auto justify-center !bg-red-50 !text-red-600 !border-red-100 hover:!bg-red-100">
                         {{ tr('Reject') }}
                     </x-ui.secondary-button>
-                    <x-ui.primary-button wire:click="approveSingle" wire:loading.attr="disabled" class="gap-2 !px-8 shadow-lg shadow-green-500/20">
+                    <x-ui.primary-button wire:click="approveSingle" wire:loading.attr="disabled" class="w-full sm:w-auto justify-center gap-2 sm:!px-8 shadow-lg shadow-green-500/20">
                         <i class="fas fa-check-circle" wire:loading.remove></i>
                         <i class="fas fa-spinner fa-spin" wire:loading></i>
                         <span>{{ tr('Approve Record') }}</span>

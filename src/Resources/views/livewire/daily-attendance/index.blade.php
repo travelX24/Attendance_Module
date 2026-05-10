@@ -324,43 +324,45 @@
                 </div>
 
                 {{-- Second Row: Action Buttons --}}
-                <div class="flex gap-2 justify-end border-t border-gray-100 pt-2.5">
+                <div class="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-2 sm:justify-between border-t border-gray-100 pt-2.5">
 
                     {{-- View Mode Toggle --}}
-                    <div class="flex items-center bg-gray-100 rounded-lg p-1 me-auto">
+                    <div class="flex items-center bg-gray-100 rounded-lg p-1 sm:me-auto w-full sm:w-auto">
                         <button 
                             wire:click="switchView('daily')" 
-                            class="px-3 py-1 text-xs font-bold rounded-md transition-all {{ $view_mode === 'daily' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700' }}"
+                            class="flex-1 sm:flex-none justify-center px-3 py-1.5 sm:py-1 text-xs font-bold rounded-md transition-all {{ $view_mode === 'daily' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700' }}"
                         >
                             <i class="fas fa-list-ul me-1"></i> {{ tr('Daily Log') }}
                         </button>
                         <button 
                             wire:click="switchView('summary')" 
-                            class="px-3 py-1 text-xs font-bold rounded-md transition-all {{ $view_mode === 'summary' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700' }}"
+                            class="flex-1 sm:flex-none justify-center px-3 py-1.5 sm:py-1 text-xs font-bold rounded-md transition-all {{ $view_mode === 'summary' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700' }}"
                         >
                             <i class="fas fa-users me-1"></i> {{ tr('Employee Summary') }}
                         </button>
                     </div>
 
-                    {{-- Refresh --}}
-                    <x-ui.secondary-button wire:click="refreshData" wire:loading.attr="disabled" size="sm" class="gap-1.5 group" title="{{ tr('Refresh') }}">
-                        <i class="fas fa-sync text-xs text-gray-400 group-hover:text-[color:var(--brand-via)]" wire:loading.class="fa-spin"></i>
-                        <span class="text-xs">{{ tr('Refresh') }}</span>
-                    </x-ui.secondary-button>
+                    <div class="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
+                        {{-- Refresh --}}
+                        <x-ui.secondary-button wire:click="refreshData" wire:loading.attr="disabled" size="sm" class="flex-1 sm:flex-none justify-center gap-1.5 group" title="{{ tr('Refresh') }}">
+                            <i class="fas fa-sync text-xs text-gray-400 group-hover:text-[color:var(--brand-via)]" wire:loading.class="fa-spin"></i>
+                            <span class="text-xs">{{ tr('Refresh') }}</span>
+                        </x-ui.secondary-button>
 
-                    @can('attendance.manage')
-                    {{-- Export Excel --}}
-                    <x-ui.secondary-button wire:click="exportExcel" size="sm" class="gap-1.5 group" title="{{ tr('Export to Excel') }}">
-                        <i class="fas fa-file-excel text-xs text-gray-400 group-hover:text-green-600"></i>
-                        <span class="text-xs">{{ tr('Excel') }}</span>
-                    </x-ui.secondary-button>
+                        @can('attendance.manage')
+                        {{-- Export Excel --}}
+                        <x-ui.secondary-button wire:click="exportExcel" size="sm" class="flex-1 sm:flex-none justify-center gap-1.5 group" title="{{ tr('Export to Excel') }}">
+                            <i class="fas fa-file-excel text-xs text-gray-400 group-hover:text-green-600"></i>
+                            <span class="text-xs">{{ tr('Excel') }}</span>
+                        </x-ui.secondary-button>
 
-                    {{-- Export PDF --}}
-                    <x-ui.secondary-button wire:click="exportPDF" size="sm" class="gap-1.5 group" title="{{ tr('Export to PDF') }}">
-                        <i class="fas fa-file-pdf text-xs text-gray-400 group-hover:text-red-600"></i>
-                        <span class="text-xs">{{ tr('PDF') }}</span>
-                    </x-ui.secondary-button>
-                    @endcan
+                        {{-- Export PDF --}}
+                        <x-ui.secondary-button wire:click="exportPDF" size="sm" class="flex-1 sm:flex-none justify-center gap-1.5 group" title="{{ tr('Export to PDF') }}">
+                            <i class="fas fa-file-pdf text-xs text-gray-400 group-hover:text-red-600"></i>
+                            <span class="text-xs">{{ tr('PDF') }}</span>
+                        </x-ui.secondary-button>
+                        @endcan
+                    </div>
                 </div>
             </div>
         </div>

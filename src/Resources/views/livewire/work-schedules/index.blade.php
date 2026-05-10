@@ -352,45 +352,46 @@
         @if($activeTab === 'summary')
             <div class="p-4 border-b border-gray-100 bg-white">
                 <div class="flex flex-col sm:flex-row items-center justify-between gap-4">
-                    <div class="flex items-center gap-2 bg-gray-50 p-1 rounded-lg border border-gray-200">
+                    <div class="flex items-center gap-2 bg-gray-50 p-1 rounded-lg border border-gray-200 w-full sm:w-auto">
                         <button
                             wire:click="setSummaryPeriod('weekly')"
-                            class="px-4 py-1.5 rounded-md text-xs font-bold transition-all {{ $summaryPeriod === 'weekly' ? 'bg-white text-[color:var(--brand-via)] shadow-sm' : 'text-gray-500 hover:bg-white/50' }}"
+                            class="flex-1 sm:flex-none justify-center px-4 py-1.5 rounded-md text-xs font-bold transition-all {{ $summaryPeriod === 'weekly' ? 'bg-white text-[color:var(--brand-via)] shadow-sm' : 'text-gray-500 hover:bg-white/50' }}"
                         >
                             {{ tr('Weekly') }}
                         </button>
                         <button
                             wire:click="setSummaryPeriod('monthly')"
-                            class="px-4 py-1.5 rounded-md text-xs font-bold transition-all {{ $summaryPeriod === 'monthly' ? 'bg-white text-[color:var(--brand-via)] shadow-sm' : 'text-gray-500 hover:bg-white/50' }}"
+                            class="flex-1 sm:flex-none justify-center px-4 py-1.5 rounded-md text-xs font-bold transition-all {{ $summaryPeriod === 'monthly' ? 'bg-white text-[color:var(--brand-via)] shadow-sm' : 'text-gray-500 hover:bg-white/50' }}"
                         >
                             {{ tr('Monthly') }}
                         </button>
                     </div>
 
-                    <div class="flex items-center gap-3">
-                        <button wire:click="prevPeriod" class="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-600 transition-colors">
-                            <i class="fas fa-chevron-{{ $isRtl ? 'right' : 'left' }}"></i>
-                        </button>
+                    <div class="flex flex-col sm:flex-row items-center gap-3 w-full sm:w-auto">
+                        <div class="flex items-center justify-between gap-1 w-full sm:w-auto">
+                            <button wire:click="prevPeriod" class="w-10 h-10 shrink-0 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-600 transition-colors">
+                                <i class="fas fa-chevron-{{ $isRtl ? 'right' : 'left' }}"></i>
+                            </button>
 
-                        <div class="flex items-center gap-2 px-4 h-10 bg-gray-50 rounded-lg border border-gray-200 font-bold text-gray-700 min-w-[200px] justify-center text-sm">
-                            <i class="far fa-calendar-alt text-[color:var(--brand-via)]"></i>
-                            @php
-                                $cId = $this->getCompanyId();
-                                $currentCarbon = \Carbon\Carbon::parse($summaryDate);
-                            @endphp
-                            @if($summaryPeriod === 'weekly')
-                                {{ $this->formatCompanyDate($currentCarbon->copy()->startOfWeek(\Carbon\Carbon::SATURDAY)->toDateString(), $cId) }} - 
-                                {{ $this->formatCompanyDate($currentCarbon->copy()->startOfWeek(\Carbon\Carbon::SATURDAY)->addDays(6)->toDateString(), $cId) }}
-                            @else
-                                {{ $this->formatCompanyMonthYear($currentCarbon, $cId) }}
-                            @endif
+                            <div class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-2 sm:px-4 h-10 bg-gray-50 rounded-lg border border-gray-200 font-bold text-gray-700 text-[10px] sm:text-sm text-center">
+                                <i class="far fa-calendar-alt text-[color:var(--brand-via)] hidden sm:block"></i>
+                                @php
+                                    $cId = $this->getCompanyId();
+                                    $currentCarbon = \Carbon\Carbon::parse($summaryDate);
+                                @endphp
+                                @if($summaryPeriod === 'weekly')
+                                    <span dir="ltr" class="inline-block tracking-tight">{{ $this->formatCompanyDate($currentCarbon->copy()->startOfWeek(\Carbon\Carbon::SATURDAY)->toDateString(), $cId) }} - {{ $this->formatCompanyDate($currentCarbon->copy()->startOfWeek(\Carbon\Carbon::SATURDAY)->addDays(6)->toDateString(), $cId) }}</span>
+                                @else
+                                    <span dir="ltr" class="inline-block">{{ $this->formatCompanyMonthYear($currentCarbon, $cId) }}</span>
+                                @endif
+                            </div>
+
+                            <button wire:click="nextPeriod" class="w-10 h-10 shrink-0 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-600 transition-colors">
+                                <i class="fas fa-chevron-{{ $isRtl ? 'left' : 'right' }}"></i>
+                            </button>
                         </div>
 
-                        <button wire:click="nextPeriod" class="w-10 h-10 flex items-center justify-center rounded-lg border border-gray-200 hover:bg-gray-50 text-gray-600 transition-colors">
-                            <i class="fas fa-chevron-{{ $isRtl ? 'left' : 'right' }}"></i>
-                        </button>
-
-                        <x-ui.secondary-button wire:click="goToToday" size="sm" class="h-10">
+                        <x-ui.secondary-button wire:click="goToToday" size="sm" class="h-10 w-full sm:w-auto justify-center">
                             {{ tr('Today') }}
                         </x-ui.secondary-button>
                     </div>
@@ -639,7 +640,7 @@
                 <table class="w-full border-collapse">
                     <thead>
                         <tr class="bg-gray-50 border-b border-gray-100">
-                            <th class="sticky left-0 z-20 bg-gray-50 px-4 py-3 text-{{ $isRtl ? 'right' : 'left' }} text-xs font-bold text-gray-600 uppercase tracking-wider border-{{ $isRtl ? 'left' : 'right' }} border-gray-200 min-w-[200px]">
+                            <th class="sticky {{ $isRtl ? 'right-0' : 'left-0' }} z-20 bg-gray-50 px-4 py-3 text-{{ $isRtl ? 'right' : 'left' }} text-xs font-bold text-gray-600 uppercase tracking-wider border-{{ $isRtl ? 'left' : 'right' }} border-gray-200 min-w-[150px] sm:min-w-[200px] shadow-[{{ $isRtl ? '-2px' : '2px' }}_0_5px_rgba(0,0,0,0.05)]">
                                 {{ tr('Employee') }}
                             </th>
                             @foreach($summaryDays as $day)
@@ -652,7 +653,7 @@
                     <tbody class="divide-y divide-gray-100 bg-white">
                         @forelse($employees as $employee)
                             <tr class="hover:bg-gray-50/30 transition-colors">
-                                <td class="sticky left-0 z-10 bg-white group-hover:bg-gray-50 px-4 py-3 border-{{ $isRtl ? 'left' : 'right' }} border-gray-200 shadow-[2px_0_5px_rgba(0,0,0,0.02)]">
+                                <td class="sticky {{ $isRtl ? 'right-0' : 'left-0' }} z-10 bg-white group-hover:bg-gray-50 px-4 py-3 border-{{ $isRtl ? 'left' : 'right' }} border-gray-200 shadow-[{{ $isRtl ? '-2px' : '2px' }}_0_5px_rgba(0,0,0,0.05)]">
                                     <div class="flex items-center gap-2">
                                         <div class="w-7 h-7 rounded-full bg-[color:var(--brand-via)]/10 flex items-center justify-center text-[color:var(--brand-via)] text-[10px] font-bold">
                                             {{ mb_substr($employee->name_ar ?? $employee->name_en, 0, 1) }}

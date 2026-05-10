@@ -263,10 +263,11 @@
                 </button>
             </div>
 
-            <div class="flex flex-wrap items-center justify-between border-t border-gray-100 pt-3 mt-1">
-                <div class="flex items-center gap-2">
+            <div class="flex flex-col sm:flex-row flex-wrap sm:items-center justify-between gap-4 border-t border-gray-100 pt-4 mt-2">
+                {{-- Bulk Actions --}}
+                <div class="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto order-2 sm:order-1">
                     @if(!empty($selectedPenalties))
-                        <div class="flex items-center gap-2 px-3 py-1.5 bg-[color:var(--brand-via)]/5 rounded-xl border border-[color:var(--brand-via)]/10">
+                        <div class="flex items-center justify-center sm:justify-start gap-2 px-3 py-2 sm:py-1.5 bg-[color:var(--brand-via)]/5 rounded-xl border border-[color:var(--brand-via)]/10">
                             <span class="text-xs font-bold text-[color:var(--brand-via)]">{{ count($selectedPenalties) }} {{ tr('Selected') }}</span>
                             <div class="w-px h-4 bg-[color:var(--brand-via)]/20 mx-1"></div>
                             @can('attendance.manage')
@@ -281,15 +282,16 @@
                             @endcan
                         </div>
                     @else
-                        <div class="text-[11px] text-gray-400 italic">
+                        <div class="text-[11px] text-gray-400 italic text-center sm:text-start">
                             <i class="fas fa-info-circle me-1"></i>
                             {{ tr('Select records to perform bulk actions') }}
                         </div>
                     @endif
                 </div>
 
-                <div class="flex items-center gap-2">
-                    <div class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-gray-100 text-gray-700 text-xs font-semibold">
+                {{-- Action Buttons --}}
+                <div class="flex flex-col sm:flex-row sm:items-center gap-3 w-full sm:w-auto order-1 sm:order-2">
+                    <div class="inline-flex items-center justify-center gap-2 px-3 py-2 sm:py-1.5 rounded-xl bg-gray-100 text-gray-700 text-xs font-semibold w-full sm:w-auto">
                         <i class="fas fa-layer-group"></i>
                         @if($calculation_mode === 'single_day')
                             <span>{{ tr('Mode') }}: {{ tr('Specific Day') }}</span>
@@ -298,30 +300,34 @@
                         @endif
                     </div>
 
-                    <x-ui.secondary-button wire:click="refreshData" size="sm" class="!rounded-xl gap-2">
-                        <i class="fas fa-sync text-xs"></i>
-                        <span class="font-bold">{{ tr('Refresh') }}</span>
-                    </x-ui.secondary-button>
-
-                    @can('attendance.manage')
-                        <x-ui.secondary-button wire:click="exportExcel" size="sm" class="!rounded-xl gap-2">
-                            <i class="fas fa-file-excel text-xs"></i>
-                            <span class="font-bold">{{ tr('Excel') }}</span>
+                    <div class="flex items-center justify-center gap-2 w-full sm:w-auto">
+                        <x-ui.secondary-button wire:click="refreshData" size="sm" class="!rounded-xl gap-2 flex-1 sm:flex-none justify-center">
+                            <i class="fas fa-sync text-xs"></i>
+                            <span class="font-bold">{{ tr('Refresh') }}</span>
                         </x-ui.secondary-button>
-                    @endcan
+
+                        @can('attendance.manage')
+                            <x-ui.secondary-button wire:click="exportExcel" size="sm" class="!rounded-xl gap-2 flex-1 sm:flex-none justify-center">
+                                <i class="fas fa-file-excel text-xs"></i>
+                                <span class="font-bold">{{ tr('Excel') }}</span>
+                            </x-ui.secondary-button>
+                        @endcan
+
+                        @can('attendance.manage')
+                            <x-ui.secondary-button wire:click="exportPdf" size="sm" class="!rounded-xl gap-2 flex-1 sm:flex-none justify-center">
+                                <i class="fas fa-file-pdf text-xs"></i>
+                                <span class="font-bold">{{ tr('PDF') }}</span>
+                            </x-ui.secondary-button>
+                        @endcan
+                    </div>
 
                     @can('attendance.manage')
-                        <x-ui.secondary-button wire:click="exportPdf" size="sm" class="!rounded-xl gap-2">
-                            <i class="fas fa-file-pdf text-xs"></i>
-                            <span class="font-bold">{{ tr('PDF') }}</span>
-                        </x-ui.secondary-button>
-                    @endcan
-
-                    @can('attendance.manage')
-                        <x-ui.primary-button wire:click="runCalculation" size="sm" class="!rounded-xl !px-6 gap-2 shadow-sm">
-                            <i class="fas fa-play text-xs text-white"></i>
-                            <span class="font-bold">{{ tr('Run Calculation') }}</span>
-                        </x-ui.primary-button>
+                        <div class="w-full sm:w-auto mt-1 sm:mt-0">
+                            <x-ui.primary-button wire:click="runCalculation" size="sm" class="!rounded-xl !px-6 gap-2 shadow-sm w-full sm:w-auto justify-center">
+                                <i class="fas fa-play text-xs text-white"></i>
+                                <span class="font-bold">{{ tr('Run Calculation') }}</span>
+                            </x-ui.primary-button>
+                        </div>
                     @endcan
                 </div>
             </div>
@@ -345,142 +351,144 @@
             $headerAlign = ['center', 'start', 'start', 'center', 'center', 'center', 'center', 'center', 'center', 'center', 'center', 'center'];
         @endphp
 
-        <x-ui.table :headers="$headers" :headerAlign="$headerAlign" :enablePagination="false">
-            @php $lastPenaltyDate = null; @endphp
+        <div class="w-full overflow-x-auto">
+            <x-ui.table :headers="$headers" :headerAlign="$headerAlign" :enablePagination="false">
+                @php $lastPenaltyDate = null; @endphp
 
-            @forelse($penalties as $penalty)
-                @php
-                    $currentPenaltyDate = \Carbon\Carbon::parse($penalty->attendance_date)->format('Y-m-d');
+                @forelse($penalties as $penalty)
+                    @php
+                        $currentPenaltyDate = \Carbon\Carbon::parse($penalty->attendance_date)->format('Y-m-d');
 
-                    $violationBadge = match($penalty->violation_type) {
-                        'delay' => ['type' => 'warning', 'label' => tr('Delay')],
-                        'early_departure' => ['type' => 'orange', 'label' => tr('Early Out')],
-                        'absent' => ['type' => 'danger', 'label' => tr('Absent')],
-                        'auto_checkout' => ['type' => 'danger', 'label' => tr('Auto Checkout (System-generated due to missing manual punch)')],
-                        default => ['type' => 'default', 'label' => $penalty->violation_type],
-                    };
+                        $violationBadge = match($penalty->violation_type) {
+                            'delay' => ['type' => 'warning', 'label' => tr('Delay')],
+                            'early_departure' => ['type' => 'orange', 'label' => tr('Early Out')],
+                            'absent' => ['type' => 'danger', 'label' => tr('Absent')],
+                            'auto_checkout' => ['type' => 'danger', 'label' => tr('Auto Checkout (System-generated due to missing manual punch)')],
+                            default => ['type' => 'default', 'label' => $penalty->violation_type],
+                        };
 
-                    $statusBadge = match($penalty->status) {
-                        'confirmed' => ['type' => 'success', 'label' => tr('Confirmed')],
-                        'pending' => ['type' => 'warning', 'label' => tr('Pending')],
-                        'waived' => ['type' => 'info', 'label' => tr('Waived')],
-                        default => ['type' => 'default', 'label' => $penalty->status],
-                    };
-                @endphp
+                        $statusBadge = match($penalty->status) {
+                            'confirmed' => ['type' => 'success', 'label' => tr('Confirmed')],
+                            'pending' => ['type' => 'warning', 'label' => tr('Pending')],
+                            'waived' => ['type' => 'info', 'label' => tr('Waived')],
+                            default => ['type' => 'default', 'label' => $penalty->status],
+                        };
+                    @endphp
 
-                @if($currentPenaltyDate !== $lastPenaltyDate)
-                    <tr class="bg-gray-50/80 border-y border-gray-100">
-                        <td colspan="12" class="px-6 py-2">
-                            <div class="flex items-center gap-2 text-[color:var(--brand-via)]">
-                                <div class="w-8 h-8 rounded-lg bg-[color:var(--brand-via)]/10 flex items-center justify-center">
-                                    <i class="fas fa-calendar-day text-xs"></i>
+                    @if($currentPenaltyDate !== $lastPenaltyDate)
+                        <tr class="bg-gray-50/80 border-y border-gray-100">
+                            <td colspan="12" class="px-6 py-2">
+                                <div class="flex items-center gap-2 text-[color:var(--brand-via)]">
+                                    <div class="w-8 h-8 rounded-lg bg-[color:var(--brand-via)]/10 flex items-center justify-center">
+                                        <i class="fas fa-calendar-day text-xs"></i>
+                                    </div>
+                                    <div class="flex flex-col">
+                                        <span class="text-[10px] text-gray-400 font-bold uppercase leading-none mb-0.5">
+                                            {{ \Carbon\Carbon::parse($penalty->attendance_date)->format('l') }}
+                                        </span>
+                                        <span class="text-xs font-black text-gray-800 leading-none">
+                                            {{ company_date($penalty->attendance_date) }}
+                                        </span>
+                                    </div>
                                 </div>
-                                <div class="flex flex-col">
-                                    <span class="text-[10px] text-gray-400 font-bold uppercase leading-none mb-0.5">
-                                        {{ \Carbon\Carbon::parse($penalty->attendance_date)->format('l') }}
-                                    </span>
-                                    <span class="text-xs font-black text-gray-800 leading-none">
-                                        {{ company_date($penalty->attendance_date) }}
-                                    </span>
+                            </td>
+                        </tr>
+                        @php $lastPenaltyDate = $currentPenaltyDate; @endphp
+                    @endif
+
+                    <tr wire:key="penalty-{{ $penalty->id }}"
+                        class="group transition-all duration-200 hover:bg-[color:var(--brand-via)]/5 @if(in_array($penalty->id, $selectedPenalties)) bg-[color:var(--brand-via)]/10 @endif">
+                        <td class="px-6 py-4 text-center">
+                            <input type="checkbox" wire:model.live="selectedPenalties" value="{{ $penalty->id }}"
+                                class="w-4 h-4 rounded-md border-gray-300 text-[color:var(--brand-via)] focus:ring-[color:var(--brand-via)] transition-all cursor-pointer"
+                                @cannot('attendance.manage') disabled @endcannot>
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="flex items-center gap-3">
+                                <div class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-[color:var(--brand-via)] font-bold">
+                                    {{ mb_substr($penalty->employee->name_ar ?? $penalty->employee->name_en, 0, 1) }}
+                                </div>
+                                <div>
+                                    <p class="text-sm font-semibold text-gray-900 whitespace-nowrap">{{ $penalty->employee->name_ar ?? $penalty->employee->name_en }}</p>
+                                    <p class="text-xs text-gray-500">#{{ $penalty->employee->employee_no }}</p>
                                 </div>
                             </div>
                         </td>
-                    </tr>
-                    @php $lastPenaltyDate = $currentPenaltyDate; @endphp
-                @endif
-
-                <tr wire:key="penalty-{{ $penalty->id }}"
-                    class="group transition-all duration-200 hover:bg-[color:var(--brand-via)]/5 @if(in_array($penalty->id, $selectedPenalties)) bg-[color:var(--brand-via)]/10 @endif">
-                    <td class="px-6 py-4 text-center">
-                        <input type="checkbox" wire:model.live="selectedPenalties" value="{{ $penalty->id }}"
-                            class="w-4 h-4 rounded-md border-gray-300 text-[color:var(--brand-via)] focus:ring-[color:var(--brand-via)] transition-all cursor-pointer"
-                            @cannot('attendance.manage') disabled @endcannot>
-                    </td>
-                    <td class="px-6 py-4">
-                        <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-[color:var(--brand-via)] font-bold">
-                                {{ mb_substr($penalty->employee->name_ar ?? $penalty->employee->name_en, 0, 1) }}
-                            </div>
-                            <div>
-                                <p class="text-sm font-semibold text-gray-900">{{ $penalty->employee->name_ar ?? $penalty->employee->name_en }}</p>
-                                <p class="text-xs text-gray-500">#{{ $penalty->employee->employee_no }}</p>
-                            </div>
-                        </div>
-                    </td>
-                    <td class="px-6 py-4">
-                        <div class="flex flex-col">
-                            <span class="text-xs font-medium text-gray-700">{{ $penalty->employee->department->name ?? '-' }}</span>
-                            <span class="text-[10px] text-gray-500">{{ $penalty->employee->jobTitle->name ?? '-' }}</span>
-                        </div>
-                    </td>
-                    <td class="px-6 py-4 text-center">
-                        <span class="text-sm text-gray-700 font-medium whitespace-nowrap">{{ company_date($penalty->attendance_date) }}</span>
-                    </td>
-                    <td class="px-6 py-4 text-center">
-                        <div class="flex flex-col items-center">
-                            <span class="text-xs text-green-600 font-bold">{{ $penalty->attendanceLog->check_in_time ? \Carbon\Carbon::parse($penalty->attendanceLog->check_in_time)->format('H:i') : '-' }}</span>
-                            <span class="text-xs text-red-600 font-bold">{{ $penalty->attendanceLog->check_out_time ? \Carbon\Carbon::parse($penalty->attendanceLog->check_out_time)->format('H:i') : '-' }}</span>
-                        </div>
-                    </td>
-                    <td class="px-6 py-4 text-center">
-                        <x-ui.badge :type="$violationBadge['type']">{{ $violationBadge['label'] }}</x-ui.badge>
-                    </td>
-                    <td class="px-6 py-4 text-center">
-                        <span class="text-sm font-semibold text-gray-700">{{ $penalty->violation_minutes }} {{ tr('min') }}</span>
-                    </td>
-                    <td class="px-6 py-4 text-center">
-                        <span class="text-sm font-bold text-red-600">{{ number_format($penalty->calculated_amount, 2) }}</span>
-                    </td>
-                    <td class="px-6 py-4 text-center">
-                        @if($penalty->exemption_amount > 0)
+                        <td class="px-6 py-4">
                             <div class="flex flex-col">
-                                <span class="text-sm font-semibold text-yellow-600">-{{ number_format($penalty->exemption_amount, 2) }}</span>
-                                <span class="text-[10px] text-gray-400">{{ $penalty->exemption_reason }}</span>
+                                <span class="text-xs font-medium text-gray-700 whitespace-nowrap">{{ $penalty->employee->department->name ?? '-' }}</span>
+                                <span class="text-[10px] text-gray-500 whitespace-nowrap">{{ $penalty->employee->jobTitle->name ?? '-' }}</span>
                             </div>
-                        @else
-                            <span class="text-xs text-gray-400">-</span>
-                        @endif
-                    </td>
-                    <td class="px-6 py-4 text-center">
-                        <span class="text-sm font-bold text-gray-900">{{ number_format($penalty->net_amount, 2) }}</span>
-                    </td>
-                    <td class="px-6 py-4 text-center">
-                        <x-ui.badge :type="$statusBadge['type']">{{ $statusBadge['label'] }}</x-ui.badge>
-                        @if($penalty->exemption_attachment)
-                            <a href="{{ asset('storage/'.$penalty->exemption_attachment) }}" target="_blank" class="mt-1 block text-[10px] text-[color:var(--brand-via)] hover:underline">
-                                <i class="fas fa-paperclip me-1"></i> {{ tr('Attachment') }}
-                            </a>
-                        @endif
-                    </td>
-                    <td class="px-6 py-4 text-center">
-                        <x-ui.actions-menu>
-                            @can('attendance.manage')
-                                <x-ui.dropdown-item wire:click="openExemptionModal({{ $penalty->id }})" :disabled="$penalty->status === 'confirmed'">
-                                    <i class="fas fa-gift me-2 text-yellow-500"></i>
-                                    <span>{{ tr('Exempt/Waive') }}</span>
-                                </x-ui.dropdown-item>
-                                <x-ui.dropdown-item wire:click="openConfirmModal({{ $penalty->id }})" :disabled="$penalty->status !== 'pending'">
-                                    <i class="fas fa-check-circle me-2 text-green-500"></i>
-                                    <span>{{ tr('Confirm for Payroll') }}</span>
-                                </x-ui.dropdown-item>
-                                <x-ui.dropdown-item danger wire:click="deletePenalty({{ $penalty->id }})" :disabled="$penalty->status === 'confirmed'">
-                                    <i class="fas fa-trash me-2"></i>
-                                    <span>{{ tr('Delete') }}</span>
-                                </x-ui.dropdown-item>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="text-sm text-gray-700 font-medium whitespace-nowrap">{{ company_date($penalty->attendance_date) }}</span>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <div class="flex flex-col items-center">
+                                <span class="text-xs text-green-600 font-bold whitespace-nowrap">{{ $penalty->attendanceLog->check_in_time ? \Carbon\Carbon::parse($penalty->attendanceLog->check_in_time)->format('H:i') : '-' }}</span>
+                                <span class="text-xs text-red-600 font-bold whitespace-nowrap">{{ $penalty->attendanceLog->check_out_time ? \Carbon\Carbon::parse($penalty->attendanceLog->check_out_time)->format('H:i') : '-' }}</span>
+                            </div>
+                        </td>
+                        <td class="px-6 py-4 text-center whitespace-nowrap">
+                            <x-ui.badge :type="$violationBadge['type']">{{ $violationBadge['label'] }}</x-ui.badge>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="text-sm font-semibold text-gray-700 whitespace-nowrap">{{ $penalty->violation_minutes }} {{ tr('min') }}</span>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="text-sm font-bold text-red-600 whitespace-nowrap">{{ number_format($penalty->calculated_amount, 2) }}</span>
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            @if($penalty->exemption_amount > 0)
+                                <div class="flex flex-col">
+                                    <span class="text-sm font-semibold text-yellow-600 whitespace-nowrap">-{{ number_format($penalty->exemption_amount, 2) }}</span>
+                                    <span class="text-[10px] text-gray-400 whitespace-nowrap">{{ $penalty->exemption_reason }}</span>
+                                </div>
                             @else
-                                <span class="text-gray-400 p-2 italic"><i class="fas fa-lock text-[10px] me-1"></i> {{ tr('Read Only') }}</span>
-                            @endcan
-                        </x-ui.actions-menu>
-                    </td>
-                </tr>
-            @empty
-                <tr>
-                    <td colspan="12" class="px-6 py-12 text-center text-gray-500 italic">
-                        {{ tr('No penalties found.') }}
-                    </td>
-                </tr>
-            @endforelse
-        </x-ui.table>
+                                <span class="text-xs text-gray-400">-</span>
+                            @endif
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <span class="text-sm font-bold text-gray-900 whitespace-nowrap">{{ number_format($penalty->net_amount, 2) }}</span>
+                        </td>
+                        <td class="px-6 py-4 text-center whitespace-nowrap">
+                            <x-ui.badge :type="$statusBadge['type']">{{ $statusBadge['label'] }}</x-ui.badge>
+                            @if($penalty->exemption_attachment)
+                                <a href="{{ asset('storage/'.$penalty->exemption_attachment) }}" target="_blank" class="mt-1 block text-[10px] text-[color:var(--brand-via)] hover:underline whitespace-nowrap">
+                                    <i class="fas fa-paperclip me-1"></i> {{ tr('Attachment') }}
+                                </a>
+                            @endif
+                        </td>
+                        <td class="px-6 py-4 text-center">
+                            <x-ui.actions-menu>
+                                @can('attendance.manage')
+                                    <x-ui.dropdown-item wire:click="openExemptionModal({{ $penalty->id }})" :disabled="$penalty->status === 'confirmed'">
+                                        <i class="fas fa-gift me-2 text-yellow-500"></i>
+                                        <span>{{ tr('Exempt/Waive') }}</span>
+                                    </x-ui.dropdown-item>
+                                    <x-ui.dropdown-item wire:click="openConfirmModal({{ $penalty->id }})" :disabled="$penalty->status !== 'pending'">
+                                        <i class="fas fa-check-circle me-2 text-green-500"></i>
+                                        <span>{{ tr('Confirm for Payroll') }}</span>
+                                    </x-ui.dropdown-item>
+                                    <x-ui.dropdown-item danger wire:click="deletePenalty({{ $penalty->id }})" :disabled="$penalty->status === 'confirmed'">
+                                        <i class="fas fa-trash me-2"></i>
+                                        <span>{{ tr('Delete') }}</span>
+                                    </x-ui.dropdown-item>
+                                @else
+                                    <span class="text-gray-400 p-2 italic whitespace-nowrap"><i class="fas fa-lock text-[10px] me-1"></i> {{ tr('Read Only') }}</span>
+                                @endcan
+                            </x-ui.actions-menu>
+                        </td>
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="12" class="px-6 py-12 text-center text-gray-500 italic">
+                            {{ tr('No penalties found.') }}
+                        </td>
+                    </tr>
+                @endforelse
+            </x-ui.table>
+        </div>
 
         @if($penalties->hasPages())
             <div class="p-4 border-t border-gray-100">

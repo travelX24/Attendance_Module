@@ -14,7 +14,7 @@
     <x-slot:content>
         <div class="space-y-6">
             {{-- Employee Stats Summary --}}
-            <div class="grid grid-cols-4 gap-4">
+            <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
                  <div class="bg-gray-50 border border-gray-100 p-4 rounded-xl flex flex-col items-center justify-center gap-1 hover:bg-white hover:shadow-sm transition-all hover:border-[color:var(--brand-via)]/30 group">
                     <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest block group-hover:text-[color:var(--brand-via)]">{{ tr('Total Days') }}</span>
                     <span class="text-2xl font-black text-gray-800">{{ count($monthlyEditForm) }}</span>
@@ -200,14 +200,14 @@
     </x-slot:content>
 
     <x-slot:footer>
-        <div class="flex items-center justify-between w-full">
-            <div class="text-xs text-gray-400 italic">
+        <div class="flex flex-col-reverse sm:flex-row sm:items-center justify-between w-full gap-4 sm:gap-0">
+            <div class="text-xs text-gray-400 italic text-center sm:text-start w-full sm:w-auto">
                 <i class="fas fa-info-circle me-1"></i> {{ tr('Changes will be applied immediately upon saving.') }}
             </div>
-            <div class="flex items-center gap-3">
-                <x-ui.secondary-button wire:click="$set('showMonthlyEditModal', false)">{{ tr('Cancel') }}</x-ui.secondary-button>
+            <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
+                <x-ui.secondary-button wire:click="$set('showMonthlyEditModal', false)" class="w-full sm:w-auto justify-center">{{ tr('Cancel') }}</x-ui.secondary-button>
                 @can('attendance.manage')
-                <x-ui.brand-button wire:click="saveMonthlyEdit" class="shadow-lg shadow-[color:var(--brand-via)]/20">
+                <x-ui.brand-button wire:click="saveMonthlyEdit" class="w-full sm:w-auto justify-center shadow-lg shadow-[color:var(--brand-via)]/20">
                     <i class="fas fa-save me-2"></i> {{ tr('Save All Changes') }}
                 </x-ui.brand-button>
                 @endcan
