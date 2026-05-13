@@ -134,34 +134,32 @@
                     <input type="hidden" wire:model="bulkFormData.is_rotation" value="0">
                 @endif
 
-                <div class="grid @if($overrideContractDates) grid-cols-2 @else grid-cols-1 @endif gap-4">
+                <div class="grid @if($overrideContractDates || $isRotationMode) grid-cols-2 @else grid-cols-1 @endif gap-4">
                     <x-ui.company-date-picker
                         model="bulkFormData.start_date"
                         :label="tr('Start Date')"
                         :disabled="!auth()->user()->can('attendance.manage')"
                     />
 
-                    @if($overrideContractDates)
-                        @if($isRotationMode)
-                            <x-ui.input
-                                type="number"
-                                min="1"
-                                step="1"
-                                wire:model="bulkFormData.rotation_days"
-                                :label="tr('Rotation Days')"
-                                error="bulkFormData.rotation_days"
-                                required
-                                :disabled="!auth()->user()->can('attendance.manage')"
-                            />
-                        @else
-                            <div>
-                                <label class="block text-sm font-semibold text-gray-700 mb-1.5">{{ tr('Duration') }}</label>
-                                <x-ui.select wire:model.live="bulkFormData.is_permanent" class="w-full" align="up" :disabled="!auth()->user()->can('attendance.manage')">
-                                    <option value="1">{{ tr('Permanent') }}</option>
-                                    <option value="0">{{ tr('Temporary') }}</option>
-                                </x-ui.select>
-                            </div>
-                        @endif
+                    @if($isRotationMode)
+                        <x-ui.input
+                            type="number"
+                            min="1"
+                            step="1"
+                            wire:model="bulkFormData.rotation_days"
+                            :label="tr('Rotation Days')"
+                            error="bulkFormData.rotation_days"
+                            required
+                            :disabled="!auth()->user()->can('attendance.manage')"
+                        />
+                    @elseif($overrideContractDates)
+                        <div>
+                            <label class="block text-sm font-semibold text-gray-700 mb-1.5">{{ tr('Duration') }}</label>
+                            <x-ui.select wire:model.live="bulkFormData.is_permanent" class="w-full" align="up" :disabled="!auth()->user()->can('attendance.manage')">
+                                <option value="1">{{ tr('Permanent') }}</option>
+                                <option value="0">{{ tr('Temporary') }}</option>
+                            </x-ui.select>
+                        </div>
                     @endif
                 </div>
 
@@ -204,6 +202,24 @@
                     </x-ui.select>
 
                 </div>
+                
+                {{-- Assign Periods UI --}}
+                @if($scheduleA && !empty($periodsA))
+                    <div class="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                        <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                            <i class="fas fa-clock text-[color:var(--brand-via)]"></i>
+                            {{ tr('Assign Periods') }}
+                        </label>
+                        <div class="grid grid-cols-1 gap-2">
+                            @foreach($periodsA as $pId => $pLabel)
+                                <label class="flex items-center gap-3 p-2.5 bg-gray-50 border border-gray-100 rounded-xl cursor-pointer hover:border-[color:var(--brand-via)]/30 hover:bg-white transition-all group">
+                                    <input type="checkbox" wire:model="bulkFormData.work_periods" value="{{ $pId }}" class="w-4 h-4 text-[color:var(--brand-via)] border-gray-300 rounded focus:ring-[color:var(--brand-via)]">
+                                    <span class="text-xs font-bold text-gray-700 group-hover:text-gray-900">{{ $pLabel }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
 
                 @if($isRotationMode)
                     <div>
@@ -219,6 +235,24 @@
                             @endforeach
                         </x-ui.select>
                     </div>
+
+                    {{-- Assign Periods (B) UI --}}
+                    @if($scheduleB && !empty($periodsB))
+                        <div class="space-y-2 mt-2 animate-in fade-in slide-in-from-top-2 duration-300">
+                            <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                                <i class="fas fa-clock text-amber-500"></i>
+                                {{ tr('Assign Periods (B)') }}
+                            </label>
+                            <div class="grid grid-cols-1 gap-2">
+                                @foreach($periodsB as $pId => $pLabel)
+                                    <label class="flex items-center gap-3 p-2.5 bg-gray-50 border border-gray-100 rounded-xl cursor-pointer hover:border-amber-400 hover:bg-amber-50/30 transition-all group">
+                                        <input type="checkbox" wire:model="bulkFormData.work_periods_b" value="{{ $pId }}" class="w-4 h-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500">
+                                        <span class="text-xs font-bold text-gray-700 group-hover:text-amber-900">{{ $pLabel }}</span>
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
                 @endif
 
             </div>

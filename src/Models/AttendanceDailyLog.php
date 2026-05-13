@@ -128,15 +128,22 @@ class AttendanceDailyLog extends Model
         $ws = $service->getEffectiveSchedule($this->saas_company_id, $this->employee, $dateStr);
         $holidays = $service->getHolidays($this->saas_company_id, $dateStr, $dateStr);
         
-        $metrics = $service->getMetricsForDate($dateStr, $ws, $holidays, $this->employee);
+        // Fetch requests (leaves, missions, permissions) for the context
+        $requests = $this->employee ? $service->getEmployeeRequests($this->employee_id, $dateStr, $dateStr) : [];
+        
+        $metrics = $service->getMetricsForDate($dateStr, $ws, $holidays, $this->employee, $requests);
 
         $this->work_schedule_id = $ws->id ?? null;
         $this->scheduled_hours = $metrics['hours'] ?? 0;
         $this->scheduled_check_in = $metrics['check_in'] ?? null;
         $this->scheduled_check_out = $metrics['check_out'] ?? null;
         
-        if ($metrics['status'] === 'holiday') {
+        if (($metrics['status'] ?? null) === 'holiday') {
             $this->attendance_status = 'holiday';
+        } elseif (($metrics['status'] ?? null) === 'on_leave') {
+            $this->attendance_status = 'on_leave';
+        } elseif (($metrics['status'] ?? null) === 'mission') {
+            $this->attendance_status = 'mission';
         }
     }
 
@@ -263,6 +270,7 @@ class AttendanceDailyLog extends Model
                 $matchedP = (object)$dayMetrics['periods'][$foundDetail->work_schedule_period_id - 1];
             }
 
+            // Case 2: Multi-period or Single period with auto-checkout policy
             if ($matchedP && isset($matchedP->end_time)) {
                 $baseEnd = Carbon::parse($logDateStr . ' ' . $matchedP->end_time);
                 if ($matchedP->is_night_shift ?? false) $baseEnd->addDay();
@@ -270,32 +278,43 @@ class AttendanceDailyLog extends Model
                 $hoursToAdd = (int)($grace->auto_checkout_after_minutes ?? 2);
                 $checkoutLimit = $baseEnd->copy()->addHours($hoursToAdd);
 
-                // If now is past the limit, we apply auto-checkout
-                if (now()->greaterThan($checkoutLimit)) {
-                    $formattedLimit = $checkoutLimit->format('H:i:s');
-                    
-                    // Only update if it's missing or an incorrect auto_checkout
-                    if ($foundDetail->check_out_time === null || ($foundDetail->attendance_status === 'auto_checkout' && $foundDetail->check_out_time !== $formattedLimit)) {
-                        $foundDetail->update([
-                            'check_out_time' => $formattedLimit,
-                            'attendance_status' => 'auto_checkout'
-                        ]);
-                        
-                        $this->check_out_time = $formattedLimit;
-                        $this->attendance_status = 'auto_checkout';
-                        
-                        // Debugging: store calculation info
-                        $meta = $this->meta_data ?? [];
-                        $meta['auto_checkout_debug'] = [
-                            'base_end' => $baseEnd->toDateTimeString(),
-                            'hours_added' => $hoursToAdd,
-                            'final_limit' => $formattedLimit,
-                            'calculated_at' => now()->toDateTimeString()
-                        ];
-                        $this->meta_data = $meta;
-                        
-                        return; 
+                // --- NEW: Cap auto-checkout at the start of the next period ---
+                $nextPeriodStart = null;
+                $periods = $dayMetrics['periods'] ?? [];
+                $foundCurrent = false;
+                foreach ($periods as $pItem) {
+                    if ($foundCurrent) {
+                        $nextPeriodStart = Carbon::parse($logDateStr . ' ' . $pItem['start_time']);
+                        if ($pItem['is_night_shift'] ?? false) $nextPeriodStart->addDay();
+                        break;
                     }
+                    if (($pItem['id'] ?? null) == $foundDetail->work_schedule_period_id) {
+                        $foundCurrent = true;
+                    }
+                }
+
+                $effectiveLimit = $checkoutLimit;
+                if ($nextPeriodStart && $nextPeriodStart->lt($checkoutLimit)) {
+                    $effectiveLimit = $nextPeriodStart;
+                }
+
+                $formattedLimit = $effectiveLimit->format('H:i:s');
+
+                // If now is past the limit, we apply auto-checkout
+                if (now()->gt($effectiveLimit)) {
+                    $foundDetail->check_out = $formattedLimit;
+                    $foundDetail->save();
+
+                    $this->attendance_status = 'auto_checkout';
+
+                    $meta = $this->meta_data ?? [];
+                    $meta['auto_checkout'] = [
+                        'final_limit' => $formattedLimit,
+                        'calculated_at' => now()->toDateTimeString()
+                    ];
+                    $this->meta_data = $meta;
+                    
+                    return; 
                 }
             }
         }

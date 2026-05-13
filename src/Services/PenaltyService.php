@@ -140,7 +140,10 @@ class PenaltyService
         }
 
         if ($log->attendance_status === 'auto_checkout') {
-            $created = $this->processViolation($log, $policyId, 'auto_checkout') || $created;
+            $grace = \Athka\SystemSettings\Models\AttendanceGraceSetting::where('saas_company_id', $log->saas_company_id)->first();
+            if ($grace && (bool)$grace->auto_checkout_penalty_enabled) {
+                $created = $this->processViolation($log, $policyId, 'auto_checkout') || $created;
+            }
         }
 
         return $created;

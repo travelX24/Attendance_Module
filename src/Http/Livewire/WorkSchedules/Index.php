@@ -202,6 +202,12 @@ class Index extends Component
                 ->where('saas_company_id', $companyId)
                 ->limit(1),
 
+            'current_assignment_type' => EmployeeWorkSchedule::select('assignment_type')
+                ->whereColumn('employee_id', 'employees.id')
+                ->where('is_active', true)
+                ->where('saas_company_id', $companyId)
+                ->limit(1),
+
             'current_schedule_start' => EmployeeWorkSchedule::select('start_date')
                 ->whereColumn('employee_id', 'employees.id')
                 ->where('is_active', true)
@@ -416,13 +422,14 @@ class Index extends Component
                 DB::raw('work_schedules.name as schedule_name'),
             ]);
 
-        $oldestId = EmployeeWorkSchedule::where('employee_id', $employeeId)
+        $rotations = EmployeeShiftRotation::where('employee_id', $employeeId)
             ->where('saas_company_id', $companyId)
-            ->orderBy('start_date', 'asc')
-            ->orderBy('id', 'asc')
-            ->value('id');
+            ->get();
 
-        $this->scheduleEyeRows = $rows->map(function ($r) use ($today, $oldestId, $companyId) {
+        $scheduleNames = WorkSchedule::where('saas_company_id', $companyId)
+            ->pluck('name', 'id');
+
+        $this->scheduleEyeRows = $rows->map(function ($r) use ($today, $companyId, $rotations, $scheduleNames) {
             $start = $r->start_date ? Carbon::parse($r->start_date)->startOfDay() : null;
             $end   = $r->end_date ? Carbon::parse($r->end_date)->startOfDay() : null;
 
@@ -438,13 +445,37 @@ class Index extends Component
             }
 
             $type = (string) ($r->assignment_type ?? '');
+            $scheduleName = (string) ($r->schedule_name ?: ('#' . $r->work_schedule_id));
+            $rotationInfo = null;
+
+            if ($type === 'rotation') {
+                $rot = $rotations->filter(function($item) use ($r) {
+                    return $item->start_date->toDateString() === $r->start_date;
+                })->first();
+
+                if ($rot) {
+                    $nameA = $scheduleNames[$rot->work_schedule_id_a] ?? $scheduleName;
+                    $nameB = $scheduleNames[$rot->work_schedule_id_b] ?? ('#' . $rot->work_schedule_id_b);
+                    $scheduleName = $nameA . ' - ' . $nameB;
+                    $rotationInfo = [
+                        'days' => $rot->rotation_days,
+                        'name_a' => $nameA,
+                        'name_b' => $nameB,
+                    ];
+                }
+            }
 
             $isFuture = $start && $start->gt($today);
+            $oldestId = EmployeeWorkSchedule::where('employee_id', $r->employee_id)
+                ->where('saas_company_id', $companyId)
+                ->orderBy('start_date', 'asc')
+                ->orderBy('id', 'asc')
+                ->value('id');
             $isDefault = ((int) $r->id === (int) $oldestId);
 
             return [
                 'id' => (int) $r->id,
-                'schedule_name' => (string) ($r->schedule_name ?: ('#' . $r->work_schedule_id)),
+                'schedule_name' => $scheduleName,
                 'start_date' => $this->formatCompanyDate((string)$r->start_date, $companyId),
                 'end_date' => $this->formatCompanyDate((string)$r->end_date, $companyId),
                 'is_active' => (int) $r->is_active,
@@ -454,6 +485,7 @@ class Index extends Component
                 'contract_type' => $this->scheduleEyeEmployeeContractType,
                 'can_edit' => !$isDefault && $isFuture,
                 'can_delete' => !$isDefault && $isFuture,
+                'rotation_info' => $rotationInfo,
             ];
         })->toArray();
 

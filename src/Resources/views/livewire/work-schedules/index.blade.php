@@ -469,8 +469,11 @@
                         <div class="flex flex-wrap items-center gap-2">
                             @if($employee->current_schedule_name)
                                 <div class="flex items-center gap-1.5">
-                                    <x-ui.badge type="info">
+                                    <x-ui.badge type="info" class="flex items-center gap-1.5">
                                         {{ $employee->current_schedule_name }}
+                                        @if($employee->current_assignment_type === 'rotation')
+                                            <i class="fas fa-sync-alt text-amber-300 text-[10px]" title="{{ tr('Rotation Schedule') }}"></i>
+                                        @endif
                                     </x-ui.badge>
                                     <x-ui.badge :type="$employee->current_schedule_end ? 'warning' : 'success'" size="xs" outline>
                                         {{ $employee->current_schedule_end ? tr('Temporary') : tr('Permanent') }}

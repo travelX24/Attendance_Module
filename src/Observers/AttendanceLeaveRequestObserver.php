@@ -16,36 +16,95 @@ class AttendanceLeaveRequestObserver
     {
         if ($leave->status === 'approved') {
             $this->syncAttendanceLogs($leave);
+            $this->recalculateBalance($leave);
         }
     }
 
-    /**
-     * Handle the AttendanceLeaveRequest "updated" event.
-     * Check if status changed from approved to something else.
-     */
     public function updated(AttendanceLeaveRequest $leave): void
     {
         if ($leave->isDirty('status')) {
             $this->syncAttendanceLogs($leave);
+            $this->recalculateBalance($leave);
         }
     }
 
-    /**
-     * Re-sync all attendance logs within the leave date range.
-     */
     protected function syncAttendanceLogs(AttendanceLeaveRequest $leave): void
     {
-        $start = Carbon::parse($leave->start_date);
-        $end = Carbon::parse($leave->end_date);
-        
-        // Find existing logs for this employee in this range
-        $logs = AttendanceDailyLog::where('employee_id', $leave->employee_id)
-            ->whereBetween('attendance_date', [$start->toDateString(), $end->toDateString()])
-            ->get();
+        $start = Carbon::parse($leave->start_date)->startOfDay();
+        $end = Carbon::parse($leave->end_date)->startOfDay();
+        $cursor = $start->copy();
 
-        foreach ($logs as $log) {
-            // syncWithSchedule() in the model will check for the leave and set status to on_leave
-            $log->save(); 
+        while ($cursor->lte($end)) {
+            $dateStr = $cursor->toDateString();
+            
+            if ($leave->status === 'approved') {
+                // Ensure the log exists and has the correct status
+                AttendanceDailyLog::updateOrCreate(
+                    [
+                        'saas_company_id' => $leave->company_id, 
+                        'employee_id'     => $leave->employee_id, 
+                        'attendance_date' => $dateStr
+                    ],
+                    [
+                        'attendance_status' => 'on_leave', 
+                        'approval_status'   => 'approved'
+                    ]
+                );
+            } else {
+                // If cancelled/rejected, refresh existing logs to pick up their normal status
+                $log = AttendanceDailyLog::where('employee_id', $leave->employee_id)
+                    ->where('attendance_date', $dateStr)
+                    ->first();
+                if ($log) {
+                    $log->save(); // This will trigger syncWithSchedule and fix the status
+                }
+            }
+            $cursor->addDay();
         }
+    }
+
+    protected function recalculateBalance(AttendanceLeaveRequest $leave): void
+    {
+        if (empty($leave->leave_policy_id) || empty($leave->policy_year_id)) return;
+
+        $companyId = $leave->company_id;
+        $employeeId = $leave->employee_id;
+        $policyId = $leave->leave_policy_id;
+        $yearId = $leave->policy_year_id;
+
+        $policy = \Athka\SystemSettings\Models\LeavePolicy::find($policyId);
+        $employee = \Athka\Employees\Models\Employee::find($employeeId);
+        
+        $entitled = $policy ? (float)($policy->days_per_year ?? 0) : 0.0;
+        
+        if ($policy && $employee) {
+            $excluded = (array) ($policy->excluded_contract_types ?? []);
+            if (in_array($employee->contract_type, $excluded)) {
+                $entitled = 0.0;
+            }
+        }
+
+        $taken = (float) AttendanceLeaveRequest::query()
+            ->where('company_id', $companyId)
+            ->where('employee_id', $employeeId)
+            ->where('leave_policy_id', $policyId)
+            ->where('policy_year_id', $yearId)
+            ->where('status', 'approved')
+            ->sum('requested_days');
+        
+        \Athka\Attendance\Models\AttendanceLeaveBalance::updateOrCreate(
+            [
+                'company_id' => $companyId, 
+                'employee_id' => $employeeId, 
+                'leave_policy_id' => $policyId, 
+                'policy_year_id' => $yearId
+            ],
+            [
+                'entitled_days' => $entitled, 
+                'taken_days' => $taken, 
+                'remaining_days' => max($entitled - $taken, 0), 
+                'last_recalculated_at' => now()
+            ]
+        );
     }
 }
