@@ -302,7 +302,7 @@ class AttendanceDailyLog extends Model
 
                 // If now is past the limit, we apply auto-checkout
                 if (now()->gt($effectiveLimit)) {
-                    $foundDetail->check_out = $formattedLimit;
+                    $foundDetail->check_out_time = $formattedLimit;
                     $foundDetail->save();
 
                     $this->attendance_status = 'auto_checkout';
