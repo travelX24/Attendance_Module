@@ -215,8 +215,8 @@ trait WithAttendanceEdits
     public function saveEdit()
     {
         $this->validate([
-            'editForm.periods.*.check_in_time' => 'required|date_format:H:i',
-            'editForm.periods.*.check_out_time' => 'required|date_format:H:i|after:editForm.periods.*.check_in_time',
+            'editForm.periods.*.check_in_time' => 'nullable|date_format:H:i',
+            'editForm.periods.*.check_out_time' => 'nullable|date_format:H:i|after:editForm.periods.*.check_in_time',
             'editForm.reason' => 'required|string|min:3|max:500',
         ]);
 
@@ -235,14 +235,16 @@ trait WithAttendanceEdits
             $in = $p['check_in_time'];
             $out = $p['check_out_time'];
             
-            if ($in && $out) {
+            if ($in || $out) {
                  $validPeriods[] = $p;
-                 if (!$firstIn || $in < $firstIn) $firstIn = $in;
-                 if (!$lastOut || $out > $lastOut) $lastOut = $out;
+                 if ($in && (!$firstIn || $in < $firstIn)) $firstIn = $in;
+                 if ($out && (!$lastOut || $out > $lastOut)) $lastOut = $out;
                  
-                 $start = Carbon::parse($in);
-                 $end = Carbon::parse($out);
-                 $totalActualMinutes += $end->diffInMinutes($start);
+                 if ($in && $out) {
+                     $start = Carbon::parse($in);
+                     $end = Carbon::parse($out);
+                     $totalActualMinutes += $end->diffInMinutes($start);
+                 }
             }
         }
 
@@ -512,10 +514,10 @@ trait WithAttendanceEdits
              $validPeriodsData = [];
 
              foreach ($row['periods'] as $p) {
-                 if ($p['check_in'] && $p['check_out']) {
+                 if ($p['check_in'] || $p['check_out']) {
                      $validPeriodsData[] = $p;
-                     if (!$firstIn || $p['check_in'] < $firstIn) $firstIn = $p['check_in'];
-                     if (!$lastOut || $p['check_out'] > $lastOut) $lastOut = $p['check_out'];
+                     if ($p['check_in'] && (!$firstIn || $p['check_in'] < $firstIn)) $firstIn = $p['check_in'];
+                     if ($p['check_out'] && (!$lastOut || $p['check_out'] > $lastOut)) $lastOut = $p['check_out'];
                  }
              }
 
