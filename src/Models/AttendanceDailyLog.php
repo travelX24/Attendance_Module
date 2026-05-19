@@ -18,6 +18,8 @@ class AttendanceDailyLog extends Model
 
     protected $guarded = ['id'];
 
+    public $tempMetrics = null;
+
     protected $casts = [
         'attendance_date' => 'date',
         'meta_data' => 'array',
@@ -132,6 +134,7 @@ class AttendanceDailyLog extends Model
         $requests = $this->employee ? $service->getEmployeeRequests($this->employee_id, $dateStr, $dateStr) : [];
         
         $metrics = $service->getMetricsForDate($dateStr, $ws, $holidays, $this->employee, $requests);
+        $this->tempMetrics = $metrics;
 
         $this->work_schedule_id = $ws->id ?? null;
         $this->scheduled_hours = $metrics['hours'] ?? 0;
@@ -236,8 +239,25 @@ class AttendanceDailyLog extends Model
             return;
         }
 
-        $grace = AttendanceGraceSetting::where('saas_company_id', $this->saas_company_id)->first()
-                 ?? AttendanceGraceSetting::getGlobalDefault();
+        // Cache grace settings statically to avoid repeated DB queries per request
+        static $graceSettingsCache = [];
+        $cid = $this->saas_company_id;
+        if (!isset($graceSettingsCache[$cid])) {
+            $graceSettingsCache[$cid] = AttendanceGraceSetting::where('saas_company_id', $cid)->first()
+                     ?? AttendanceGraceSetting::getGlobalDefault();
+        }
+        $grace = $graceSettingsCache[$cid];
+
+        // Retrieve the day metrics (cached during syncWithSchedule if possible, or loaded on-demand)
+        $metrics = $this->tempMetrics ?? null;
+        $logDateStr = $this->attendance_date->toDateString();
+        if (!$metrics) {
+            $scheduleService = app(\Athka\SystemSettings\Services\WorkScheduleService::class);
+            $effectiveWs = $scheduleService->getEffectiveSchedule($this->saas_company_id, $this->employee, $logDateStr);
+            $dayHolidays = $scheduleService->getHolidays($this->saas_company_id, $logDateStr, $logDateStr);
+            $metrics = $scheduleService->getMetricsForDate($logDateStr, $effectiveWs, $dayHolidays, $this->employee);
+            $this->tempMetrics = $metrics;
+        }
 
         // --- Start: Aggressive Auto-Checkout Logic ---
         $foundDetail = $this->details()->whereNull('check_out_time')->orderBy('check_in_time', 'desc')->first();
@@ -251,14 +271,9 @@ class AttendanceDailyLog extends Model
         }
         
         if ($foundDetail) {
-            $scheduleService = app(\Athka\SystemSettings\Services\WorkScheduleService::class);
-            $logDateStr = $this->attendance_date->toDateString();
-            $effectiveWs = $scheduleService->getEffectiveSchedule($this->saas_company_id, $this->employee, $logDateStr);
-            $dayHolidays = $scheduleService->getHolidays($this->saas_company_id, $logDateStr, $logDateStr);
-            $dayMetrics = $scheduleService->getMetricsForDate($logDateStr, $effectiveWs, $dayHolidays, $this->employee);
-
             $matchedP = null;
-            foreach ($dayMetrics['periods'] as $pItem) {
+            $periods = $metrics['periods'] ?? [];
+            foreach ($periods as $pItem) {
                 if (isset($pItem['id']) && $pItem['id'] == $foundDetail->work_schedule_period_id) {
                     $matchedP = (object)$pItem;
                     break;
@@ -266,8 +281,8 @@ class AttendanceDailyLog extends Model
             }
 
             // Fallback to index-based if ID doesn't match
-            if (!$matchedP && isset($dayMetrics['periods'][$foundDetail->work_schedule_period_id - 1])) {
-                $matchedP = (object)$dayMetrics['periods'][$foundDetail->work_schedule_period_id - 1];
+            if (!$matchedP && isset($periods[$foundDetail->work_schedule_period_id - 1])) {
+                $matchedP = (object)$periods[$foundDetail->work_schedule_period_id - 1];
             }
 
             // Case 2: Multi-period or Single period with auto-checkout policy
@@ -280,7 +295,6 @@ class AttendanceDailyLog extends Model
 
                 // --- NEW: Cap auto-checkout at the start of the next period ---
                 $nextPeriodStart = null;
-                $periods = $dayMetrics['periods'] ?? [];
                 $foundCurrent = false;
                 foreach ($periods as $pItem) {
                     if ($foundCurrent) {
@@ -325,13 +339,7 @@ class AttendanceDailyLog extends Model
 
         $newStatus = 'present';
         
-        $scheduleService = app(\Athka\SystemSettings\Services\WorkScheduleService::class);
-        $logDateStr = $this->attendance_date->toDateString();
-        $effectiveWs = $scheduleService->getEffectiveSchedule($this->saas_company_id, $this->employee, $logDateStr);
-        $dayHolidays = $scheduleService->getHolidays($this->saas_company_id, $logDateStr, $logDateStr);
-        $dayMetrics = $scheduleService->getMetricsForDate($logDateStr, $effectiveWs, $dayHolidays, $this->employee);
-        
-        $periods = $dayMetrics['periods'] ?? [];
+        $periods = $metrics['periods'] ?? [];
         
         $isLate = false;
         $isEarlyDeparture = false;
