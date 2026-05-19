@@ -324,26 +324,77 @@ class AttendanceDailyLog extends Model
         $earlyGrace = $grace->early_leave_grace_minutes ?? 15;
 
         $newStatus = 'present';
-        if ($this->scheduled_check_in) {
-            $dateStr = $this->attendance_date->toDateString();
-            $sIn = $this->parseLocalizedCarbon($dateStr . " " . $this->formatTimeHm($this->scheduled_check_in));
-            $aIn = $this->parseLocalizedCarbon($dateStr . " " . $this->formatTimeHm($effectiveCheckIn));
-            
-            if ($sIn && $aIn && $aIn->gt($sIn->copy()->addMinutes($lateGrace))) {
-                $newStatus = 'late';
+        
+        $scheduleService = app(\Athka\SystemSettings\Services\WorkScheduleService::class);
+        $logDateStr = $this->attendance_date->toDateString();
+        $effectiveWs = $scheduleService->getEffectiveSchedule($this->saas_company_id, $this->employee, $logDateStr);
+        $dayHolidays = $scheduleService->getHolidays($this->saas_company_id, $logDateStr, $logDateStr);
+        $dayMetrics = $scheduleService->getMetricsForDate($logDateStr, $effectiveWs, $dayHolidays, $this->employee);
+        
+        $periods = $dayMetrics['periods'] ?? [];
+        
+        $isLate = false;
+        $isEarlyDeparture = false;
+        
+        if (count($periods) > 0) {
+            $details = $this->details;
+            foreach ($details as $detail) {
+                if ($detail->work_schedule_period_id) {
+                    $matchedP = null;
+                    foreach ($periods as $pItem) {
+                        if (isset($pItem['id']) && $pItem['id'] == $detail->work_schedule_period_id) {
+                            $matchedP = (object)$pItem;
+                            break;
+                        }
+                    }
+                    if (!$matchedP && isset($periods[$detail->work_schedule_period_id - 1])) {
+                        $matchedP = (object)$periods[$detail->work_schedule_period_id - 1];
+                    }
+                    
+                    if ($matchedP) {
+                        // Check if late for this period
+                        if ($detail->check_in_time && isset($matchedP->start_time)) {
+                            $sIn = $this->parseLocalizedCarbon($logDateStr . " " . $this->formatTimeHm($matchedP->start_time));
+                            $aIn = $this->parseLocalizedCarbon($logDateStr . " " . $this->formatTimeHm($detail->check_in_time));
+                            if ($sIn && $aIn && $aIn->gt($sIn->copy()->addMinutes($lateGrace))) {
+                                $isLate = true;
+                            }
+                        }
+                        
+                        // Check if early checkout for this period
+                        if ($detail->check_out_time && isset($matchedP->end_time)) {
+                            $sOut = $this->parseLocalizedCarbon($logDateStr . " " . $this->formatTimeHm($matchedP->end_time));
+                            $aOut = $this->parseLocalizedCarbon($logDateStr . " " . $this->formatTimeHm($detail->check_out_time));
+                            if ($sOut && $aOut && $aOut->lt($sOut->copy()->subMinutes($earlyGrace))) {
+                                $isEarlyDeparture = true;
+                            }
+                        }
+                    }
+                }
+            }
+        } else {
+            if ($this->scheduled_check_in && $effectiveCheckIn) {
+                $sIn = $this->parseLocalizedCarbon($logDateStr . " " . $this->formatTimeHm($this->scheduled_check_in));
+                $aIn = $this->parseLocalizedCarbon($logDateStr . " " . $this->formatTimeHm($effectiveCheckIn));
+                if ($sIn && $aIn && $aIn->gt($sIn->copy()->addMinutes($lateGrace))) {
+                    $isLate = true;
+                }
+            }
+            if ($this->check_out_time && $this->scheduled_check_out) {
+                $sOut = $this->parseLocalizedCarbon($logDateStr . " " . $this->formatTimeHm($this->scheduled_check_out));
+                $aOut = $this->parseLocalizedCarbon($logDateStr . " " . $this->formatTimeHm($this->check_out_time));
+                if ($sOut && $aOut && $aOut->lt($sOut->copy()->subMinutes($earlyGrace))) {
+                    $isEarlyDeparture = true;
+                }
             }
         }
-
-        if ($this->check_out_time && $this->scheduled_check_out) {
-            $dateStr = $this->attendance_date->toDateString();
-            $sOut = $this->parseLocalizedCarbon($dateStr . " " . $this->formatTimeHm($this->scheduled_check_out));
-            $aOut = $this->parseLocalizedCarbon($dateStr . " " . $this->formatTimeHm($this->check_out_time));
-
-            if ($sOut && $aOut && $aOut->lt($sOut->copy()->subMinutes($earlyGrace))) {
-                $newStatus = 'early_departure';
-            }
+        
+        if ($isEarlyDeparture) {
+            $newStatus = 'early_departure';
+        } elseif ($isLate) {
+            $newStatus = 'late';
         }
-
+        
         $this->attendance_status = $newStatus;
     }
 
