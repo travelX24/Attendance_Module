@@ -19,6 +19,9 @@ class AttendanceDailyLog extends Model
     protected $guarded = ['id'];
 
     public $tempMetrics = null;
+    public $preFetchedHolidays = null;
+    public $preFetchedRequests = null;
+    public $preFetchedSchedule = null;
 
     protected $casts = [
         'attendance_date' => 'date',
@@ -127,11 +130,31 @@ class AttendanceDailyLog extends Model
         $service = app(\Athka\SystemSettings\Services\WorkScheduleService::class);
         $dateStr = $this->attendance_date->toDateString();
 
-        $ws = $service->getEffectiveSchedule($this->saas_company_id, $this->employee, $dateStr);
-        $holidays = $service->getHolidays($this->saas_company_id, $dateStr, $dateStr);
+        $ws = $this->preFetchedSchedule ?? $service->getEffectiveSchedule($this->saas_company_id, $this->employee, $dateStr);
         
-        // Fetch requests (leaves, missions, permissions) for the context
-        $requests = $this->employee ? $service->getEmployeeRequests($this->employee_id, $dateStr, $dateStr) : [];
+        if ($this->preFetchedHolidays !== null) {
+            $holidays = $this->preFetchedHolidays->filter(function($h) use ($dateStr) {
+                return $dateStr >= Carbon::parse($h->start_date)->toDateString() && $dateStr <= Carbon::parse($h->end_date)->toDateString();
+            });
+        } else {
+            $holidays = $service->getHolidays($this->saas_company_id, $dateStr, $dateStr);
+        }
+        
+        if ($this->preFetchedRequests !== null) {
+            $requests = [
+                'leaves' => ($this->preFetchedRequests['leaves'] ?? collect())->filter(function($l) use ($dateStr) {
+                    $d = Carbon::parse($dateStr);
+                    return $d->between(Carbon::parse($l->start_date)->startOfDay(), Carbon::parse($l->end_date)->startOfDay());
+                }),
+                'missions' => ($this->preFetchedRequests['missions'] ?? collect())->filter(function($m) use ($dateStr) {
+                    $d = Carbon::parse($dateStr);
+                    return $d->between(Carbon::parse($m->start_date)->startOfDay(), Carbon::parse($m->end_date)->startOfDay());
+                }),
+                'permissions' => ($this->preFetchedRequests['permissions'] ?? collect())->filter(fn($p) => (string)$p->permission_date === $dateStr),
+            ];
+        } else {
+            $requests = $this->employee ? $service->getEmployeeRequests($this->employee_id, $dateStr, $dateStr) : [];
+        }
         
         $metrics = $service->getMetricsForDate($dateStr, $ws, $holidays, $this->employee, $requests);
         $this->tempMetrics = $metrics;
@@ -204,9 +227,10 @@ class AttendanceDailyLog extends Model
 
     public function calculateActualHours(): void
     {
-        if ($this->details()->exists()) {
+        $details = $this->relationLoaded('details') ? $this->details : $this->details()->get();
+        if ($details->isNotEmpty()) {
             $totalMinutes = 0;
-            foreach ($this->details as $detail) {
+            foreach ($details as $detail) {
                 if ($detail->check_in_time && $detail->check_out_time) {
                     $in = $this->parseLocalizedCarbon($detail->check_in_time);
                     $out = $this->parseLocalizedCarbon($detail->check_out_time);
@@ -226,9 +250,10 @@ class AttendanceDailyLog extends Model
 
     public function calculateStatus(): void
     {
+        $details = $this->relationLoaded('details') ? $this->details : $this->details()->get();
         $effectiveCheckIn = $this->check_in_time;
         if (!$effectiveCheckIn) {
-            $firstDetail = $this->details()->orderBy('check_in_time', 'asc')->first();
+            $firstDetail = $details->sortBy('check_in_time')->first();
             $effectiveCheckIn = $firstDetail?->check_in_time;
             if ($effectiveCheckIn) $this->check_in_time = $effectiveCheckIn;
         }
@@ -260,11 +285,11 @@ class AttendanceDailyLog extends Model
         }
 
         // --- Start: Aggressive Auto-Checkout Logic ---
-        $foundDetail = $this->details()->whereNull('check_out_time')->orderBy('check_in_time', 'desc')->first();
+        $foundDetail = $details->whereNull('check_out_time')->sortByDesc('check_in_time')->first();
         
         // If no open detail, we check if the last one is an auto_checkout that might need correction
         if (!$foundDetail) {
-            $lastD = $this->details()->orderBy('check_in_time', 'desc')->first();
+            $lastD = $details->sortByDesc('check_in_time')->first();
             if ($lastD && $lastD->attendance_status === 'auto_checkout') {
                 $foundDetail = $lastD;
             }
@@ -345,7 +370,6 @@ class AttendanceDailyLog extends Model
         $isEarlyDeparture = false;
         
         if (count($periods) > 0) {
-            $details = $this->details;
             foreach ($details as $detail) {
                 if ($detail->work_schedule_period_id) {
                     $matchedP = null;
