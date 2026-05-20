@@ -13,6 +13,8 @@ class AttendanceDailyPenalty extends Model
 {
     use AppliesCompanyAndBranchScopeThroughEmployee;
 
+    protected $table = 'attendance_daily_penalties';
+
     protected $fillable = [
         'saas_company_id',
         'employee_id',
