@@ -227,7 +227,7 @@ class AttendanceDailyLog extends Model
 
     public function calculateActualHours(): void
     {
-        $details = $this->relationLoaded('details') ? $this->details : $this->details()->get();
+        $details = $this->exists ? ($this->relationLoaded('details') ? $this->details : $this->details()->get()) : collect();
         if ($details->isNotEmpty()) {
             $totalMinutes = 0;
             foreach ($details as $detail) {
@@ -250,7 +250,7 @@ class AttendanceDailyLog extends Model
 
     public function calculateStatus(): void
     {
-        $details = $this->relationLoaded('details') ? $this->details : $this->details()->get();
+        $details = $this->exists ? ($this->relationLoaded('details') ? $this->details : $this->details()->get()) : collect();
         $effectiveCheckIn = $this->check_in_time;
         if (!$effectiveCheckIn) {
             $firstDetail = $details->sortBy('check_in_time')->first();
