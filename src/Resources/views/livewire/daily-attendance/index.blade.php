@@ -569,13 +569,17 @@
                             </span>
                         </td>
     
+                        @php
+                            $punchRows = $this->alignedPunchRows($log);
+                        @endphp
+
                         {{-- Check In Time --}}
                         <td class="px-6 py-4 text-center">
-                            @if($log->details->isNotEmpty())
+                            @if(!empty($punchRows))
                                 <div class="flex flex-col items-center gap-0.5">
-                                    @foreach($log->details as $detail)
+                                    @foreach($punchRows as $punch)
                                         <span class="text-sm font-bold {{ $statusColor === 'green' ? 'text-green-700' : ($statusColor === 'yellow' ? 'text-yellow-700' : ($statusColor === 'red' ? 'text-red-700' : 'text-gray-700')) }}">
-                                            {{ company_time($detail->check_in_time) ?: '-' }}
+                                            {{ $punch['check_in'] ?: '-' }}
                                         </span>
                                     @endforeach
                                 </div>
@@ -590,11 +594,11 @@
     
                         {{-- Check Out Time --}}
                         <td class="px-6 py-4 text-center">
-                            @if($log->details->isNotEmpty())
+                            @if(!empty($punchRows))
                                 <div class="flex flex-col items-center gap-0.5">
-                                    @foreach($log->details as $detail)
+                                    @foreach($punchRows as $punch)
                                         <span class="text-sm font-bold {{ $statusColor === 'green' ? 'text-green-700' : ($statusColor === 'yellow' ? 'text-yellow-700' : ($statusColor === 'red' ? 'text-red-700' : 'text-gray-700')) }}">
-                                            {{ $detail->check_out_time ? \Carbon\Carbon::parse($detail->check_out_time)->format('H:i') : '-' }}
+                                            {{ $punch['check_out'] ?: '-' }}
                                         </span>
                                     @endforeach
                                 </div>

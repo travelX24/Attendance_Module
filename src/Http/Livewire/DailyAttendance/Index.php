@@ -280,6 +280,87 @@ class Index extends Component
         return company_time($value) ?: '-';
     }
 
+    public function alignedPunchRows($log): array
+    {
+        $details = $log->details ? $log->details->sortBy('check_in_time')->values() : collect();
+        $periods = $log->workSchedule?->periods ? $log->workSchedule->periods->values() : collect();
+
+        if ($periods->isEmpty()) {
+            if ($details->isNotEmpty()) {
+                return $details->map(fn ($detail) => [
+                    'check_in' => company_time($detail->check_in_time),
+                    'check_out' => company_time($detail->check_out_time),
+                ])->all();
+            }
+
+            if ($log->check_in_time || $log->check_out_time) {
+                return [[
+                    'check_in' => company_time($log->check_in_time),
+                    'check_out' => company_time($log->check_out_time),
+                ]];
+            }
+
+            return [];
+        }
+
+        $dateStr = $log->attendance_date ? Carbon::parse($log->attendance_date)->toDateString() : now()->toDateString();
+        $usedDetailIds = [];
+        $rows = [];
+
+        foreach ($periods as $period) {
+            $detail = $details->first(function ($item) use ($period, $usedDetailIds) {
+                return !in_array($item->id, $usedDetailIds, true)
+                    && $item->work_schedule_period_id
+                    && (int) $item->work_schedule_period_id === (int) $period->id;
+            });
+
+            if (!$detail) {
+                $periodStart = Carbon::parse($dateStr . ' ' . substr((string) $period->start_time, 0, 5));
+                $periodEnd = Carbon::parse($dateStr . ' ' . substr((string) $period->end_time, 0, 5));
+
+                $crossesMidnight = (bool) $period->is_night_shift || $periodEnd->lt($periodStart);
+                if ($crossesMidnight) {
+                    $periodEnd->addDay();
+                }
+
+                $detail = $details->first(function ($item) use ($dateStr, $periodStart, $periodEnd, $crossesMidnight, $usedDetailIds) {
+                    if (in_array($item->id, $usedDetailIds, true) || empty($item->check_in_time)) {
+                        return false;
+                    }
+
+                    $checkIn = Carbon::parse($dateStr . ' ' . substr((string) $item->check_in_time, 0, 5));
+                    if ($crossesMidnight && $checkIn->lt($periodStart)) {
+                        $checkIn->addDay();
+                    }
+
+                    return $checkIn->between($periodStart, $periodEnd);
+                });
+            }
+
+            if ($detail) {
+                $usedDetailIds[] = $detail->id;
+            }
+
+            $rows[] = [
+                'check_in' => $detail ? company_time($detail->check_in_time) : null,
+                'check_out' => $detail ? company_time($detail->check_out_time) : null,
+            ];
+        }
+
+        foreach ($details as $detail) {
+            if (in_array($detail->id, $usedDetailIds, true)) {
+                continue;
+            }
+
+            $rows[] = [
+                'check_in' => company_time($detail->check_in_time),
+                'check_out' => company_time($detail->check_out_time),
+            ];
+        }
+
+        return $rows;
+    }
+
     public function render()
     {
      return view('attendance::livewire.daily-attendance.index', [
