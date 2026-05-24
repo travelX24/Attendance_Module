@@ -81,6 +81,8 @@ class AttendanceLeaveRequestObserver
             $excluded = (array) ($policy->excluded_contract_types ?? []);
             if (in_array($employee->contract_type, $excluded)) {
                 $entitled = 0.0;
+            } elseif (($policy->leave_type ?? '') === 'annual' && method_exists($employee, 'calculateLeaveEntitlement')) {
+                $entitled = (float) $employee->calculateLeaveEntitlement();
             }
         }
 
