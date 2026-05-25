@@ -310,17 +310,16 @@ class Index extends Component
 
     public function runCalculation(PenaltyService $service)
     {
-        $companyId = auth()->user()->saas_company_id;
-        [$dateFrom, $dateTo] = $this->getEffectiveDateRange();
-
-        $allowed = $this->allowedBranchIds();
-        if (!empty($allowed) && $this->branch_id === 'all') {
+        if (! auth()->user()->can('attendance.penalties.manage') && ! auth()->user()->can('attendance.manage')) {
             $this->dispatch('toast', [
                 'type' => 'error',
-                'message' => tr('Please select a branch before running calculation.')
+                'message' => tr('You do not have permission to run daily penalties calculation.')
             ]);
             return;
         }
+
+        $companyId = auth()->user()->saas_company_id;
+        [$dateFrom, $dateTo] = $this->getEffectiveDateRange();
 
         if (!$dateFrom || !$dateTo) {
             $this->dispatch('toast', [
@@ -330,9 +329,19 @@ class Index extends Component
             return;
         }
 
+        $employeeIds = $this->getCalculationEmployeeIds((int) $companyId);
+
+        if (empty($employeeIds)) {
+            $this->dispatch('toast', [
+                'type' => 'error',
+                'message' => tr('No employees found for the selected filters.')
+            ]);
+            return;
+        }
+
         $res = $this->calculation_mode === 'single_day'
-            ? $service->calculateForDate($dateFrom, $companyId)
-            : $service->calculateForRange($dateFrom, $dateTo, $companyId);
+            ? $service->calculateForDate($dateFrom, $companyId, $employeeIds)
+            : $service->calculateForRange($dateFrom, $dateTo, $companyId, $employeeIds);
 
         $this->resetPage();
         $this->loadStats();
@@ -346,8 +355,46 @@ class Index extends Component
             'type' => 'success',
             'message' => $message
                 . ' | ' . tr('Processed logs:') . ' ' . ($res['processed'] ?? 0)
-                . ' | ' . tr('Penalties created:') . ' ' . ($res['created'] ?? 0),
+                . ' | ' . tr('Penalties created:') . ' ' . ($res['created'] ?? 0)
+                . ' | ' . tr('Employees:') . ' ' . count($employeeIds),
         ]);
+    }
+
+    private function getCalculationEmployeeIds(int $companyId): array
+    {
+        $query = Employee::forCompany($companyId);
+
+        $allowed = $this->allowedBranchIds();
+        if (!empty($allowed)) {
+            $query->whereIn('branch_id', $allowed);
+        }
+
+        if (!$this->isAll($this->branch_id)) {
+            $query->where('branch_id', (int) $this->branch_id);
+        }
+
+        if (!$this->isAll($this->department_id)) {
+            $query->where('department_id', (int) $this->department_id);
+        }
+
+        if (!$this->isAll($this->job_title_id)) {
+            $query->where('job_title_id', (int) $this->job_title_id);
+        }
+
+        if ($this->status_emp_filter !== 'all') {
+            $query->where('status', (string) $this->status_emp_filter);
+        }
+
+        if ($this->search) {
+            $search = '%' . $this->search . '%';
+            $query->where(function ($q) use ($search) {
+                $q->where('name_ar', 'like', $search)
+                    ->orWhere('name_en', 'like', $search)
+                    ->orWhere('employee_no', 'like', $search);
+            });
+        }
+
+        return $query->pluck('id')->map(fn ($id) => (int) $id)->all();
     }
 
     public function openExemptionModal($id)

@@ -946,8 +946,162 @@
         </div>
     @endif
 
-    {{-- Balances --}}
+    {{-- Balances by employee --}}
     @if($tab === 'balances')
+        <x-ui.card class="overflow-hidden border border-gray-200 rounded-2xl bg-white">
+            <div class="p-4 border-b border-gray-100 flex items-center justify-between">
+                <div class="font-extrabold text-gray-900">{{ tr('Leave Balances') }}</div>
+                <x-ui.badge class="text-xs">{{ $balances->total() }}</x-ui.badge>
+            </div>
+
+            <div class="overflow-x-auto">
+                <x-ui.table class="min-w-full text-sm">
+                    <thead class="bg-gray-50 text-gray-600">
+                    <tr>
+                        <th class="text-start p-3 w-12"></th>
+                        <th class="text-start p-3">{{ tr('Employee') }}</th>
+                        <th class="text-start p-3">{{ tr('Employee Status') }}</th>
+                        <th class="text-start p-3">{{ tr('Leave Types') }}</th>
+                        <th class="text-start p-3">{{ tr('Taken') }}</th>
+                        <th class="text-start p-3">{{ tr('Remaining') }}</th>
+                    </tr>
+                    </thead>
+
+                    <tbody class="divide-y divide-gray-100">
+                    @forelse($balances as $employeeBalance)
+                        @php
+                            $isExpanded = in_array((int) $employeeBalance->id, $expandedBalanceEmployees ?? [], true);
+                            $balanceRows = collect($employeeBalance->leave_balance_rows ?? []);
+                            $summary = $employeeBalance->leave_balance_summary ?? ['taken' => 0, 'remaining' => 0];
+                        @endphp
+                        <tr>
+                            <td class="p-3">
+                                <button
+                                    type="button"
+                                    wire:click="toggleBalanceEmployee({{ $employeeBalance->id }})"
+                                    class="w-8 h-8 rounded-lg border border-gray-200 bg-white text-gray-500 hover:text-[color:var(--brand-from)] hover:border-[color:var(--brand-from)] transition-all"
+                                    title="{{ tr('Show Details') }}"
+                                >
+                                    <i class="fas {{ $isExpanded ? 'fa-chevron-up' : 'fa-chevron-down' }}"></i>
+                                </button>
+                            </td>
+
+                            <td class="p-3">
+                                <div class="font-bold text-gray-900">
+                                    {{ $employeeBalance->name_ar ?? $employeeBalance->name_en ?? $employeeBalance->name ?? $employeeBalance->full_name ?? ('#' . $employeeBalance->id) }}
+                                </div>
+                                <div class="text-xs text-gray-400">{{ $employeeBalance->employee_no ?? ('#' . $employeeBalance->id) }}</div>
+                            </td>
+
+                            <td class="p-3">
+                                @php
+                                    $empStatus = strtoupper($employeeBalance->status ?? 'ACTIVE');
+                                    $empStatusColor = 'green';
+                                    if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
+                                    elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
+                                @endphp
+                                <div class="flex items-center gap-1.5">
+                                    <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
+                                    <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
+                                </div>
+                            </td>
+
+                            <td class="p-3">
+                                <span class="inline-flex items-center px-2 py-1 rounded-lg bg-gray-100 text-gray-700 text-xs font-bold">
+                                    {{ $balanceRows->count() }}
+                                </span>
+                            </td>
+
+                            <td class="p-3 font-mono text-xs">{{ number_format((float) ($summary['taken'] ?? 0), 2) }}</td>
+                            <td class="p-3 font-black text-gray-900">{{ number_format((float) ($summary['remaining'] ?? 0), 2) }}</td>
+                        </tr>
+
+                        @if($isExpanded)
+                            <tr class="bg-gray-50/70">
+                                <td class="p-0"></td>
+                                <td colspan="5" class="p-4">
+                                    <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white">
+                                        <table class="min-w-full text-xs">
+                                            <thead class="bg-gray-50 text-gray-500">
+                                            <tr>
+                                                <th class="text-start p-3">{{ tr('Leave Type') }}</th>
+                                                <th class="text-start p-3">{{ tr('Entitled') }}</th>
+                                                <th class="text-start p-3">{{ tr('Taken') }}</th>
+                                                <th class="text-start p-3">{{ tr('Remaining') }}</th>
+                                                <th class="text-start p-3">{{ tr('Usage %') }}</th>
+                                                <th class="text-start p-3">{{ tr('Actions') }}</th>
+                                            </tr>
+                                            </thead>
+                                            <tbody class="divide-y divide-gray-100">
+                                            @forelse($balanceRows as $row)
+                                                <tr>
+                                                    <td class="p-3 font-bold text-gray-800">{{ $row->policy_name }}</td>
+                                                    <td class="p-3 font-mono">{{ number_format((float) $row->entitled_days, 2) }}</td>
+                                                    <td class="p-3 font-mono">{{ number_format((float) $row->taken_days, 2) }}</td>
+                                                    <td class="p-3 font-mono font-black text-gray-900">{{ number_format((float) $row->remaining_days, 2) }}</td>
+                                                    <td class="p-3 font-mono text-gray-700">
+                                                        {{ $row->usage_percentage === null ? '-' : number_format((float) $row->usage_percentage, 2) . '%' }}
+                                                    </td>
+                                                    <td class="p-3">
+                                                        @if($row->balance_id)
+                                                            <div class="flex items-center gap-1">
+                                                                @can('attendance.manage')
+                                                                <x-ui.secondary-button
+                                                                    type="button"
+                                                                    wire:click="recalcBalanceRow({{ $row->balance_id }})"
+                                                                    class="px-2 py-1 text-[10px] font-bold"
+                                                                    title="{{ tr('Recalculate') }}"
+                                                                >
+                                                                    <i class="fas fa-sync"></i>
+                                                                </x-ui.secondary-button>
+                                                                @endcan
+
+                                                                <x-ui.secondary-button
+                                                                    type="button"
+                                                                    wire:click="openBalanceAudit({{ $row->balance_id }})"
+                                                                    class="px-2 py-1 text-[10px] font-bold border-blue-200 text-blue-600 hover:bg-orange-50"
+                                                                    title="{{ tr('Audit History') }}"
+                                                                >
+                                                                    <i class="fas fa-history"></i>
+                                                                </x-ui.secondary-button>
+                                                            </div>
+                                                        @else
+                                                            <span class="text-gray-400">-</span>
+                                                        @endif
+                                                    </td>
+                                                </tr>
+                                            @empty
+                                                <tr>
+                                                    <td colspan="6" class="p-4 text-center text-gray-500">
+                                                        {{ tr('No leave policies found.') }}
+                                                    </td>
+                                                </tr>
+                                            @endforelse
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </td>
+                            </tr>
+                        @endif
+                    @empty
+                        <tr>
+                            <td colspan="6" class="p-4 text-center text-gray-500">
+                                {{ tr('No employees found.') }}
+                            </td>
+                        </tr>
+                    @endforelse
+                    </tbody>
+                </x-ui.table>
+            </div>
+
+            <div class="p-3 border-t border-gray-100">
+                {{ $balances->links() }}
+            </div>
+        </x-ui.card>
+    @endif
+
+    {{-- Balances --}}
+    @if(false && $tab === 'balances')
         <x-ui.card class="overflow-hidden border border-gray-200 rounded-2xl bg-white">
             <div class="p-4 border-b border-gray-100 flex items-center justify-between">
                 <div class="font-extrabold text-gray-900">{{ tr('Leave Balances') }}</div>

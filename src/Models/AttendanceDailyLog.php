@@ -344,6 +344,7 @@ class AttendanceDailyLog extends Model
                     $foundDetail->check_out_time = $formattedLimit;
                     $foundDetail->save();
 
+                    $this->check_out_time = $formattedLimit;
                     $this->attendance_status = 'auto_checkout';
 
                     $meta = $this->meta_data ?? [];

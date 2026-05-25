@@ -65,6 +65,7 @@ class Index extends Component
     public string $currentRequestType = 'leave';
     public string $pendingSubTab = 'leaves';
     public string $historySubTab = 'leaves';
+    public array $expandedBalanceEmployees = [];
 
 
     public ?string $employeeBranchColumn = null;
@@ -164,6 +165,16 @@ class Index extends Component
         $this->historySubTab = in_array($subTab, ['leaves', 'permissions', 'cuts', 'missions', 'activity'], true) ? $subTab : 'leaves';
     }
 
+    public function toggleBalanceEmployee(int $employeeId): void
+    {
+        if (in_array($employeeId, $this->expandedBalanceEmployees, true)) {
+            $this->expandedBalanceEmployees = array_values(array_diff($this->expandedBalanceEmployees, [$employeeId]));
+            return;
+        }
+
+        $this->expandedBalanceEmployees[] = $employeeId;
+    }
+
 
     public function openWorkflow(string $type, int $id): void
     {
@@ -252,6 +263,113 @@ class Index extends Component
         if (!$this->shouldLoadProperty('balances')) {
             return $this->emptyPaginator('balancePage');
         }
+
+        return $this->getCachedProperty('balances_by_employee', function() {
+            $employeeQuery = Employee::withoutGlobalScope('active_only');
+            $employeeQuery = $this->applyDataScoping($employeeQuery, 'attendance.leaves.view', 'attendance.leaves.view-subordinates', '');
+
+            if ($this->employeeCompanyColumn) {
+                $employeeQuery->where($this->employeeCompanyColumn, $this->companyId);
+            }
+
+            $term = trim((string) $this->search);
+            $allowed = $this->allowedBranchIds();
+
+            if (
+                !empty($allowed)
+                || $term !== ''
+                || ($this->branchId ?? '') !== ''
+                || $this->departmentId
+                || $this->jobTitleId
+                || $this->status !== 'all'
+            ) {
+                $this->applyEmployeeWhere($employeeQuery, $term, $allowed);
+            }
+
+            $employees = $employeeQuery
+                ->orderBy('employee_no')
+                ->orderBy('id')
+                ->paginate($this->perPage, ['*'], 'balancePage');
+
+            $employeeIds = $employees->getCollection()->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+            $policies = LeavePolicy::query()
+                ->where('company_id', $this->companyId)
+                ->when($this->selectedYearId, fn ($q) => $q->where('policy_year_id', (int) $this->selectedYearId))
+                ->when($this->filterLeavePolicyId, fn ($q) => $q->where('id', (int) $this->filterLeavePolicyId))
+                ->when(Schema::hasColumn((new LeavePolicy())->getTable(), 'is_active'), fn ($q) => $q->where('is_active', true))
+                ->orderBy('id')
+                ->get();
+
+            $policyIds = $policies->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+            $approvedTaken = collect();
+            if (!empty($employeeIds) && !empty($policyIds)) {
+                $approvedTaken = AttendanceLeaveRequest::query()
+                    ->select('employee_id', 'leave_policy_id', DB::raw('SUM(requested_days) as total_taken'))
+                    ->where('company_id', $this->companyId)
+                    ->where('status', 'approved')
+                    ->whereIn('employee_id', $employeeIds)
+                    ->whereIn('leave_policy_id', $policyIds)
+                    ->when($this->selectedYearId, fn ($q) => $q->where('policy_year_id', (int) $this->selectedYearId))
+                    ->groupBy('employee_id', 'leave_policy_id')
+                    ->get()
+                    ->keyBy(fn ($row) => (int) $row->employee_id . ':' . (int) $row->leave_policy_id);
+            }
+
+            $storedBalances = collect();
+            if (Schema::hasTable('attendance_leave_balances') && !empty($employeeIds) && !empty($policyIds)) {
+                $storedBalances = AttendanceLeaveBalance::query()
+                    ->where('company_id', $this->companyId)
+                    ->whereIn('employee_id', $employeeIds)
+                    ->whereIn('leave_policy_id', $policyIds)
+                    ->when($this->selectedYearId, fn ($q) => $q->where('policy_year_id', (int) $this->selectedYearId))
+                    ->get()
+                    ->keyBy(fn ($row) => (int) $row->employee_id . ':' . (int) $row->leave_policy_id);
+            }
+
+            $employees->setCollection($employees->getCollection()->map(function ($employee) use ($policies, $approvedTaken, $storedBalances) {
+                $rows = $policies->map(function ($policy) use ($employee, $approvedTaken, $storedBalances) {
+                    $key = (int) $employee->id . ':' . (int) $policy->id;
+                    $stored = $storedBalances->get($key);
+                    $taken = (float) ($approvedTaken->get($key)->total_taken ?? $stored->taken_days ?? 0);
+                    $isAnnual = ($policy->leave_type ?? '') === 'annual';
+
+                    if ($isAnnual) {
+                        if ($employee->is_transferred_employee) {
+                            $entitled = (float) (($employee->opening_leave_balance ?? 0) + ($employee->leave_balance_adjustments ?? 0));
+                        } else {
+                            $entitled = (float) (($employee->annual_leave_days ?? $policy->days_per_year ?? 0) + ($employee->leave_balance_adjustments ?? 0));
+                        }
+                    } else {
+                        $entitled = (float) ($stored->entitled_days ?? $policy->days_per_year ?? 0);
+                    }
+
+                    $remaining = max(0, $entitled - $taken);
+
+                    return (object) [
+                        'balance_id' => $stored?->id,
+                        'policy_id' => (int) $policy->id,
+                        'policy_name' => $policy->name ?? '-',
+                        'leave_type' => $policy->leave_type ?? '',
+                        'entitled_days' => $entitled,
+                        'taken_days' => $taken,
+                        'remaining_days' => $remaining,
+                        'usage_percentage' => $entitled > 0 ? round(($taken / $entitled) * 100, 2) : null,
+                    ];
+                });
+
+                $employee->leave_balance_rows = $rows;
+                $employee->leave_balance_summary = [
+                    'taken' => (float) $rows->sum('taken_days'),
+                    'remaining' => (float) $rows->sum('remaining_days'),
+                ];
+
+                return $employee;
+            }));
+
+            return $employees;
+        });
 
         return $this->getCachedProperty('balances', function() {
             if (!Schema::hasTable('attendance_leave_balances')) {
@@ -608,7 +726,7 @@ class Index extends Component
         $pendingPerm  = $this->tab === 'pending' ? $this->pendingPermissionRequests : $this->emptyPaginator('permPage');
         $pendingCut   = $this->tab === 'pending' ? $this->pendingCutLeaveRequests : $this->emptyPaginator('cutPage');
         $pendingMission = $this->tab === 'pending' ? $this->pendingMissionRequests : $this->emptyPaginator('missionPage');
-        $balances     = ($this->tab === 'balances' && Schema::hasTable('attendance_leave_balances')) ? $this->balances : $this->emptyPaginator('balancePage');
+        $balances     = $this->tab === 'balances' ? $this->balances : $this->emptyPaginator('balancePage');
         $prevCut      = $this->tab === 'history' ? $this->previousCutLeaveRequests : $this->emptyPaginator('historyCutPage');
         $history      = $this->tab === 'history' ? $this->history : $this->emptyPaginator('historyPage');
         $prevLeave    = $this->tab === 'history' ? $this->previousLeaveRequests : $this->emptyPaginator('historyLeavePage');
@@ -617,6 +735,10 @@ class Index extends Component
 
         if ($balances instanceof \Illuminate\Pagination\LengthAwarePaginator) {
             $balances->setCollection($balances->getCollection()->map(function ($row) {
+                if (isset($row->leave_balance_rows)) {
+                    return $row;
+                }
+
                 $entitled = (float)($row->entitled_days ?? 0);
                 $row->usage_percentage = $entitled > 0 ? round((($row->taken_days ?? 0) / $entitled) * 100, 2) : 0.0;
                 return $row;

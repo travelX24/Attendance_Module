@@ -7,6 +7,8 @@ use Athka\Attendance\Models\AttendanceDailyPenalty;
 use Athka\Employees\Models\Employee;
 use Athka\SystemSettings\Models\AttendancePolicy;
 use Athka\SystemSettings\Models\AttendancePenaltyPolicy;
+use Athka\SystemSettings\Models\UnexcusedAbsencePolicy;
+use Athka\SystemSettings\Services\WorkScheduleService;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -17,9 +19,9 @@ class PenaltyService
      *
      * @return array{processed:int,created:int}
      */
-    public function calculateForDate($date, $companyId): array
+    public function calculateForDate($date, $companyId, array $employeeIds = []): array
     {
-        return $this->calculateForRange($date, $date, $companyId);
+        return $this->calculateForRange($date, $date, $companyId, $employeeIds);
     }
 
     /**
@@ -27,13 +29,14 @@ class PenaltyService
      *
      * @return array{processed:int,created:int}
      */
-    public function calculateForRange($dateFrom, $dateTo, $companyId): array
+    public function calculateForRange($dateFrom, $dateTo, $companyId, array $employeeIds = []): array
     {
-        $this->prepareAbsentLogs($dateFrom, $dateTo, $companyId);
+        $this->prepareAbsentLogs($dateFrom, $dateTo, $companyId, $employeeIds);
 
         $logs = AttendanceDailyLog::forCompany($companyId)
             ->whereBetween('attendance_date', [$dateFrom, $dateTo])
             ->whereIn('attendance_status', ['late', 'early_departure', 'absent', 'auto_checkout'])
+            ->when(!empty($employeeIds), fn ($q) => $q->whereIn('employee_id', $employeeIds))
             ->get();
 
         $processed = 0;
@@ -52,17 +55,18 @@ class PenaltyService
     /**
      * Nightly preparation: Identify employees who didn't check in and aren't on leave.
      */
-    private function prepareAbsentLogs($dateFrom, $dateTo, $companyId): void
+    private function prepareAbsentLogs($dateFrom, $dateTo, $companyId, array $employeeIds = []): void
     {
         $start = Carbon::parse($dateFrom);
         $end = Carbon::parse($dateTo);
         $cursor = $start->copy();
+        $scheduleService = app(WorkScheduleService::class);
 
         while ($cursor->lte($end)) {
             $dateStr = $cursor->toDateString();
 
             $activeEmployees = Employee::forCompany($companyId)
-                ->where('status', 'active')
+                ->when(!empty($employeeIds), fn ($q) => $q->whereIn('id', $employeeIds))
                 ->get();
 
             foreach ($activeEmployees as $employee) {
@@ -76,14 +80,9 @@ class PenaltyService
                     continue;
                 }
 
-                $hasSchedule = \Athka\Attendance\Models\EmployeeWorkSchedule::where('employee_id', $employee->id)
-                    ->where('is_active', true)
-                    ->where('saas_company_id', $companyId)
-                    ->where('start_date', '<=', $dateStr)
-                    ->where(fn ($q) => $q->whereNull('end_date')->orWhere('end_date', '>=', $dateStr))
-                    ->first();
+                $schedule = $scheduleService->getEffectiveSchedule($companyId, $employee, $dateStr);
 
-                if (! $hasSchedule) {
+                if (! $schedule) {
                     continue;
                 }
 
@@ -93,7 +92,7 @@ class PenaltyService
                     'attendance_date' => $dateStr,
                     'attendance_status' => 'absent',
                     'approval_status' => 'pending',
-                    'work_schedule_id' => $hasSchedule->work_schedule_id,
+                    'work_schedule_id' => $schedule->id,
                 ]);
             }
 
@@ -187,7 +186,7 @@ class PenaltyService
             'delay' => 'late_arrival',
             'early_departure' => 'early_departure',
             'auto_checkout' => 'auto_checkout',
-            'absent' => 'absence',
+            'absent' => 'unexcused_absence',
             default => null,
         };
 
@@ -212,8 +211,13 @@ class PenaltyService
         $recurrenceCount = AttendanceDailyPenalty::where('saas_company_id', $log->saas_company_id)
             ->where('employee_id', $log->employee_id)
             ->where('violation_type', $violationType)
-            ->whereBetween('attendance_date', [$startOfMonth, $endDate])
+            ->where('attendance_date', '>=', $startOfMonth)
+            ->where('attendance_date', '<', $endDate)
             ->count() + 1;
+
+        if ($violationType === 'absent') {
+            return $this->processAbsenceViolation($log, $recurrenceCount, $existing);
+        }
 
         $penaltyPolicy = AttendancePenaltyPolicy::findApplicablePenalty(
             $policyId,
@@ -236,8 +240,9 @@ class PenaltyService
                 ->where('saas_company_id', $log->saas_company_id)
                 ->where('policy_id', $policyId)
                 ->where('violation_type', $policyType)
+                ->where('is_active', true)
                 ->where(function ($q) {
-                    $q->where('is_enabled', true)->orWhere('is_active', true);
+                    $q->where('is_enabled', true)->orWhereNull('is_enabled');
                 })
                 ->where('minutes_from', 0)
                 ->where('minutes_to', 0)
@@ -297,6 +302,89 @@ class PenaltyService
         );
 
         return true;
+    }
+
+    private function processAbsenceViolation(AttendanceDailyLog $log, int $recurrenceCount, ?AttendanceDailyPenalty $existing): bool
+    {
+        $group = DB::table('employee_group_members')
+            ->join('employee_groups', 'employee_group_members.group_id', '=', 'employee_groups.id')
+            ->where('employee_group_members.employee_id', $log->employee_id)
+            ->select('employee_groups.applied_policy_id')
+            ->first();
+
+        $policyId = $group
+            ? (int) $group->applied_policy_id
+            : (int) AttendancePolicy::where('saas_company_id', $log->saas_company_id)->where('is_default', true)->value('id');
+
+        if (! $policyId) {
+            return false;
+        }
+
+        $absencePolicy = UnexcusedAbsencePolicy::query()
+            ->where('saas_company_id', $log->saas_company_id)
+            ->where('policy_id', $policyId)
+            ->where('absence_reason_type', 'no_notice')
+            ->where('is_active', true)
+            ->where(function ($q) {
+                $q->where('is_enabled', true)->orWhereNull('is_enabled');
+            })
+            ->where('day_from', '<=', $recurrenceCount)
+            ->where(function ($q) use ($recurrenceCount) {
+                $q->whereNull('day_to')->orWhere('day_to', '>=', $recurrenceCount);
+            })
+            ->orderByDesc('day_from')
+            ->first();
+
+        if (! $absencePolicy) {
+            return false;
+        }
+
+        $action = strtolower((string) $absencePolicy->penalty_action);
+        if (! in_array($action, ['deduction', 'deduct'], true)) {
+            return false;
+        }
+
+        $amount = $this->calculateDeductionAmount(
+            $log,
+            (string) $absencePolicy->deduction_type,
+            (float) $absencePolicy->deduction_value
+        );
+
+        AttendanceDailyPenalty::updateOrCreate(
+            [
+                'saas_company_id' => $log->saas_company_id,
+                'employee_id' => $log->employee_id,
+                'attendance_date' => $log->attendance_date,
+                'violation_type' => 'absent',
+            ],
+            [
+                'attendance_daily_log_id' => $log->id,
+                'violation_minutes' => 0,
+                'penalty_policy_id' => null,
+                'calculated_amount' => $amount,
+                'net_amount' => $amount,
+                'status' => 'pending',
+                'notes' => ($existing ? $existing->notes : '') . "\n[System] Calculated/Recalculated absence penalty at " . now(),
+            ]
+        );
+
+        return true;
+    }
+
+    private function calculateDeductionAmount(AttendanceDailyLog $log, string $type, float $value, int $units = 1): float
+    {
+        $type = strtolower($type);
+
+        if (in_array($type, ['fixed', 'fixed_amount'], true)) {
+            return $value * $units;
+        }
+
+        if (in_array($type, ['percentage', 'percent'], true)) {
+            $dailyRate = ((float) ($log->employee->basic_salary ?? 0)) / 30;
+            return ($dailyRate * ($value / 100)) * $units;
+        }
+
+        return 0.0;
     }
 
     private function getLateMinutes(AttendanceDailyLog $log): int

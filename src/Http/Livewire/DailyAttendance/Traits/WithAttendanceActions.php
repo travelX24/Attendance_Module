@@ -341,14 +341,6 @@ trait WithAttendanceActions
             return;
         }
 
-        if ($end->isFuture()) {
-            $end = now(); 
-        }
-        
-        if ($start->isFuture()) {
-             return;
-        }
-
         // 1. Fetch relevant employees
         $empQ = \Athka\Employees\Models\Employee::forCompany($companyId)
                 ->where('status', 'active');
@@ -360,6 +352,23 @@ trait WithAttendanceActions
 
         $employees = $empQ->pluck('id', 'id');
         $employeeIds = $employees->keys()->all();
+
+        if (empty($employeeIds)) {
+            return;
+        }
+
+        if (class_exists(\Athka\Attendance\Services\LeaveApprovalImpactService::class)) {
+            app(\Athka\Attendance\Services\LeaveApprovalImpactService::class)
+                ->syncApprovedLeavesForRange($companyId, $start, $end, $employeeIds);
+        }
+
+        if ($end->isFuture()) {
+            $end = now(); 
+        }
+        
+        if ($start->isFuture()) {
+             return;
+        }
 
         // 2. Sync Existing Logs in range (to fix any inconsistencies)
         $existingQ = AttendanceDailyLog::forCompany($companyId)
