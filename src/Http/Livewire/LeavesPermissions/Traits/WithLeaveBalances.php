@@ -33,8 +33,6 @@ trait WithLeaveBalances
             $excluded = (array) ($policy->excluded_contract_types ?? []);
             if (in_array($employee->contract_type, $excluded)) {
                 $entitled = 0.0;
-            } elseif (($policy->leave_type ?? '') === 'annual' && method_exists($employee, 'calculateLeaveEntitlement')) {
-                $entitled = (float) $employee->calculateLeaveEntitlement();
             }
         }
         $taken = (float) AttendanceLeaveRequest::query()->where('company_id', $companyId)->where('employee_id', $employeeId)->where('leave_policy_id', $policyId)->where('policy_year_id', $yearId)->where('status', 'approved')->sum('requested_days');

@@ -273,7 +273,7 @@ trait WithAttendanceFilters
 
         // ==================== DAILY VIEW (Standard Log List) ====================
     $query = AttendanceDailyLog::forCompany($companyId)
-            ->with(['employee.branch', 'workSchedule.periods', 'editor', 'approver', 'rejector', 'revoker', 'details', 'scheduleException'])
+            ->with(['employee.branch', 'workSchedule', 'editor', 'approver', 'rejector', 'revoker', 'details', 'scheduleException'])
             ->withCount([
                 'auditLogs as edits_count' => fn ($q) => $q->where('action', 'attendance.edited'),
             ]);

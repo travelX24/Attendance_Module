@@ -16,8 +16,8 @@
             <div class="space-y-6">
                 {{-- Quick Tip --}}
                 <div class="flex items-center gap-3 p-3 bg-blue-50/50 rounded-xl border border-blue-100/50">
-                    <i class="fas fa-info-circle text-blue-500"></i>
-                    <p class="text-[11px] text-blue-800 leading-relaxed">
+                    <i class="fas fa-info-circle text-[color:var(--brand-from)]"></i>
+                    <p class="text-[11px] text-[color:var(--brand-from)] leading-relaxed">
                         {{ tr('Approved records are locked and used for calculating monthly salaries. Ensure all times and status are correct before proceeding.') }}
                     </p>
                 </div>
@@ -102,8 +102,8 @@
                                         </div>
                                     </div>
                                     <div class="text-center">
-                                        <p class="text-[10px] font-bold text-purple-400 uppercase mb-3">{{ tr('Actual (Punch)') }}</p>
-                                        <div class="flex flex-col gap-1 font-mono text-xs text-purple-700 bg-purple-50 rounded-lg py-2">
+                                        <p class="text-[10px] font-bold text-[color:var(--brand-via)] uppercase mb-3">{{ tr('Actual (Punch)') }}</p>
+                                        <div class="flex flex-col gap-1 font-mono text-xs text-[color:var(--brand-via)] bg-orange-50 rounded-lg py-2">
                                             <span class="font-bold">{{ $approvalPreview['check_in'] ?? '--:--' }}</span>
                                             <span class="font-black">{{ $approvalPreview['check_out'] ?? '--:--' }}</span>
                                         </div>

@@ -60,7 +60,7 @@
 
         {{-- On Leave --}}
         <x-ui.card hover class="flex items-center gap-4">
-            <div class="p-3 bg-blue-50 text-blue-600 rounded-xl">
+            <div class="p-3 bg-orange-50 text-[color:var(--brand-from)] rounded-xl">
                 <i class="fas fa-umbrella-beach fa-lg"></i>
             </div>
             <div>
@@ -330,13 +330,13 @@
                     <div class="flex items-center bg-gray-100 rounded-lg p-1 sm:me-auto w-full sm:w-auto">
                         <button 
                             wire:click="switchView('daily')" 
-                            class="flex-1 sm:flex-none justify-center px-3 py-1.5 sm:py-1 text-xs font-bold rounded-md transition-all {{ $view_mode === 'daily' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700' }}"
+                            class="flex-1 sm:flex-none justify-center px-3 py-1.5 sm:py-1 text-xs font-bold rounded-md transition-all {{ $view_mode === 'daily' ? 'bg-white shadow text-[color:var(--brand-via)]' : 'text-gray-500 hover:text-gray-700' }}"
                         >
                             <i class="fas fa-list-ul me-1"></i> {{ tr('Daily Log') }}
                         </button>
                         <button 
                             wire:click="switchView('summary')" 
-                            class="flex-1 sm:flex-none justify-center px-3 py-1.5 sm:py-1 text-xs font-bold rounded-md transition-all {{ $view_mode === 'summary' ? 'bg-white shadow text-blue-600' : 'text-gray-500 hover:text-gray-700' }}"
+                            class="flex-1 sm:flex-none justify-center px-3 py-1.5 sm:py-1 text-xs font-bold rounded-md transition-all {{ $view_mode === 'summary' ? 'bg-white shadow text-[color:var(--brand-via)]' : 'text-gray-500 hover:text-gray-700' }}"
                         >
                             <i class="fas fa-users me-1"></i> {{ tr('Employee Summary') }}
                         </button>
@@ -569,17 +569,13 @@
                             </span>
                         </td>
     
-                        @php
-                            $punchRows = $this->alignedPunchRows($log);
-                        @endphp
-
                         {{-- Check In Time --}}
                         <td class="px-6 py-4 text-center">
-                            @if(!empty($punchRows))
+                            @if($log->details->isNotEmpty())
                                 <div class="flex flex-col items-center gap-0.5">
-                                    @foreach($punchRows as $punch)
+                                    @foreach($log->details as $detail)
                                         <span class="text-sm font-bold {{ $statusColor === 'green' ? 'text-green-700' : ($statusColor === 'yellow' ? 'text-yellow-700' : ($statusColor === 'red' ? 'text-red-700' : 'text-gray-700')) }}">
-                                            {{ $punch['check_in'] ?: '-' }}
+                                            {{ company_time($detail->check_in_time) ?: '-' }}
                                         </span>
                                     @endforeach
                                 </div>
@@ -594,11 +590,11 @@
     
                         {{-- Check Out Time --}}
                         <td class="px-6 py-4 text-center">
-                            @if(!empty($punchRows))
+                            @if($log->details->isNotEmpty())
                                 <div class="flex flex-col items-center gap-0.5">
-                                    @foreach($punchRows as $punch)
+                                    @foreach($log->details as $detail)
                                         <span class="text-sm font-bold {{ $statusColor === 'green' ? 'text-green-700' : ($statusColor === 'yellow' ? 'text-yellow-700' : ($statusColor === 'red' ? 'text-red-700' : 'text-gray-700')) }}">
-                                            {{ $punch['check_out'] ?: '-' }}
+                                            {{ $detail->check_out_time ? \Carbon\Carbon::parse($detail->check_out_time)->format('H:i') : '-' }}
                                         </span>
                                     @endforeach
                                 </div>

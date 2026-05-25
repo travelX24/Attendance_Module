@@ -117,7 +117,7 @@
                         file:mr-4 file:py-2 file:px-4
                         file:rounded-full file:border-0
                         file:text-sm file:font-semibold
-                        file:bg-blue-50 file:text-blue-700
+                        file:bg-orange-50 file:text-[color:var(--brand-from)]
                         hover:file:bg-blue-100
                         disabled:opacity-50
                      " @cannot('attendance.manage') disabled @endcannot />
