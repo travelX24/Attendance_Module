@@ -190,11 +190,7 @@
                         model="status_emp_filter"
                         :label="tr('Employee Status')"
                         :placeholder="tr('All')"
-                        :options="[
-                            ['value' => 'ACTIVE', 'label' => tr('Active')],
-                            ['value' => 'SUSPENDED', 'label' => tr('Suspended')],
-                            ['value' => 'TERMINATED', 'label' => tr('Terminated')],
-                        ]"
+                        :options="\Athka\Employees\Support\EmployeeStatus::filterOptions(true)"
                         width="full"
                         :disabled="!$canManagePenalties"
                     />
@@ -374,6 +370,9 @@
                             'waived' => ['type' => 'info', 'label' => tr('Waived')],
                             default => ['type' => 'default', 'label' => $penalty->status],
                         };
+                        $employeeStatus = strtoupper($penalty->employee->status ?? 'ACTIVE');
+                        $employeeStatusColor = \Athka\Employees\Support\EmployeeStatus::color($employeeStatus);
+                        $employeeStatusLabel = \Athka\Employees\Support\EmployeeStatus::label($employeeStatus);
                     @endphp
 
                     @if($currentPenaltyDate !== $lastPenaltyDate)
@@ -411,7 +410,13 @@
                                 </div>
                                 <div>
                                     <p class="text-sm font-semibold text-gray-900 whitespace-nowrap">{{ $penalty->employee->name_ar ?? $penalty->employee->name_en }}</p>
-                                    <p class="text-xs text-gray-500">#{{ $penalty->employee->employee_no }}</p>
+                                    <div class="flex flex-wrap items-center gap-1.5 mt-0.5">
+                                        <p class="text-xs text-gray-500">#{{ $penalty->employee->employee_no }}</p>
+                                        <span class="inline-flex items-center gap-1 rounded-full bg-{{ $employeeStatusColor }}-50 px-2 py-0.5 text-[10px] font-bold text-{{ $employeeStatusColor }}-700">
+                                            <span class="w-1.5 h-1.5 rounded-full bg-{{ $employeeStatusColor }}-500"></span>
+                                            {{ $employeeStatusLabel }}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                         </td>

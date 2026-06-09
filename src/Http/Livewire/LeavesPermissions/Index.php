@@ -153,6 +153,8 @@ class Index extends Component
     public function setTab(string $tab): void
     {
         $this->tab = in_array($tab, ['balances', 'pending', 'history'], true) ? $tab : 'pending';
+        $this->expandedBalanceEmployees = [];
+        $this->resetAllPages();
     }
 
     public function setPendingSubTab(string $subTab): void
@@ -180,10 +182,10 @@ class Index extends Component
     {
         $this->currentRequestType = $type;
         $this->currentRequest = match($type) {
-            'leave' => AttendanceLeaveRequest::with('employee')->find($id),
-            'permission' => AttendancePermissionRequest::with('employee')->find($id),
-            'mission' => \Athka\Attendance\Models\AttendanceMissionRequest::with('employee')->find($id),
-            'cut' => AttendanceLeaveCutRequest::with('employee')->find($id),
+            'leave' => AttendanceLeaveRequest::with(['employee' => fn ($employee) => $employee->withoutGlobalScope('active_only')])->find($id),
+            'permission' => AttendancePermissionRequest::with(['employee' => fn ($employee) => $employee->withoutGlobalScope('active_only')])->find($id),
+            'mission' => \Athka\Attendance\Models\AttendanceMissionRequest::with(['employee' => fn ($employee) => $employee->withoutGlobalScope('active_only')])->find($id),
+            'cut' => AttendanceLeaveCutRequest::with(['employee' => fn ($employee) => $employee->withoutGlobalScope('active_only')])->find($id),
             default => null
         };
 
@@ -218,7 +220,7 @@ class Index extends Component
     {
         return $this->getCachedProperty('pendingLeaveRequests', function() {
             $q = AttendanceLeaveRequest::query()
-                ->with(['employee', 'policy', 'approvalTasks.approver'])
+                ->with(['employee' => fn ($employee) => $employee->withoutGlobalScope('active_only'), 'policy', 'approvalTasks.approver'])
                 ->where('company_id', $this->companyId)
                 ->where('status', 'pending');
 
@@ -242,7 +244,7 @@ class Index extends Component
         $permCoCol = $this->detectCompanyColumn($permTable);
 
         $q = AttendancePermissionRequest::query()
-            ->with(['employee', 'approvalTasks.approver'])
+            ->with(['employee' => fn ($employee) => $employee->withoutGlobalScope('active_only'), 'approvalTasks.approver'])
             ->when($permCoCol, fn ($qq) => $qq->where($permCoCol, $this->companyId))
             ->where('status', 'pending');
 
@@ -334,15 +336,18 @@ class Index extends Component
                     $stored = $storedBalances->get($key);
                     $taken = (float) ($approvedTaken->get($key)->total_taken ?? $stored->taken_days ?? 0);
                     $isAnnual = ($policy->leave_type ?? '') === 'annual';
+                    $excluded = (array) ($policy->excluded_contract_types ?? []);
 
-                    if ($isAnnual) {
+                    if (in_array($employee->contract_type, $excluded, true)) {
+                        $entitled = 0.0;
+                    } elseif ($isAnnual) {
                         if ($employee->is_transferred_employee) {
                             $entitled = (float) (($employee->opening_leave_balance ?? 0) + ($employee->leave_balance_adjustments ?? 0));
                         } else {
                             $entitled = (float) (($employee->annual_leave_days ?? $policy->days_per_year ?? 0) + ($employee->leave_balance_adjustments ?? 0));
                         }
                     } else {
-                        $entitled = (float) ($stored->entitled_days ?? $policy->days_per_year ?? 0);
+                        $entitled = (float) ($policy->days_per_year ?? 0);
                     }
 
                     $remaining = max(0, $entitled - $taken);
@@ -377,7 +382,7 @@ class Index extends Component
             }
 
             $q = AttendanceLeaveBalance::query()
-                ->with(['employee', 'policy', 'year'])
+                ->with(['employee' => fn ($employee) => $employee->withoutGlobalScope('active_only'), 'policy', 'year'])
                 ->where('company_id', $this->companyId);
 
             // ✅ Data scoping
@@ -387,7 +392,7 @@ class Index extends Component
             if ($this->filterLeavePolicyId) $q->where('leave_policy_id', (int) $this->filterLeavePolicyId);
 
             $this->applyEmployeeFilters($q);
-            if ($this->status !== 'all') $q->whereHas('employee', fn($qq) => $qq->where('status', (string)$this->status));
+            if ($this->status !== 'all') $q->whereHas('employee', fn($qq) => $qq->withoutGlobalScope('active_only')->where('status', (string)$this->status));
 
             return $q->orderByDesc('remaining_days')->paginate($this->perPage, ['*'], 'balancePage');
         });
@@ -414,8 +419,10 @@ class Index extends Component
             || ($this->branchId ?? '') !== ''
             || $this->departmentId
             || $this->jobTitleId
+            || $this->status !== 'all'
         ) {
             $q->whereHas('employee', function ($qq) use ($term, $allowed) {
+                $qq->withoutGlobalScope('active_only');
                 $this->applyEmployeeWhere($qq, $term, $allowed);
             });
         }
@@ -425,7 +432,7 @@ class Index extends Component
     public function getPreviousLeaveRequestsProperty()
     {
         $q = AttendanceLeaveRequest::query()
-            ->with(['employee', 'policy', 'approvalTasks.approver'])
+            ->with(['employee' => fn ($employee) => $employee->withoutGlobalScope('active_only'), 'policy', 'approvalTasks.approver'])
 
             ->where('company_id', $this->companyId)
             ->where('status', '!=', 'pending');
@@ -449,7 +456,7 @@ class Index extends Component
         $permCoCol = $this->detectCompanyColumn($permTable);
 
         $q = AttendancePermissionRequest::query()
-            ->with(['employee', 'approvalTasks.approver'])
+            ->with(['employee' => fn ($employee) => $employee->withoutGlobalScope('active_only'), 'approvalTasks.approver'])
 
             ->when($permCoCol, fn ($qq) => $qq->where($permCoCol, $this->companyId))
             ->where('status', '!=', 'pending');
@@ -470,7 +477,7 @@ class Index extends Component
     public function getPendingCutLeaveRequestsProperty()
     {
         $q = AttendanceLeaveCutRequest::query()
-            ->with(['employee', 'policy', 'approvalTasks.approver'])
+            ->with(['employee' => fn ($employee) => $employee->withoutGlobalScope('active_only'), 'policy', 'approvalTasks.approver'])
             ->where('company_id', $this->companyId)
             ->where('status', 'pending');
 
@@ -491,7 +498,7 @@ class Index extends Component
     public function getPreviousCutLeaveRequestsProperty()
     {
         $q = AttendanceLeaveCutRequest::query()
-            ->with(['employee', 'policy'])
+            ->with(['employee' => fn ($employee) => $employee->withoutGlobalScope('active_only'), 'policy'])
             ->where('company_id', $this->companyId)
             ->where('status', '!=', 'pending');
 
@@ -510,7 +517,7 @@ class Index extends Component
 
     public function getGroupEmployeesForSelectProperty()
     {
-        $q = Employee::query();
+        $q = Employee::withoutGlobalScope('active_only');
 
         // âœ… Data scoping
         $q = $this->applyDataScoping($q, 'attendance.leaves.view', 'attendance.leaves.view-subordinates', '');
@@ -576,7 +583,7 @@ class Index extends Component
     public function getApprovedLeavesForCutProperty()
     {
         $q = AttendanceLeaveRequest::query()
-            ->with(['employee', 'policy'])
+            ->with(['employee' => fn ($employee) => $employee->withoutGlobalScope('active_only'), 'policy'])
             ->where('company_id', $this->companyId)
             ->where('status', 'approved')
             ->whereNull('salary_processed_at');
@@ -589,7 +596,7 @@ class Index extends Component
         $this->applyEmployeeFilters($q);
 
         if ($this->status !== 'all') {
-            $q->whereHas('employee', fn($qq) => $qq->where('status', (string)$this->status));
+            $q->whereHas('employee', fn($qq) => $qq->withoutGlobalScope('active_only')->where('status', (string)$this->status));
         }
 
         return $q->orderByDesc('id')->limit(50)->get();
@@ -621,11 +628,13 @@ class Index extends Component
             && ($this->branchId ?? '') === ''
             && ! $this->departmentId
             && ! $this->jobTitleId
+            && $this->status === 'all'
         ) {
             return;
         }
 
         $q->whereHas('employee', function ($qq) use ($term, $allowed) {
+            $qq->withoutGlobalScope('active_only');
             $this->applyEmployeeWhere($qq, $term, $allowed);
         });
     }

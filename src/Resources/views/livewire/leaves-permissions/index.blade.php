@@ -1,4 +1,4 @@
-{{-- app/Modules/Attendance/Resources/views/livewire/leaves-permissions/index.blade.php --}}
+﻿{{-- app/Modules/Attendance/Resources/views/livewire/leaves-permissions/index.blade.php --}}
 
 @php
     $locale = app()->getLocale();
@@ -15,7 +15,7 @@
 
         if ($unit === 'hours') {
             $mins = (int) ($r->minutes ?? 0);
-            if ($mins <= 0) return '—';
+            if ($mins <= 0) return 'â€”';
             $hours = $mins / 60;
             return $smartNumber((float)$hours, 2) . ' ' . tr('Hours');
         }
@@ -43,7 +43,7 @@
 
     $formatMissionDuration = function ($r) use ($smartNumber): string {
         if ($r->type === 'partial') {
-            return ($r->from_time ?? '--') . ' → ' . ($r->to_time ?? '--');
+            return ($r->from_time ?? '--') . ' â†’ ' . ($r->to_time ?? '--');
         }
         $start = \Carbon\Carbon::parse($r->start_date);
         $end = \Carbon\Carbon::parse($r->end_date ?: $r->start_date);
@@ -68,21 +68,21 @@
     {{-- Tabs & Actions Row --}}
     <div class="flex flex-col sm:flex-row items-center justify-between gap-4 mb-4">
         <div class="flex items-center gap-1 bg-gray-100/50 p-1 rounded-xl border border-gray-200 shadow-sm w-fit">
-            <button wire:click="$set('tab', 'pending')"
+            <button wire:click="setTab('pending')"
                 onclick="showTabLoadingBar()"
                 class="px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300 min-w-[100px] {{ $tab === 'pending' ? 'bg-[color:var(--brand-from)] text-white shadow-sm' : 'bg-transparent text-gray-400 hover:text-gray-700 hover:bg-gray-200/50' }}">
                 <i class="fas fa-clock-rotate-left me-1 opacity-70"></i>
                 {{ tr('Pending') }}
             </button>
 
-            <button wire:click="$set('tab', 'balances')"
+            <button wire:click="setTab('balances')"
                 onclick="showTabLoadingBar()"
                 class="px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300 min-w-[100px] {{ $tab === 'balances' ? 'bg-[color:var(--brand-from)] text-white shadow-sm' : 'bg-transparent text-gray-400 hover:text-gray-700 hover:bg-gray-200/50' }}">
                 <i class="fas fa-wallet me-1 opacity-70"></i>
                 {{ tr('Balances') }}
             </button>
 
-            <button wire:click="$set('tab', 'history')"
+            <button wire:click="setTab('history')"
                 onclick="showTabLoadingBar()"
                 class="px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300 min-w-[100px] {{ $tab === 'history' ? 'bg-[color:var(--brand-from)] text-white shadow-sm' : 'bg-transparent text-gray-400 hover:text-gray-700 hover:bg-gray-200/50' }}">
                 <i class="fas fa-history me-1 opacity-70"></i>
@@ -195,10 +195,9 @@
                 <div>
                     <div class="text-[11px] text-gray-500 mb-1 font-bold uppercase tracking-wider">{{ tr('Employee Status') }}</div>
                     <x-ui.select wire:model.live="status" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
-                        <option value="all">{{ tr('All Statuses') }}</option>
-                        <option value="ACTIVE">{{ tr('Active') }}</option>
-                        <option value="SUSPENDED">{{ tr('Suspended') }}</option>
-                        <option value="TERMINATED">{{ tr('Terminated') }}</option>
+                        @foreach(\Athka\Employees\Support\EmployeeStatus::filterOptions(true) as $option)
+                            <option value="{{ $option['value'] }}">{{ $option['label'] }}</option>
+                        @endforeach
                     </x-ui.select>
                 </div>
 
@@ -376,13 +375,11 @@
                                 <td class="p-3">
                                     @php
                                         $empStatus = strtoupper($r->employee->status ?? 'ACTIVE');
-                                        $empStatusColor = 'green';
-                                        if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
-                                        elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
+                                        $empStatusColor = \Athka\Employees\Support\EmployeeStatus::color($empStatus);
                                     @endphp
                                     <div class="flex items-center gap-1.5">
                                         <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
-                                        <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
+                                        <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ \Athka\Employees\Support\EmployeeStatus::label($empStatus) }}</span>
                                     </div>
                                 </td>
 
@@ -414,7 +411,7 @@
 
                                 <td class="p-3">
                                     <div class="text-xs text-gray-600">
-                                        {{ company_date($r->start_date) }} → {{ company_date($r->end_date) }}
+                                        {{ company_date($r->start_date) }} â†’ {{ company_date($r->end_date) }}
                                     </div>
                                     <div class="mt-1 font-bold text-gray-900">
                                         {{ $formatLeaveDuration($r) }}
@@ -429,7 +426,7 @@
                                             : ($r->reason ?? null);
                                     @endphp
                                     <div class="max-w-[150px] truncate" title="{{ $reason }}">
-                                        {{ $reason ?: '—' }}
+                                        {{ $reason ?: 'â€”' }}
                                     </div>
                                 </td>
 
@@ -562,13 +559,11 @@
                                 <td class="p-3">
                                     @php
                                         $empStatus = strtoupper($r->employee->status ?? 'ACTIVE');
-                                        $empStatusColor = 'green';
-                                        if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
-                                        elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
+                                        $empStatusColor = \Athka\Employees\Support\EmployeeStatus::color($empStatus);
                                     @endphp
                                     <div class="flex items-center gap-1.5">
                                         <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
-                                        <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
+                                        <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ \Athka\Employees\Support\EmployeeStatus::label($empStatus) }}</span>
                                     </div>
                                 </td>
 
@@ -577,7 +572,7 @@
                                         {{ company_date($r->permission_date) }}
                                     </div>
                                     <div class="mt-1 font-mono text-xs text-gray-800 font-bold">
-                                        {{ $r->from_time ?? '--:--' }} → {{ $r->to_time ?? '--:--' }}
+                                        {{ $r->from_time ?? '--:--' }} â†’ {{ $r->to_time ?? '--:--' }}
                                     </div>
                                 </td>
 
@@ -587,7 +582,7 @@
 
                                 <td class="p-3 text-gray-700">
                                     <div class="max-w-[150px] truncate" title="{{ $r->reason }}">
-                                        {{ $r->reason ?: '—' }}
+                                        {{ $r->reason ?: 'â€”' }}
                                     </div>
                                 </td>
 
@@ -703,19 +698,17 @@
                                 <td class="p-3">
                                     @php
                                         $empStatus = strtoupper($row->employee->status ?? 'ACTIVE');
-                                        $empStatusColor = 'green';
-                                        if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
-                                        elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
+                                        $empStatusColor = \Athka\Employees\Support\EmployeeStatus::color($empStatus);
                                     @endphp
                                     <div class="flex items-center gap-1.5">
                                         <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
-                                        <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
+                                        <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ \Athka\Employees\Support\EmployeeStatus::label($empStatus) }}</span>
                                     </div>
                                 </td>
 
                                 <td class="p-3 text-gray-700">
                                     <div class="font-mono text-xs">
-                                        {{ company_date($row->original_start_date) }} → {{ company_date($row->original_end_date) }}
+                                        {{ company_date($row->original_start_date) }} â†’ {{ company_date($row->original_end_date) }}
                                     </div>
                                 </td>
 
@@ -831,13 +824,11 @@
                                 <td class="p-3">
                                     @php
                                         $empStatus = strtoupper($r->employee->status ?? 'ACTIVE');
-                                        $empStatusColor = 'green';
-                                        if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
-                                        elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
+                                        $empStatusColor = \Athka\Employees\Support\EmployeeStatus::color($empStatus);
                                     @endphp
                                     <div class="flex items-center gap-1.5">
                                         <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
-                                        <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
+                                        <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ \Athka\Employees\Support\EmployeeStatus::label($empStatus) }}</span>
                                     </div>
                                 </td>
 
@@ -848,7 +839,7 @@
                                 </td>
 
                                 <td class="p-3 text-gray-700 font-mono text-xs">
-                                    {{ company_date($r->start_date) }} {{ $r->end_date && $r->end_date !== $r->start_date ? '→ '.company_date($r->end_date) : '' }}
+                                    {{ company_date($r->start_date) }} {{ $r->end_date && $r->end_date !== $r->start_date ? 'â†’ '.company_date($r->end_date) : '' }}
                                 </td>
 
                                 <td class="p-3 font-bold text-gray-900">
@@ -856,11 +847,11 @@
                                 </td>
 
                                 <td class="p-3 text-gray-700">
-                                    {{ $r->destination ?: '—' }}
+                                    {{ $r->destination ?: 'â€”' }}
                                 </td>
 
                                 <td class="p-3 text-gray-700">
-                                    {{ $r->reason ?: '—' }}
+                                    {{ $r->reason ?: 'â€”' }}
                                 </td>
 
                                 <td class="p-3">
@@ -967,22 +958,21 @@
                     </tr>
                     </thead>
 
-                    <tbody class="divide-y divide-gray-100">
+                    <tbody class="divide-y divide-gray-100" x-data="{ expanded: {} }">
                     @forelse($balances as $employeeBalance)
                         @php
-                            $isExpanded = in_array((int) $employeeBalance->id, $expandedBalanceEmployees ?? [], true);
                             $balanceRows = collect($employeeBalance->leave_balance_rows ?? []);
                             $summary = $employeeBalance->leave_balance_summary ?? ['taken' => 0, 'remaining' => 0];
                         @endphp
-                        <tr>
+                        <tr wire:key="balance-employee-row-{{ $employeeBalance->id }}">
                             <td class="p-3">
                                 <button
                                     type="button"
-                                    wire:click="toggleBalanceEmployee({{ $employeeBalance->id }})"
+                                    x-on:click="expanded[{{ $employeeBalance->id }}] = !expanded[{{ $employeeBalance->id }}]"
                                     class="w-8 h-8 rounded-lg border border-gray-200 bg-white text-gray-500 hover:text-[color:var(--brand-from)] hover:border-[color:var(--brand-from)] transition-all"
                                     title="{{ tr('Show Details') }}"
                                 >
-                                    <i class="fas {{ $isExpanded ? 'fa-chevron-up' : 'fa-chevron-down' }}"></i>
+                                    <i class="fas" x-bind:class="expanded[{{ $employeeBalance->id }}] ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
                                 </button>
                             </td>
 
@@ -996,13 +986,11 @@
                             <td class="p-3">
                                 @php
                                     $empStatus = strtoupper($employeeBalance->status ?? 'ACTIVE');
-                                    $empStatusColor = 'green';
-                                    if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
-                                    elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
+                                    $empStatusColor = \Athka\Employees\Support\EmployeeStatus::color($empStatus);
                                 @endphp
                                 <div class="flex items-center gap-1.5">
                                     <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
-                                    <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
+                                    <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ \Athka\Employees\Support\EmployeeStatus::label($empStatus) }}</span>
                                 </div>
                             </td>
 
@@ -1016,8 +1004,12 @@
                             <td class="p-3 font-black text-gray-900">{{ number_format((float) ($summary['remaining'] ?? 0), 2) }}</td>
                         </tr>
 
-                        @if($isExpanded)
-                            <tr class="bg-gray-50/70">
+                            <tr
+                                x-show="expanded[{{ $employeeBalance->id }}]"
+                                x-cloak
+                                class="bg-gray-50/70"
+                                wire:key="balance-employee-details-{{ $employeeBalance->id }}"
+                            >
                                 <td class="p-0"></td>
                                 <td colspan="5" class="p-4">
                                     <div class="overflow-x-auto rounded-xl border border-gray-200 bg-white">
@@ -1034,7 +1026,7 @@
                                             </thead>
                                             <tbody class="divide-y divide-gray-100">
                                             @forelse($balanceRows as $row)
-                                                <tr>
+                                                <tr wire:key="balance-policy-row-{{ $employeeBalance->id }}-{{ $row->policy_id }}">
                                                     <td class="p-3 font-bold text-gray-800">{{ $row->policy_name }}</td>
                                                     <td class="p-3 font-mono">{{ number_format((float) $row->entitled_days, 2) }}</td>
                                                     <td class="p-3 font-mono">{{ number_format((float) $row->taken_days, 2) }}</td>
@@ -1044,27 +1036,14 @@
                                                     </td>
                                                     <td class="p-3">
                                                         @if($row->balance_id)
-                                                            <div class="flex items-center gap-1">
-                                                                @can('attendance.manage')
-                                                                <x-ui.secondary-button
-                                                                    type="button"
-                                                                    wire:click="recalcBalanceRow({{ $row->balance_id }})"
-                                                                    class="px-2 py-1 text-[10px] font-bold"
-                                                                    title="{{ tr('Recalculate') }}"
-                                                                >
-                                                                    <i class="fas fa-sync"></i>
-                                                                </x-ui.secondary-button>
-                                                                @endcan
-
-                                                                <x-ui.secondary-button
-                                                                    type="button"
-                                                                    wire:click="openBalanceAudit({{ $row->balance_id }})"
-                                                                    class="px-2 py-1 text-[10px] font-bold border-blue-200 text-blue-600 hover:bg-orange-50"
-                                                                    title="{{ tr('Audit History') }}"
-                                                                >
-                                                                    <i class="fas fa-history"></i>
-                                                                </x-ui.secondary-button>
-                                                            </div>
+                                                            <x-ui.secondary-button
+                                                                type="button"
+                                                                wire:click="openBalanceAudit({{ $row->balance_id }})"
+                                                                class="px-2 py-1 text-[10px] font-bold border-blue-200 text-blue-600 hover:bg-orange-50"
+                                                                title="{{ tr('Audit History') }}"
+                                                            >
+                                                                <i class="fas fa-history"></i>
+                                                            </x-ui.secondary-button>
                                                         @else
                                                             <span class="text-gray-400">-</span>
                                                         @endif
@@ -1082,7 +1061,6 @@
                                     </div>
                                 </td>
                             </tr>
-                        @endif
                     @empty
                         <tr>
                             <td colspan="6" class="p-4 text-center text-gray-500">
@@ -1136,13 +1114,11 @@
                             <td class="p-3">
                                 @php
                                     $empStatus = strtoupper($b->employee->status ?? 'ACTIVE');
-                                    $empStatusColor = 'green';
-                                    if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
-                                    elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
+                                    $empStatusColor = \Athka\Employees\Support\EmployeeStatus::color($empStatus);
                                 @endphp
                                 <div class="flex items-center gap-1.5">
                                     <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
-                                    <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
+                                    <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ \Athka\Employees\Support\EmployeeStatus::label($empStatus) }}</span>
                                 </div>
                             </td>
 
@@ -1159,31 +1135,18 @@
                                     $taken = (float) $b->taken_days;
                                     $usage = $entitled > 0 ? ($taken / $entitled) * 100 : null;
                                 @endphp
-                                {{ $usage === null ? '—' : number_format($usage, 2) . '%' }}
+                                {{ $usage === null ? 'â€”' : number_format($usage, 2) . '%' }}
                             </td>
 
                              <td class="p-3">
-                                <div class="flex items-center gap-1">
-                                    @can('attendance.manage')
-                                    <x-ui.secondary-button
-                                        type="button"
-                                        wire:click="recalcBalanceRow({{ $b->id }})"
-                                        class="px-2 py-1 text-[10px] font-bold"
-                                        title="{{ tr('Recalculate') }}"
-                                    >
-                                        <i class="fas fa-sync"></i>
-                                    </x-ui.secondary-button>
-                                    @endcan
-
-                                    <x-ui.secondary-button
-                                        type="button"
-                                        wire:click="openBalanceAudit({{ $b->id }})"
-                                        class="px-2 py-1 text-[10px] font-bold border-blue-200 text-blue-600 hover:bg-orange-50"
-                                        title="{{ tr('Audit History') }}"
-                                    >
-                                        <i class="fas fa-history"></i>
-                                    </x-ui.secondary-button>
-                                </div>
+                                <x-ui.secondary-button
+                                    type="button"
+                                    wire:click="openBalanceAudit({{ $b->id }})"
+                                    class="px-2 py-1 text-[10px] font-bold border-blue-200 text-blue-600 hover:bg-orange-50"
+                                    title="{{ tr('Audit History') }}"
+                                >
+                                    <i class="fas fa-history"></i>
+                                </x-ui.secondary-button>
                             </td>
                         </tr>
                     @empty
@@ -1292,13 +1255,11 @@
                                 <td class="p-3">
                                     @php
                                         $empStatus = strtoupper($r->employee->status ?? 'ACTIVE');
-                                        $empStatusColor = 'green';
-                                        if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
-                                        elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
+                                        $empStatusColor = \Athka\Employees\Support\EmployeeStatus::color($empStatus);
                                     @endphp
                                     <div class="flex items-center gap-1.5">
                                         <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
-                                        <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
+                                        <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ \Athka\Employees\Support\EmployeeStatus::label($empStatus) }}</span>
                                     </div>
                                 </td>
 
@@ -1323,7 +1284,7 @@
 
                                 <td class="p-3 text-gray-700">
                                     <div class="font-mono text-[10px] whitespace-nowrap">
-                                        {{ company_date($r->start_date) }}<br/>→ {{ company_date($r->end_date) }}
+                                        {{ company_date($r->start_date) }}<br/>â†’ {{ company_date($r->end_date) }}
                                     </div>
                                 </td>
 
@@ -1339,7 +1300,7 @@
                                             : ($r->reason ?? null);
                                     @endphp
                                     <div class="max-w-[150px] truncate" title="{{ $reason }}">
-                                        {{ $reason ?: '—' }}
+                                        {{ $reason ?: 'â€”' }}
                                     </div>
                                 </td>
 
@@ -1392,7 +1353,7 @@
                                                 <span class="text-xs text-gray-400 italic">{{ tr('Locked') }}</span>
                                             @endcan
                                         @else
-                                            <span class="text-xs text-gray-400">—</span>
+                                            <span class="text-xs text-gray-400">â€”</span>
                                         @endif
                                     </div>
                                 </td>
@@ -1452,13 +1413,11 @@
                                 <td class="p-3">
                                     @php
                                         $empStatus = strtoupper($r->employee->status ?? 'ACTIVE');
-                                        $empStatusColor = 'green';
-                                        if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
-                                        elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
+                                        $empStatusColor = \Athka\Employees\Support\EmployeeStatus::color($empStatus);
                                     @endphp
                                     <div class="flex items-center gap-1.5">
                                         <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
-                                        <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
+                                        <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ \Athka\Employees\Support\EmployeeStatus::label($empStatus) }}</span>
                                     </div>
                                 </td>
 
@@ -1467,7 +1426,7 @@
                                         {{ company_date($r->permission_date) }}
                                     </div>
                                     <div class="mt-1 font-mono text-xs text-gray-800 font-bold">
-                                        {{ $r->from_time ?? '--:--' }} → {{ $r->to_time ?? '--:--' }}
+                                        {{ $r->from_time ?? '--:--' }} â†’ {{ $r->to_time ?? '--:--' }}
                                     </div>
                                     <div class="mt-1 text-[10px] font-bold text-gray-400">
                                         {{ (int) $r->minutes }} {{ tr('min') }}
@@ -1476,7 +1435,7 @@
 
                                 <td class="p-3 text-gray-700">
                                     <div class="max-w-[150px] truncate" title="{{ $r->reason }}">
-                                        {{ $r->reason ?: '—' }}
+                                        {{ $r->reason ?: 'â€”' }}
                                     </div>
                                 </td>
 
@@ -1515,7 +1474,7 @@
                                                 <i class="fas fa-paperclip"></i>
                                             </a>
                                         @endif
-                                        <span class="text-xs text-gray-400">—</span>
+                                        <span class="text-xs text-gray-400">â€”</span>
                                     </div>
                                 </td>
                             </tr>
@@ -1572,19 +1531,17 @@
                                 <td class="p-3">
                                     @php
                                         $empStatus = strtoupper($row->employee->status ?? 'ACTIVE');
-                                        $empStatusColor = 'green';
-                                        if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
-                                        elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
+                                        $empStatusColor = \Athka\Employees\Support\EmployeeStatus::color($empStatus);
                                     @endphp
                                     <div class="flex items-center gap-1.5">
                                         <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
-                                        <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
+                                        <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ \Athka\Employees\Support\EmployeeStatus::label($empStatus) }}</span>
                                     </div>
                                 </td>
 
                                 <td class="p-3 text-gray-700">
                                     <div class="font-mono text-xs">
-                                        {{ company_date($row->original_start_date) }} → {{ company_date($row->original_end_date) }}
+                                        {{ company_date($row->original_start_date) }} â†’ {{ company_date($row->original_end_date) }}
                                     </div>
                                 </td>
 
@@ -1675,13 +1632,11 @@
                                 <td class="p-3">
                                     @php
                                         $empStatus = strtoupper($r->employee->status ?? 'ACTIVE');
-                                        $empStatusColor = 'green';
-                                        if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
-                                        elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
+                                        $empStatusColor = \Athka\Employees\Support\EmployeeStatus::color($empStatus);
                                     @endphp
                                     <div class="flex items-center gap-1.5">
                                         <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
-                                        <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
+                                        <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ \Athka\Employees\Support\EmployeeStatus::label($empStatus) }}</span>
                                     </div>
                                 </td>
 
@@ -1692,7 +1647,7 @@
                                 </td>
 
                                 <td class="p-3 text-gray-700 font-mono text-xs">
-                                    {{ company_date($r->start_date) }} {{ $r->end_date && $r->end_date !== $r->start_date ? '→ '.company_date($r->end_date) : '' }}
+                                    {{ company_date($r->start_date) }} {{ $r->end_date && $r->end_date !== $r->start_date ? 'â†’ '.company_date($r->end_date) : '' }}
                                 </td>
 
                                 <td class="p-3 font-bold text-gray-900">
@@ -1701,7 +1656,7 @@
 
                                 <td class="p-3 text-gray-700">
                                     <div class="max-w-[150px] truncate" title="{{ $r->reason }}">
-                                        {{ $r->reason ?: '—' }}
+                                        {{ $r->reason ?: 'â€”' }}
                                     </div>
                                 </td>
 
@@ -1740,7 +1695,7 @@
                                                 <i class="fas fa-paperclip"></i>
                                             </a>
                                         @else
-                                            <span class="text-xs text-gray-400">—</span>
+                                            <span class="text-xs text-gray-400">â€”</span>
                                         @endif
                                     </div>
                                 </td>
@@ -1775,7 +1730,7 @@
                         <thead class="bg-gray-50 text-gray-600">
                         <tr>
                             <th class="text-start p-3">{{ tr('When') }}</th>
-                            <th class="text-start p-3">{{ tr('Approved By') == 'Approved By' ? 'المعتمد' : tr('Approved By') }}</th>
+                            <th class="text-start p-3">{{ tr('Approved By') == 'Approved By' ? 'Ø§Ù„Ù…Ø¹ØªÙ…Ø¯' : tr('Approved By') }}</th>
                             <th class="text-start p-3">{{ tr('Employee') }}</th>
                             <th class="text-start p-3">{{ tr('Employee Status') }}</th>
                             <th class="text-start p-3">{{ tr('Type') }}</th>
@@ -1802,23 +1757,21 @@
                                     @if($h->employee)
                                         @php
                                             $empStatus = strtoupper($h->employee->status ?? 'ACTIVE');
-                                            $empStatusColor = 'green';
-                                            if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
-                                            elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
+                                            $empStatusColor = \Athka\Employees\Support\EmployeeStatus::color($empStatus);
                                         @endphp
                                         <div class="flex items-center gap-1.5">
                                             <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
-                                            <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
+                                            <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ \Athka\Employees\Support\EmployeeStatus::label($empStatus) }}</span>
                                         </div>
                                     @else
-                                        <span class="text-xs text-gray-400">—</span>
+                                        <span class="text-xs text-gray-400">â€”</span>
                                     @endif
                                 </td>
 
                                 <td class="p-3 text-gray-700">
                                     @php
                                         $type = strtolower($h->subject_type);
-                                        $typeMap = ['leave' => 'إجازة', 'permission' => 'إذن', 'mission' => 'مهمة'];
+                                        $typeMap = ['leave' => 'Ø¥Ø¬Ø§Ø²Ø©', 'permission' => 'Ø¥Ø°Ù†', 'mission' => 'Ù…Ù‡Ù…Ø©'];
                                     @endphp
                                     {{ $typeMap[$type] ?? tr($h->subject_type) }}
                                 </td>
@@ -1901,7 +1854,7 @@
                     </div>
                 </div>
 
-                {{-- ✅ Duration (from policy settings) --}}
+                {{-- âœ… Duration (from policy settings) --}}
                 @if($leave_policy_id > 0)
                     <div class="bg-gray-50 border border-gray-100 rounded-xl p-3">
                         <div class="text-[11px] text-gray-500 font-bold mb-1">{{ tr('Duration') }}</div>
@@ -1924,7 +1877,7 @@
                     </div>
                 @endif
 
-                {{-- ✅ Date/Time fields based on duration unit --}}
+                {{-- âœ… Date/Time fields based on duration unit --}}
                 @if($create_leave_duration_unit === 'full_day')
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
@@ -1966,7 +1919,7 @@
                             @error('start_date') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
                         </div>
                         @php
-                        // سنمررها من السيرفر بعد ما نعرف الأعمدة
+                        // Ø³Ù†Ù…Ø±Ø±Ù‡Ø§ Ù…Ù† Ø§Ù„Ø³ÙŠØ±ÙØ± Ø¨Ø¹Ø¯ Ù…Ø§ Ù†Ø¹Ø±Ù Ø§Ù„Ø£Ø¹Ù…Ø¯Ø©
                         $workStart = $workStart ?? '08:00';
                         $workEnd   = $workEnd   ?? '16:00';
                         @endphp
@@ -1989,7 +1942,7 @@
                     </div>
                 @endif
 
-                {{-- ✅ Policy Note --}}
+                {{-- âœ… Policy Note --}}
                 @if(trim($create_leave_note_text) !== '')
                     <div class="bg-amber-50 border border-amber-100 rounded-xl p-3">
                         <div class="text-[11px] text-amber-800 font-bold mb-1">
@@ -2009,7 +1962,7 @@
                     </div>
                 @endif
 
-                {{-- ✅ Attachment (required by policy OR note exists) --}}
+                {{-- âœ… Attachment (required by policy OR note exists) --}}
                 @if($create_leave_attachment_required)
                     <div class="bg-gray-50 border border-gray-100 rounded-xl p-3">
                         <div class="text-[11px] text-gray-500 font-bold mb-1">{{ tr('Attachment') }}</div>
@@ -2028,7 +1981,7 @@
 
                         <div class="text-[11px] text-gray-500 mt-2">
                             {{ tr('Allowed') }}: {{ implode(', ', $create_leave_attachment_types) }}
-                            • {{ tr('Max') }}: {{ (int) $create_leave_attachment_max_mb }}MB
+                            â€¢ {{ tr('Max') }}: {{ (int) $create_leave_attachment_max_mb }}MB
                         </div>
 
                         <div wire:loading wire:target="leave_attachment" class="text-[11px] text-blue-600 mt-2">
@@ -2297,7 +2250,7 @@
                     </div>
                 @endif
 
-                {{-- ✅ Date/Time fields based on duration unit --}}
+                {{-- âœ… Date/Time fields based on duration unit --}}
                 @if($group_leave_duration_unit === 'full_day')
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
@@ -2468,7 +2421,7 @@
                         <option value="{{ $l->id }}">
                             #{{ $l->id }} -
                             {{ $l->employee->name_ar ?? $l->employee->name_en ?? ('#'.$l->employee_id) }}
-                            ({{ optional($l->start_date)->toDateString() }} → {{ optional($l->end_date)->toDateString() }})
+                            ({{ optional($l->start_date)->toDateString() }} â†’ {{ optional($l->end_date)->toDateString() }})
                         </option>
                     @endforeach
                 </x-ui.select>
@@ -2511,25 +2464,36 @@
 
         <x-slot name="content">
             @if($selectedBalance)
+                @php
+                    $auditSummary = $selectedBalanceSummary ?? ['entitled' => 0, 'taken' => 0, 'remaining' => 0];
+                @endphp
                 <div class="space-y-6">
                     {{-- Summary Card --}}
                     <div class="bg-gray-50 rounded-xl p-4 border border-gray-100">
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div class="grid grid-cols-2 md:grid-cols-6 gap-4">
                             <div>
                                 <p class="text-[10px] text-gray-500 uppercase font-bold">{{ tr('Employee') }}</p>
-                                <p class="text-sm font-bold text-gray-900">{{ $selectedBalance->employee->name_ar ?? $selectedBalance->employee->name_en }}</p>
+                                <p class="text-sm font-bold text-gray-900">{{ $selectedBalance->employee?->name_ar ?? $selectedBalance->employee?->name_en ?? ('#' . $selectedBalance->employee_id) }}</p>
                             </div>
                             <div>
                                 <p class="text-[10px] text-gray-500 uppercase font-bold">{{ tr('Policy') }}</p>
-                                <p class="text-sm font-bold text-gray-900">{{ $selectedBalance->policy->name }}</p>
+                                <p class="text-sm font-bold text-gray-900">{{ $selectedBalance->policy?->name ?? '-' }}</p>
                             </div>
                             <div>
                                 <p class="text-[10px] text-gray-500 uppercase font-bold">{{ tr('Year') }}</p>
-                                <p class="text-sm font-bold text-gray-900">{{ $selectedBalance->year->year }}</p>
+                                <p class="text-sm font-bold text-gray-900">{{ $selectedBalance->year?->year ?? '-' }}</p>
                             </div>
                             <div>
-                                <p class="text-[10px] text-gray-500 uppercase font-bold">{{ tr('Current Balance') }}</p>
-                                <p class="text-sm font-black text-[color:var(--brand-via)]">{{ number_format($selectedBalance->remaining_days, 2) }} {{ tr('Days') }}</p>
+                                <p class="text-[10px] text-gray-500 uppercase font-bold">{{ tr('Entitled') }}</p>
+                                <p class="text-sm font-black text-gray-900">{{ number_format((float) ($auditSummary['entitled'] ?? 0), 2) }} {{ tr('Days') }}</p>
+                            </div>
+                            <div>
+                                <p class="text-[10px] text-gray-500 uppercase font-bold">{{ tr('Taken') }}</p>
+                                <p class="text-sm font-black text-red-600">{{ number_format((float) ($auditSummary['taken'] ?? 0), 2) }} {{ tr('Days') }}</p>
+                            </div>
+                            <div>
+                                <p class="text-[10px] text-gray-500 uppercase font-bold">{{ tr('Remaining') }}</p>
+                                <p class="text-sm font-black text-[color:var(--brand-via)]">{{ number_format((float) ($auditSummary['remaining'] ?? 0), 2) }} {{ tr('Days') }}</p>
                             </div>
                         </div>
                     </div>
@@ -2561,10 +2525,10 @@
                                                 -{{ number_format($log->requested_days, 2) }}
                                             </td>
                                             <td class="p-3 text-gray-600 truncate max-w-[150px]" title="{{ $log->reason }}">
-                                                {{ $log->reason ?: '—' }}
+                                                {{ $log->reason ?: 'â€”' }}
                                             </td>
                                             <td class="p-3 text-center text-gray-400">
-                                                {{ $log->approved_at ? $log->approved_at->format('Y-m-d') : '—' }}
+                                                {{ $log->approved_at ? $log->approved_at->format('Y-m-d') : 'â€”' }}
                                             </td>
                                         </tr>
                                     @empty
@@ -2579,7 +2543,7 @@
                                     <tr>
                                         <td class="p-3 font-bold text-gray-900 text-end">{{ tr('Total Consumed') }}:</td>
                                         <td class="p-3 text-center font-black text-red-700 underline">
-                                            {{ number_format($selectedBalance->taken_days, 2) }}
+                                            {{ number_format((float) ($auditSummary['taken'] ?? 0), 2) }}
                                         </td>
                                         <td colspan="2"></td>
                                     </tr>
@@ -2983,3 +2947,5 @@
         type="danger"
     />
 </div>
+
+

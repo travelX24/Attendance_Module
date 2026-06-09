@@ -19,7 +19,7 @@ trait WithScheduleFilters
     public $allowedLocationIds = []; 
     public $work_schedule_id = 'all';
 
-    public $status = 'all';
+    public $status = 'ACTIVE';
     public $contract_type = 'all';
     public $filterWarning = 'all'; 
 
@@ -38,6 +38,7 @@ trait WithScheduleFilters
     public $warningIds = [
         'no_schedule_overdue' => [],
         'ending_soon' => [],
+        'contract_conflict' => [],
         'changed_too_much' => [],
         'inactive_schedule' => [],
     ];
@@ -47,6 +48,7 @@ trait WithScheduleFilters
         'no_schedule_overdue' => [],
         'with_schedule' => [],
         'ending_soon' => [],
+        'contract_conflict' => [],
         'changed_too_much' => [],
         'inactive_schedule' => [],
     ];
@@ -126,7 +128,7 @@ trait WithScheduleFilters
         $this->department_id = 'all';
         $this->schedule_type = 'all';
         $this->work_schedule_id = 'all';
-        $this->status = 'all';
+        $this->status = 'ACTIVE';
         $this->contract_type = 'all';
         $this->filterWarning = 'all';
 
@@ -147,7 +149,8 @@ trait WithScheduleFilters
     {
        $companyId = $this->getCompanyId();
 
-        $baseEmployees = Employee::forCompany($companyId)
+        $baseEmployees = Employee::withoutGlobalScope('active_only')
+             ->forCompany($companyId)
              ->when($this->status !== 'all', fn($q) => $q->where('status', $this->status));
 
       $locationCol = $this->resolveEmployeeLocationColumn();
@@ -231,8 +234,13 @@ trait WithScheduleFilters
         $this->earlyWarnings['changed_too_much'] = count($changedTooMuchIds);
         $this->warningEmployees['changed_too_much'] = $this->getEmployeeNamesForPop($changedTooMuchIds);
 
-        $contractConflictIds = $this->detectContractConflictEmployeeIds($companyId);
+        $contractConflictIds = array_values(array_intersect(
+            $this->detectContractConflictEmployeeIds($companyId),
+            array_map('intval', $employeeIdsScope)
+        ));
+        $this->warningIds['contract_conflict'] = $contractConflictIds;
         $this->earlyWarnings['contract_conflict'] = count($contractConflictIds);
+        $this->warningEmployees['contract_conflict'] = $this->getEmployeeNamesForPop($contractConflictIds);
 
         $inactiveScheduleIds = EmployeeWorkSchedule::query()
             ->where('employee_work_schedules.saas_company_id', $companyId)

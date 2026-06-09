@@ -40,7 +40,7 @@ class Index extends Component
     public $date_to = '';
     public $violation_type_filter = 'all'; // all/delay/early_departure/absent/auto_checkout
     public $status_filter = 'all'; // all/pending/confirmed/waived
-    public $status_emp_filter = 'all'; // all/ACTIVE/SUSPENDED/TERMINATED
+    public $status_emp_filter = 'ACTIVE'; // all/ACTIVE/SUSPENDED/ENDED/TERMINATED/RESIGNED/RETIRED
     public $department_id = 'all';
     public $job_title_id = 'all';
     public $branch_id = 'all';
@@ -76,7 +76,7 @@ class Index extends Component
         'date_to' => ['except' => ''],
         'violation_type_filter' => ['except' => 'all'],
         'status_filter' => ['except' => 'all'],
-        'status_emp_filter' => ['except' => 'all'],
+        'status_emp_filter' => ['except' => 'ACTIVE'],
         'department_id' => ['except' => 'all'],
         'job_title_id' => ['except' => 'all'],
         'branch_id' => ['except' => 'all'],
@@ -114,7 +114,7 @@ class Index extends Component
         $this->date_to = now()->format('Y-m-d');
         $this->violation_type_filter = 'all';
         $this->status_filter = 'all';
-        $this->status_emp_filter = 'all';
+        $this->status_emp_filter = 'ACTIVE';
         $this->department_id = 'all';
         $this->job_title_id = 'all';
 
@@ -254,7 +254,7 @@ class Index extends Component
         $query = $this->applyPenaltyDateFilters($query);
 
         if ($this->status_emp_filter !== 'all') {
-            $query->whereHas('employee', fn($q) => $q->where('status', (string) $this->status_emp_filter));
+            $query->whereHas('employee', fn($q) => $q->withoutGlobalScope('active_only')->where('status', (string) $this->status_emp_filter));
         }
 
         $base = clone $query;
@@ -271,7 +271,10 @@ class Index extends Component
     {
         $companyId = auth()->user()->saas_company_id;
         $query = AttendanceDailyPenalty::forCompany($companyId)
-            ->with(['employee.department', 'employee.jobTitle', 'employee.branch', 'attendanceLog']);
+            ->with([
+                'employee' => fn ($q) => $q->withoutGlobalScope('active_only')->with(['department', 'jobTitle', 'branch']),
+                'attendanceLog',
+            ]);
 
         $query = $this->applyDataScoping($query, 'attendance.penalties.view', 'attendance.penalties.view-subordinates');
         $query = $this->applyBranchScopeToPenaltiesQuery($query);
@@ -286,19 +289,20 @@ class Index extends Component
         }
 
         if ($this->status_emp_filter !== 'all') {
-            $query->whereHas('employee', fn($q) => $q->where('status', (string) $this->status_emp_filter));
+            $query->whereHas('employee', fn($q) => $q->withoutGlobalScope('active_only')->where('status', (string) $this->status_emp_filter));
         }
 
         if (!$this->isAll($this->department_id)) {
-            $query->whereHas('employee', fn($q) => $q->where('department_id', (int) $this->department_id));
+            $query->whereHas('employee', fn($q) => $q->withoutGlobalScope('active_only')->where('department_id', (int) $this->department_id));
         }
 
         if (!$this->isAll($this->job_title_id)) {
-            $query->whereHas('employee', fn($q) => $q->where('job_title_id', (int) $this->job_title_id));
+            $query->whereHas('employee', fn($q) => $q->withoutGlobalScope('active_only')->where('job_title_id', (int) $this->job_title_id));
         }
 
         if ($this->search) {
             $query->whereHas('employee', function ($q) {
+                $q->withoutGlobalScope('active_only');
                 $q->where('name_ar', 'like', '%' . $this->search . '%')
                     ->orWhere('name_en', 'like', '%' . $this->search . '%')
                     ->orWhere('employee_no', 'like', '%' . $this->search . '%');
@@ -362,7 +366,7 @@ class Index extends Component
 
     private function getCalculationEmployeeIds(int $companyId): array
     {
-        $query = Employee::forCompany($companyId);
+        $query = Employee::withoutGlobalScope('active_only')->forCompany($companyId);
 
         $allowed = $this->allowedBranchIds();
         if (!empty($allowed)) {
@@ -622,7 +626,10 @@ class Index extends Component
     {
         $companyId = auth()->user()->saas_company_id;
         $query = AttendanceDailyPenalty::forCompany($companyId)
-            ->with(['employee.department', 'employee.jobTitle', 'employee.branch', 'attendanceLog']);
+            ->with([
+                'employee' => fn ($q) => $q->withoutGlobalScope('active_only')->with(['department', 'jobTitle', 'branch']),
+                'attendanceLog',
+            ]);
 
         $query = $this->applyDataScoping($query, 'attendance.penalties.view', 'attendance.penalties.view-subordinates');
         $query = $this->applyBranchScopeToPenaltiesQuery($query);
@@ -630,17 +637,21 @@ class Index extends Component
 
         if ($this->violation_type_filter !== 'all') $query->where('violation_type', $this->violation_type_filter);
         if ($this->status_filter !== 'all') $query->where('status', $this->status_filter);
+        if ($this->status_emp_filter !== 'all') {
+            $query->whereHas('employee', fn($q) => $q->withoutGlobalScope('active_only')->where('status', (string) $this->status_emp_filter));
+        }
 
         if ($this->department_id !== 'all') {
-            $query->whereHas('employee', fn($q) => $q->where('department_id', $this->department_id));
+            $query->whereHas('employee', fn($q) => $q->withoutGlobalScope('active_only')->where('department_id', $this->department_id));
         }
 
         if ($this->job_title_id !== 'all') {
-            $query->whereHas('employee', fn($q) => $q->where('job_title_id', $this->job_title_id));
+            $query->whereHas('employee', fn($q) => $q->withoutGlobalScope('active_only')->where('job_title_id', $this->job_title_id));
         }
 
         if ($this->search) {
             $query->whereHas('employee', function ($q) {
+                $q->withoutGlobalScope('active_only');
                 $q->where('name_ar', 'like', '%' . $this->search . '%')
                     ->orWhere('name_en', 'like', '%' . $this->search . '%')
                     ->orWhere('employee_no', 'like', '%' . $this->search . '%');
@@ -678,6 +689,8 @@ class Index extends Component
         $selectedBranchId = $this->branch_id;
 
         $query->whereHas('employee', function ($q) use ($allowed, $selectedBranchId) {
+            $q->withoutGlobalScope('active_only');
+
             if (!empty($allowed)) {
                 $q->whereIn('branch_id', $allowed);
             }
@@ -694,11 +707,13 @@ class Index extends Component
     {
         $companyId = auth()->user()->saas_company_id;
 
-        $q = AttendanceDailyPenalty::forCompany($companyId)->with('employee');
+        $q = AttendanceDailyPenalty::forCompany($companyId)->with([
+            'employee' => fn ($query) => $query->withoutGlobalScope('active_only'),
+        ]);
 
         $allowed = $this->allowedBranchIds();
         if (!empty($allowed)) {
-            $q->whereHas('employee', fn($qq) => $qq->whereIn('branch_id', $allowed));
+            $q->whereHas('employee', fn($qq) => $qq->withoutGlobalScope('active_only')->whereIn('branch_id', $allowed));
         }
 
         return $q->findOrFail($id);

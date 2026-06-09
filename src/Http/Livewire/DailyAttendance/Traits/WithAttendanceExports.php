@@ -12,7 +12,7 @@ trait WithAttendanceExports
     {
         $allowed = $this->allowedBranchIds();
         if (!empty($allowed)) {
-            $query->whereHas('employee', fn ($q) => $q->whereIn('branch_id', $allowed));
+            $query->whereHas('employee', fn ($q) => $q->withoutGlobalScope('active_only')->whereIn('branch_id', $allowed));
         }
 
         if ($this->date_from) $query->where('attendance_date', '>=', $this->date_from);
@@ -26,6 +26,7 @@ trait WithAttendanceExports
 
         if ($this->search) {
             $query->whereHas('employee', function ($q) {
+                $q->withoutGlobalScope('active_only');
                 $q->where('name_ar', 'like', '%' . $this->search . '%')
                 ->orWhere('name_en', 'like', '%' . $this->search . '%')
                 ->orWhere('employee_no', 'like', '%' . $this->search . '%');
@@ -33,15 +34,19 @@ trait WithAttendanceExports
         }
 
         if ($this->department_id !== 'all') {
-            $query->whereHas('employee', function ($q) { $q->where('department_id', $this->department_id); });
+            $query->whereHas('employee', function ($q) { $q->withoutGlobalScope('active_only')->where('department_id', $this->department_id); });
         }
 
         if ($this->branch_id !== 'all') {
-            $query->whereHas('employee', function ($q) { $q->where('branch_id', $this->branch_id); });
+            $query->whereHas('employee', function ($q) { $q->withoutGlobalScope('active_only')->where('branch_id', $this->branch_id); });
         }
 
         if ($this->job_title_id !== 'all') {
-            $query->whereHas('employee', function ($q) { $q->where('job_title_id', $this->job_title_id); });
+            $query->whereHas('employee', function ($q) { $q->withoutGlobalScope('active_only')->where('job_title_id', $this->job_title_id); });
+        }
+
+        if ($this->status !== 'all') {
+            $query->whereHas('employee', function ($q) { $q->withoutGlobalScope('active_only')->where('status', (string) $this->status); });
         }
 
         return $query;
@@ -50,7 +55,10 @@ trait WithAttendanceExports
     public function exportExcel()
     {
         $companyId = auth()->user()->saas_company_id;
-        $query = AttendanceDailyLog::forCompany($companyId)->with(['employee', 'workSchedule']);
+        $query = AttendanceDailyLog::forCompany($companyId)->with([
+            'employee' => fn ($q) => $q->withoutGlobalScope('active_only'),
+            'workSchedule',
+        ]);
         $query = $this->applyExportFilters($query);
 
         $logs = $query->orderByDesc('attendance_date')->get();
@@ -80,7 +88,10 @@ trait WithAttendanceExports
     public function exportPDF()
     {
         $companyId = auth()->user()->saas_company_id;
-        $query = AttendanceDailyLog::forCompany($companyId)->with(['employee', 'workSchedule']);
+        $query = AttendanceDailyLog::forCompany($companyId)->with([
+            'employee' => fn ($q) => $q->withoutGlobalScope('active_only'),
+            'workSchedule',
+        ]);
         $query = $this->applyExportFilters($query);
         $logs = $query->orderByDesc('attendance_date')->get();
 

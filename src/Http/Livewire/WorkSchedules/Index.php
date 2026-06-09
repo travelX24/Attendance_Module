@@ -149,7 +149,8 @@ class Index extends Component
     public function render()
     {
         $companyId = $this->getCompanyId();
-        $query = Employee::forCompany($companyId)
+        $query = Employee::withoutGlobalScope('active_only')
+            ->forCompany($companyId)
             ->when($this->status !== 'all', fn($q) => $q->where('status', (string)$this->status))
             ->when($this->contract_type !== 'all', fn($q) => $q->where('contract_type', (string)$this->contract_type))
             ->with(['department', 'jobTitle']);
@@ -267,6 +268,7 @@ class Index extends Component
              $idsToFilter = [];
              if ($this->filterWarning === 'no_schedule') $idsToFilter = $this->warningIds['no_schedule_overdue'] ?? [];
              elseif ($this->filterWarning === 'ending_soon') $idsToFilter = $this->warningIds['ending_soon'] ?? [];
+             elseif ($this->filterWarning === 'contract_conflict') $idsToFilter = $this->warningIds['contract_conflict'] ?? [];
              elseif ($this->filterWarning === 'changed_too_much') $idsToFilter = $this->warningIds['changed_too_much'] ?? [];
              elseif ($this->filterWarning === 'inactive_schedule') $idsToFilter = $this->warningIds['inactive_schedule'] ?? [];
              
@@ -319,7 +321,7 @@ class Index extends Component
         $contractTypes = [];
         $contractCol = $this->resolveEmployeeContractTypeColumn();
         if ($contractCol) {
-            $contractTypes = Employee::forCompany($companyId)->when($this->status !== 'all', fn($q) => $q->where('status', $this->status))->whereNotNull($contractCol)->distinct()->pluck($contractCol)->filter()->values()->all();
+            $contractTypes = Employee::withoutGlobalScope('active_only')->forCompany($companyId)->when($this->status !== 'all', fn($q) => $q->where('status', $this->status))->whereNotNull($contractCol)->distinct()->pluck($contractCol)->filter()->values()->all();
         }
 
         $employees = $query->paginate(10);
@@ -390,7 +392,7 @@ class Index extends Component
         $this->resetModalFlags();
         $companyId = $this->getCompanyId();
 
-        $empQ = Employee::forCompany($companyId)->whereKey($employeeId);
+        $empQ = Employee::withoutGlobalScope('active_only')->forCompany($companyId)->whereKey($employeeId);
 
         // âœ… Data scoping
         $empQ = $this->applyDataScoping($empQ, 'attendance.schedules.view', 'attendance.schedules.view-subordinates', '');
@@ -449,9 +451,22 @@ class Index extends Component
             $rotationInfo = null;
 
             if ($type === 'rotation') {
-                $rot = $rotations->filter(function($item) use ($r) {
-                    return $item->start_date->toDateString() === $r->start_date;
-                })->first();
+                $rowStart = $r->start_date ? Carbon::parse($r->start_date)->toDateString() : null;
+
+                $rot = $rotations->first(function ($item) use ($r, $rowStart) {
+                    $rotationStart = $item->start_date ? Carbon::parse($item->start_date)->toDateString() : null;
+
+                    return $rotationStart === $rowStart
+                        && (int) $item->work_schedule_id_a === (int) $r->work_schedule_id;
+                });
+
+                if (!$rot) {
+                    $rot = $rotations->first(function ($item) use ($rowStart) {
+                        $rotationStart = $item->start_date ? Carbon::parse($item->start_date)->toDateString() : null;
+
+                        return $rotationStart === $rowStart;
+                    });
+                }
 
                 if ($rot) {
                     $nameA = $scheduleNames[$rot->work_schedule_id_a] ?? $scheduleName;
@@ -461,6 +476,8 @@ class Index extends Component
                         'days' => $rot->rotation_days,
                         'name_a' => $nameA,
                         'name_b' => $nameB,
+                        'schedule_id_a' => (int) $rot->work_schedule_id_a,
+                        'schedule_id_b' => (int) $rot->work_schedule_id_b,
                     ];
                 }
             }

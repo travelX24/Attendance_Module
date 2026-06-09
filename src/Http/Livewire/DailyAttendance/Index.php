@@ -219,7 +219,7 @@ class Index extends Component
 
         $threeDaysAgo = now()->subDays(3)->toDateString();
 
-        $empQ = Employee::forCompany($companyId)
+        $empQ = Employee::withoutGlobalScope('active_only')->forCompany($companyId)
             ->when($this->status !== 'all', fn($q) => $q->where('status', (string)$this->status));
 
         // âœ… Data scoping

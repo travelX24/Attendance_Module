@@ -21,7 +21,7 @@ trait WithLeavePermissionsFilters
     public string $fromDate = '';
     public string $toDate = '';
     public string $historyStatus = '';
-    public string $status = 'all';
+    public string $status = 'ACTIVE';
 
     public string $branchId = '';
 
@@ -74,7 +74,7 @@ trait WithLeavePermissionsFilters
         $this->toDate = '';
         $this->historyStatus = '';
         $this->branchId = '';
-        $this->status = 'all';
+        $this->status = 'ACTIVE';
         $this->resetAllPages();
     }
 
@@ -156,9 +156,13 @@ trait WithLeavePermissionsFilters
     {
         $empTable = (new Employee())->getTable();
 
-        $q = Employee::query();
+        $q = Employee::withoutGlobalScope('active_only');
         if ($this->employeeCompanyColumn) {
             $q->where($this->employeeCompanyColumn, $this->companyId);
+        }
+
+        if ($this->status !== 'all') {
+            $q->where('status', (string) $this->status);
         }
 
         $allowed = $this->lpAllowedBranchIds();
@@ -316,9 +320,13 @@ trait WithLeavePermissionsFilters
     {
         $empTable = (new Employee())->getTable();
 
-        $q = Employee::query();
+        $q = Employee::withoutGlobalScope('active_only');
         if ($this->employeeCompanyColumn) {
             $q->where($this->employeeCompanyColumn, $this->companyId);
+        }
+
+        if ($this->status !== 'all') {
+            $q->where('status', (string) $this->status);
         }
         $allowed = $this->lpAllowedBranchIds();
 

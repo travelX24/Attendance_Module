@@ -64,8 +64,89 @@ trait WithScheduleHelpers
 
     public function detectContractConflictEmployeeIds(int $companyId): array
     {
-        // Placeholder as per existing logic
-        return [];
+        return Employee::forCompany($companyId)
+            ->where('status', 'ACTIVE')
+            ->whereNotNull('hired_at')
+            ->where('contract_duration_months', '>', 0)
+            ->get(['id', 'hired_at', 'contract_duration_months'])
+            ->filter(fn ($employee) => $this->isEmployeeContractExpired($employee))
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+    }
+
+    protected function employeeContractEndDate(Employee $employee): ?Carbon
+    {
+        $duration = (int) ($employee->contract_duration_months ?? 0);
+
+        if (!$employee->hired_at || $duration <= 0) {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($employee->hired_at)
+                ->startOfDay()
+                ->addMonthsNoOverflow($duration);
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    public function isEmployeeContractExpired(Employee $employee): bool
+    {
+        $endDate = $this->employeeContractEndDate($employee);
+
+        return $endDate !== null && $endDate->lte(now()->startOfDay());
+    }
+
+    public function employeeContractEndDateLabel(Employee $employee): string
+    {
+        $endDate = $this->employeeContractEndDate($employee);
+
+        return $endDate ? $this->formatCompanyDate($endDate->toDateString(), $this->getCompanyId()) : '';
+    }
+
+    protected function expiredContractAssignmentMessage(): string
+    {
+        return app()->isLocale('ar')
+            ? 'لا يمكن إضافة جدول عمل لموظف منتهي العقد'
+            : 'Cannot add a work schedule for an employee with an expired contract.';
+    }
+
+    protected function selectedExpiredContractEmployeeIds(array $employeeIds, int $companyId): array
+    {
+        $ids = array_values(array_filter(array_map('intval', $employeeIds)));
+
+        if (empty($ids)) {
+            return [];
+        }
+
+        return Employee::withoutGlobalScope('active_only')
+            ->forCompany($companyId)
+            ->whereIn('id', $ids)
+            ->get(['id', 'status', 'hired_at', 'contract_duration_months'])
+            ->filter(function ($employee) {
+                $status = strtoupper((string) ($employee->status ?? 'ACTIVE'));
+
+                if (in_array($status, ['SUSPENDED', 'ENDED', 'TERMINATED', 'RESIGNED', 'RETIRED'], true)) {
+                    return true;
+                }
+
+                return $status === 'ACTIVE' && $this->isEmployeeContractExpired($employee);
+            })
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->values()
+            ->all();
+    }
+
+    protected function notifyExpiredContractAssignmentBlocked(): void
+    {
+        $this->dispatch('toast', [
+            'type' => 'error',
+            'message' => $this->expiredContractAssignmentMessage(),
+        ]);
     }
 
     protected function resolveJobTitlesLabelColumns(): array

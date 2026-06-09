@@ -27,7 +27,7 @@ trait WithAttendanceFilters
     public $department_id = 'all';
     public $branch_id = 'all';
     public $job_title_id = 'all';
-    public $status = 'all';
+    public $status = 'ACTIVE';
 
     public function updatingSearch()
     {
@@ -147,7 +147,7 @@ trait WithAttendanceFilters
         $this->compliance_to = '';
         $this->department_id = 'all';
         $this->job_title_id = 'all';
-        $this->status = 'all';
+        $this->status = 'ACTIVE';
 
         $userBranchId = (int) (auth()->user()->branch_id ?? 0);
         $allowed = $this->allowedBranchIds();
@@ -178,7 +178,8 @@ trait WithAttendanceFilters
 
         // ==================== SUMMARY VIEW (Grouped by Employee) ====================
         if ($this->view_mode === 'summary') {
-            $employeeQuery = Employee::forCompany($companyId)
+            $employeeQuery = Employee::withoutGlobalScope('active_only')
+                ->forCompany($companyId)
                 ->with('branch')
                 ->when($this->status !== 'all', fn($q) => $q->where('status', (string)$this->status));
 
@@ -273,7 +274,16 @@ trait WithAttendanceFilters
 
         // ==================== DAILY VIEW (Standard Log List) ====================
     $query = AttendanceDailyLog::forCompany($companyId)
-            ->with(['employee.branch', 'workSchedule', 'editor', 'approver', 'rejector', 'revoker', 'details', 'scheduleException'])
+            ->with([
+                'employee' => fn ($q) => $q->withoutGlobalScope('active_only')->with('branch'),
+                'workSchedule',
+                'editor',
+                'approver',
+                'rejector',
+                'revoker',
+                'details',
+                'scheduleException',
+            ])
             ->withCount([
                 'auditLogs as edits_count' => fn ($q) => $q->where('action', 'attendance.edited'),
             ]);
@@ -283,17 +293,19 @@ trait WithAttendanceFilters
 
         $allowed = $this->allowedBranchIds();
         if (!empty($allowed)) {
-            $query->whereHas('employee', fn ($q) => $q->whereIn('branch_id', $allowed));
+            $query->whereHas('employee', fn ($q) => $q->withoutGlobalScope('active_only')->whereIn('branch_id', $allowed));
         }
 
         if ($this->branch_id !== 'all') {
             $query->whereHas('employee', function ($q) {
+                $q->withoutGlobalScope('active_only');
                 $q->where('branch_id', $this->branch_id);
             });
         }
 
         if ($this->status !== 'all') {
             $query->whereHas('employee', function ($q) {
+                $q->withoutGlobalScope('active_only');
                 $q->where('status', (string)$this->status);
             });
         }
@@ -328,20 +340,23 @@ trait WithAttendanceFilters
 
         if ($this->search) {
             $query->whereHas('employee', function ($q) {
+                $q->withoutGlobalScope('active_only');
                 $q->where('name_ar', 'like', '%' . $this->search . '%')
-                    ->orWhere('name_en', 'like', '%' . $this->search . '%')
-                    ->orWhere('employee_no', 'like', '%' . $this->search . '%');
+                  ->orWhere('name_en', 'like', '%' . $this->search . '%')
+                  ->orWhere('employee_no', 'like', '%' . $this->search . '%');
             });
         }
 
         if ($this->department_id !== 'all') {
             $query->whereHas('employee', function ($q) {
+                $q->withoutGlobalScope('active_only');
                 $q->where('department_id', $this->department_id);
             });
         }
 
         if ($this->job_title_id !== 'all') {
             $query->whereHas('employee', function ($q) {
+                $q->withoutGlobalScope('active_only');
                 $q->where('job_title_id', $this->job_title_id);
             });
         }
@@ -379,7 +394,9 @@ trait WithAttendanceFilters
 
     public function getEmployeesProperty()
     {
-        $q = Employee::where('saas_company_id', auth()->user()->saas_company_id);
+        $q = Employee::withoutGlobalScope('active_only')
+            ->where('saas_company_id', auth()->user()->saas_company_id)
+            ->when($this->status !== 'all', fn ($query) => $query->where('status', (string) $this->status));
 
         // âœ… Data scoping for employee list
         $q = $this->applyDataScoping($q, 'attendance.daily.view', 'attendance.daily.view-subordinates', '');

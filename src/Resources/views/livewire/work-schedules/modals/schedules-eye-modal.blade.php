@@ -44,18 +44,39 @@
                         <tr class="hover:bg-gray-50/50 border-b border-gray-50 last:border-0 transition-colors">
                             <td class="py-3 px-6 text-sm">
                                 <div class="flex flex-col gap-0.5">
-                                    <div class="font-semibold text-gray-900 flex items-center gap-2">
-                                        {{ $r['schedule_name'] ?? '-' }}
-                                        @if(($r['assignment_type'] ?? '') === 'rotation')
-                                            <i class="fas fa-sync-alt text-amber-500 text-[10px]" title="{{ tr('Rotation') }}"></i>
-                                        @endif
-                                    </div>
                                     @if(!empty($r['rotation_info']))
-                                        <div class="text-[10px] text-gray-500 flex items-center gap-1">
-                                            <i class="far fa-calendar-check opacity-70"></i>
-                                            {{ tr('Rotation every') }} <span class="font-bold text-amber-600">{{ $r['rotation_info']['days'] }}</span> {{ tr('days') }}
+                                        <div class="flex flex-col gap-2">
+                                            <div class="flex items-center gap-2">
+                                                <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-100">
+                                                    <i class="fas fa-sync-alt text-[9px]"></i>
+                                                    {{ tr('Rotation') }}
+                                                </span>
+                                                <span class="text-[10px] text-gray-500">
+                                                    {{ tr('Every') }} <span class="font-bold text-amber-700">{{ $r['rotation_info']['days'] }}</span> {{ tr('days') }}
+                                                </span>
+                                            </div>
+
+                                            <div class="space-y-1">
+                                                <div class="flex items-center gap-2 text-xs">
+                                                    <span class="w-5 h-5 rounded-lg bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center font-black">A</span>
+                                                    <span class="font-semibold text-gray-900">{{ $r['rotation_info']['name_a'] ?? '-' }}</span>
+                                                </div>
+                                                <div class="flex items-center gap-2 text-xs">
+                                                    <span class="w-5 h-5 rounded-lg bg-purple-50 text-purple-600 border border-purple-100 flex items-center justify-center font-black">B</span>
+                                                    <span class="font-semibold text-gray-900">{{ $r['rotation_info']['name_b'] ?? '-' }}</span>
+                                                </div>
+                                            </div>
                                         </div>
-                                    @elseif(!empty($r['assignment_type']))
+                                    @else
+                                        <div class="font-semibold text-gray-900 flex items-center gap-2">
+                                            {{ $r['schedule_name'] ?? '-' }}
+                                            @if(($r['assignment_type'] ?? '') === 'rotation')
+                                                <i class="fas fa-sync-alt text-amber-500 text-[10px]" title="{{ tr('Rotation') }}"></i>
+                                            @endif
+                                        </div>
+                                    @endif
+
+                                    @if(empty($r['rotation_info']) && !empty($r['assignment_type']))
                                         <div class="text-[10px] text-gray-400 italic">
                                             ({{ $r['assignment_type'] }})
                                         </div>

@@ -263,12 +263,7 @@
                         model="status"
                         :label="tr('Employee Status')"
                         :placeholder="tr('All Statuses')"
-                        :options="[
-                            ['value' => 'all', 'label' => tr('All')],
-                            ['value' => 'ACTIVE', 'label' => tr('Active')],
-                            ['value' => 'SUSPENDED', 'label' => tr('Suspended')],
-                            ['value' => 'TERMINATED', 'label' => tr('Terminated')],
-                        ]"
+                        :options="\Athka\Employees\Support\EmployeeStatus::filterOptions(true)"
                         width="full"
                         :defer="false"
                         :applyOnChange="true"
@@ -302,6 +297,7 @@
                             ['value' => 'all', 'label' => tr('All')],
                             ['value' => 'no_schedule', 'label' => tr('No Schedule')],
                             ['value' => 'ending_soon', 'label' => tr('Ending Soon')],
+                            ['value' => 'contract_conflict', 'label' => app()->isLocale('ar') ? 'منتهي العقد' : 'Expired Contract'],
                             ['value' => 'changed_too_much', 'label' => tr('Too many changes')],
                             ['value' => 'inactive_schedule', 'label' => tr('Inactive Schedule')],
                         ]"
@@ -419,6 +415,14 @@
 
         <x-ui.table :headers="$headers" :headerAlign="$headerAlign" :enablePagination="false">
             @forelse($employees as $employee)
+                @php
+                    $isContractExpired = $this->isEmployeeContractExpired($employee);
+                    $contractEndLabel = $isContractExpired ? $this->employeeContractEndDateLabel($employee) : '';
+                    $expiredContractLabel = app()->isLocale('ar') ? 'منتهي العقد' : 'Expired Contract';
+                    $expiredContractMessage = app()->isLocale('ar')
+                        ? 'لا يمكن إضافة جدول عمل لموظف منتهي العقد'
+                        : 'Cannot add a work schedule for an employee with an expired contract.';
+                @endphp
                 <tr class="hover:bg-gray-50/50 transition-colors">
                     <td class="px-6 py-4">
                         <input type="checkbox" wire:model.live="selectedEmployees" value="{{ $employee->id }}" class="w-4 h-4 text-[color:var(--brand-via)] border-gray-300 rounded focus:ring-[color:var(--brand-via)]" @cannot('attendance.manage') disabled @endcannot>
@@ -433,6 +437,7 @@
 
                                 @php
                                     $hasIssue = !$employee->current_schedule_name
+                                        || $isContractExpired
                                         || $employee->is_schedule_disabled
                                         || in_array($employee->id, $warningIds['no_schedule_overdue'] ?? [])
                                         || in_array($employee->id, $warningIds['inactive_schedule'] ?? []);
@@ -446,6 +451,13 @@
                             <div>
                                 <p class="text-sm font-semibold text-gray-900">{{ $employee->name_ar ?: $employee->name_en }}</p>
                                 <p class="text-xs text-gray-500">#{{ $employee->employee_no }}</p>
+                                @if($isContractExpired)
+                                    <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-700"
+                                          title="{{ $contractEndLabel ? (tr('Expiry Date') . ': ' . $contractEndLabel) : $expiredContractLabel }}">
+                                        <i class="fas fa-exclamation-triangle text-[9px]"></i>
+                                        {{ $expiredContractLabel }}
+                                    </span>
+                                @endif
                             </div>
                         </div>
                     </td>
@@ -519,14 +531,24 @@
                     <td class="px-6 py-4">
                         @php
                             $status = strtoupper($employee->status ?? 'ACTIVE');
-                            $statusColor = 'green';
-                            if ($status === 'SUSPENDED') $statusColor = 'orange';
-                            elseif ($status === 'TERMINATED') $statusColor = 'red';
+                            $statusColor = \Athka\Employees\Support\EmployeeStatus::color($status);
+                            $statusLabel = \Athka\Employees\Support\EmployeeStatus::label($status);
                         @endphp
-                        <div class="flex items-center gap-1.5">
-                            <div class="w-2 h-2 rounded-full bg-{{ $statusColor }}-500"></div>
-                            <span class="text-xs text-{{ $statusColor }}-700 font-bold">{{ tr($status) }}</span>
-                        </div>
+                        @if($isContractExpired)
+                            <div class="space-y-1">
+                                <div class="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-2 py-1"
+                                     title="{{ $contractEndLabel ? (tr('Expiry Date') . ': ' . $contractEndLabel) : $expiredContractLabel }}">
+                                    <div class="w-2 h-2 rounded-full bg-red-500"></div>
+                                    <span class="text-xs text-red-700 font-bold">{{ $expiredContractLabel }}</span>
+                                </div>
+                                <div class="text-[10px] text-gray-400 font-semibold">{{ $statusLabel }}</div>
+                            </div>
+                        @else
+                            <div class="flex items-center gap-1.5">
+                                <div class="w-2 h-2 rounded-full bg-{{ $statusColor }}-500"></div>
+                                <span class="text-xs text-{{ $statusColor }}-700 font-bold">{{ $statusLabel }}</span>
+                            </div>
+                        @endif
                     </td>
 
                     <td class="px-6 py-4">
@@ -584,8 +606,8 @@
                            <button type="button" 
                                wire:click="openBulkModalForSingleEmployee({{ $employee->id }})" 
                                wire:loading.attr="disabled" 
-                               class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white rounded-lg text-xs font-bold transition-all border border-blue-100 hover:border-blue-600 active:scale-95 group shadow-sm" 
-                               title="{{ tr('Assign or change schedule') }}"
+                               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border active:scale-95 group shadow-sm {{ $isContractExpired ? 'bg-red-50 text-red-600 border-red-100 hover:bg-red-100 hover:border-red-200 cursor-not-allowed' : 'bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white border-blue-100 hover:border-blue-600' }}" 
+                               title="{{ $isContractExpired ? $expiredContractMessage : tr('Assign or change schedule') }}"
                             >
                                 <i class="fas fa-calendar-plus opacity-70 group-hover:scale-110 transition-transform"></i>
                                 {{ tr('Assign') }}
@@ -594,8 +616,8 @@
                             <button type="button" 
                                 wire:click="openRotationModalForSingleEmployee({{ $employee->id }})" 
                                 wire:loading.attr="disabled" 
-                                class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-purple-50 text-purple-700 hover:bg-purple-600 hover:text-white rounded-lg text-xs font-bold transition-all border border-purple-100 hover:border-purple-600 active:scale-95 group shadow-sm" 
-                                title="{{ tr('Assign rotation schedule') }}"
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border active:scale-95 group shadow-sm {{ $isContractExpired ? 'bg-red-50 text-red-600 border-red-100 hover:bg-red-100 hover:border-red-200 cursor-not-allowed' : 'bg-purple-50 text-purple-700 hover:bg-purple-600 hover:text-white border-purple-100 hover:border-purple-600' }}" 
+                                title="{{ $isContractExpired ? $expiredContractMessage : tr('Assign rotation schedule') }}"
                             >
                                 <i class="fas fa-sync-alt opacity-70 group-hover:rotate-45 transition-transform"></i>
                                 {{ tr('Rotation') }}

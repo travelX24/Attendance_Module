@@ -76,6 +76,12 @@ trait WithScheduleAssignments
         $this->resetModalFlags();
         $this->resetBulkFormData();
 
+        $companyId = $this->getCompanyId();
+        if (!empty($this->selectedExpiredContractEmployeeIds($this->selectedEmployees, $companyId))) {
+            $this->notifyExpiredContractAssignmentBlocked();
+            return;
+        }
+
         $this->applyContractLogic($this->selectedEmployees);
 
         $this->bulkModalMode = 'single';
@@ -91,6 +97,13 @@ trait WithScheduleAssignments
         $this->resetBulkFormData();
 
         $this->selectedEmployees = [(int) $employeeId];
+
+        $companyId = $this->getCompanyId();
+        if (!empty($this->selectedExpiredContractEmployeeIds($this->selectedEmployees, $companyId))) {
+            $this->notifyExpiredContractAssignmentBlocked();
+            return;
+        }
+
         $this->applyContractLogic($this->selectedEmployees);
 
         $this->bulkModalMode = 'single';
@@ -101,6 +114,14 @@ trait WithScheduleAssignments
 
     public function applyBulkAssignment()
     {
+        $companyId = $this->getCompanyId();
+        if (!empty($this->selectedExpiredContractEmployeeIds($this->selectedEmployees, $companyId))) {
+            $this->notifyExpiredContractAssignmentBlocked();
+            throw ValidationException::withMessages([
+                'selectedEmployees' => $this->expiredContractAssignmentMessage(),
+            ]);
+        }
+
         $rules = [
             'bulkFormData.work_schedule_id' => 'required|exists:work_schedules,id',
             'bulkFormData.start_date' => 'required',
@@ -136,8 +157,6 @@ trait WithScheduleAssignments
 
         $this->validate($rules, $messages);
 
-
-        $companyId = $this->getCompanyId();
 
         DB::transaction(function () use ($companyId, $isRotation) {
             foreach ($this->selectedEmployees as $employeeId) {
@@ -463,6 +482,13 @@ trait WithScheduleAssignments
         }
 
         $this->selectedEmployees = array_map('intval', $this->criteriaPreviewSelected);
+
+        $companyId = $this->getCompanyId();
+        if (!empty($this->selectedExpiredContractEmployeeIds($this->selectedEmployees, $companyId))) {
+            $this->notifyExpiredContractAssignmentBlocked();
+            return;
+        }
+
         $this->bulkContextMeta = [
             'source' => 'criteria',
             'criteria' => $this->criteriaForm,
@@ -476,6 +502,12 @@ trait WithScheduleAssignments
     {
         $this->resetModalFlags();
         $this->resetBulkFormData();
+
+        $companyId = $this->getCompanyId();
+        if (!empty($this->selectedExpiredContractEmployeeIds($this->selectedEmployees, $companyId))) {
+            $this->notifyExpiredContractAssignmentBlocked();
+            return;
+        }
 
         $this->bulkModalMode = 'rotation';
         $this->bulkFormData['is_rotation'] = true;
@@ -494,6 +526,13 @@ trait WithScheduleAssignments
         $this->bulkFormData['is_rotation'] = true;
 
         $this->selectedEmployees = [(int) $employeeId];
+
+        $companyId = $this->getCompanyId();
+        if (!empty($this->selectedExpiredContractEmployeeIds($this->selectedEmployees, $companyId))) {
+            $this->notifyExpiredContractAssignmentBlocked();
+            return;
+        }
+
         $this->bulkContextMeta = ['source' => 'single-rotation'];
         $this->showBulkModal = true;
     }

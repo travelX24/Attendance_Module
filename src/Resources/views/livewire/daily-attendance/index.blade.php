@@ -190,11 +190,7 @@
                             model="status"
                             :label="tr('Employee Status')"
                             :placeholder="tr('All')"
-                            :options="[
-                                ['value' => 'ACTIVE', 'label' => tr('Active')],
-                                ['value' => 'SUSPENDED', 'label' => tr('Suspended')],
-                                ['value' => 'TERMINATED', 'label' => tr('Terminated')],
-                            ]"
+                            :options="\Athka\Employees\Support\EmployeeStatus::filterOptions(true)"
                             width="full"
                             :defer="false"
                             :applyOnChange="true"
@@ -545,13 +541,12 @@
                         <td class="px-6 py-4">
                             @php
                                 $empStatus = strtoupper($employee->status ?? 'ACTIVE');
-                                $empStatusColor = 'green';
-                                if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
-                                elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
+                                $empStatusColor = \Athka\Employees\Support\EmployeeStatus::color($empStatus);
+                                $empStatusLabel = \Athka\Employees\Support\EmployeeStatus::label($empStatus);
                             @endphp
                             <div class="flex items-center gap-1.5 justify-center">
                                 <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
-                                <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
+                                <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ $empStatusLabel }}</span>
                             </div>
                         </td>
     
@@ -728,13 +723,12 @@
                         <td class="px-6 py-4 text-center">
                             @php
                                 $empStatus = strtoupper($employee->status ?? 'ACTIVE');
-                                $empStatusColor = 'green';
-                                if ($empStatus === 'SUSPENDED') $empStatusColor = 'orange';
-                                elseif ($empStatus === 'TERMINATED') $empStatusColor = 'red';
+                                $empStatusColor = \Athka\Employees\Support\EmployeeStatus::color($empStatus);
+                                $empStatusLabel = \Athka\Employees\Support\EmployeeStatus::label($empStatus);
                             @endphp
                             <div class="flex items-center gap-1.5 justify-center">
                                 <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
-                                <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ tr($empStatus) }}</span>
+                                <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ $empStatusLabel }}</span>
                             </div>
                         </td>
 
