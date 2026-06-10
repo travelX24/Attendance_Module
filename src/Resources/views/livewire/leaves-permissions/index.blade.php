@@ -50,6 +50,15 @@
         $days = $start->diffInDays($end) + 1;
         return $smartNumber((float)$days, 0) . ' ' . tr('Days');
     };
+
+    $approvalTaskClass = function (?string $status): string {
+        return match ($status) {
+            'approved' => 'bg-[color:var(--success)]',
+            'rejected' => 'bg-[color:var(--error)]',
+            'pending' => 'bg-[color:var(--warning)] animate-pulse',
+            default => 'bg-gray-300',
+        };
+    };
 @endphp
 
 
@@ -70,21 +79,21 @@
         <div class="flex items-center gap-1 bg-gray-100/50 p-1 rounded-xl border border-gray-200 shadow-sm w-fit">
             <button wire:click="setTab('pending')"
                 onclick="showTabLoadingBar()"
-                class="px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300 min-w-[100px] {{ $tab === 'pending' ? 'bg-[color:var(--brand-from)] text-white shadow-sm' : 'bg-transparent text-gray-400 hover:text-gray-700 hover:bg-gray-200/50' }}">
+                class="px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300 min-w-[100px] {{ $tab === 'pending' ? 'bg-[color:var(--accent-orange)] text-white shadow-sm' : 'bg-transparent text-gray-400 hover:text-gray-700 hover:bg-gray-200/50' }}">
                 <i class="fas fa-clock-rotate-left me-1 opacity-70"></i>
                 {{ tr('Pending') }}
             </button>
 
             <button wire:click="setTab('balances')"
                 onclick="showTabLoadingBar()"
-                class="px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300 min-w-[100px] {{ $tab === 'balances' ? 'bg-[color:var(--brand-from)] text-white shadow-sm' : 'bg-transparent text-gray-400 hover:text-gray-700 hover:bg-gray-200/50' }}">
+                class="px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300 min-w-[100px] {{ $tab === 'balances' ? 'bg-[color:var(--accent-orange)] text-white shadow-sm' : 'bg-transparent text-gray-400 hover:text-gray-700 hover:bg-gray-200/50' }}">
                 <i class="fas fa-wallet me-1 opacity-70"></i>
                 {{ tr('Balances') }}
             </button>
 
             <button wire:click="setTab('history')"
                 onclick="showTabLoadingBar()"
-                class="px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300 min-w-[100px] {{ $tab === 'history' ? 'bg-[color:var(--brand-from)] text-white shadow-sm' : 'bg-transparent text-gray-400 hover:text-gray-700 hover:bg-gray-200/50' }}">
+                class="px-4 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-all duration-300 min-w-[100px] {{ $tab === 'history' ? 'bg-[color:var(--accent-orange)] text-white shadow-sm' : 'bg-transparent text-gray-400 hover:text-gray-700 hover:bg-gray-200/50' }}">
                 <i class="fas fa-history me-1 opacity-70"></i>
                 {{ tr('History') }}
             </button>
@@ -95,7 +104,7 @@
         <div class="shrink-0">
             <x-ui.dropdown-menu>
                 <x-slot name="trigger">
-                    <div class="flex items-center gap-2 px-5 py-2.5 bg-[color:var(--brand-from)] text-white rounded-xl font-bold shadow-lg hover:bg-[color:var(--brand-via)] transition-all cursor-pointer group text-xs">
+                    <div class="flex items-center gap-2 px-5 py-2.5 bg-[color:var(--accent-orange)] text-white rounded-xl font-bold shadow-lg hover:bg-[color:var(--accent-orange-hover)] transition-all cursor-pointer group text-xs">
                         <i class="fas fa-plus"></i>
                         <span>{{ tr('New Request') }}</span>
                         <i class="fas fa-chevron-down text-[8px] opacity-70 group-hover:translate-y-0.5 transition-transform"></i>
@@ -103,15 +112,15 @@
                 </x-slot>
 
                 <x-ui.dropdown-item wire:click="openCreateLeave">
-                    <i class="fas fa-calendar-plus me-2 text-[color:var(--brand-from)]"></i> {{ tr('New Leave Request') }}
+                    <i class="fas fa-calendar-plus me-2 text-[color:var(--accent-orange)]"></i> {{ tr('New Leave Request') }}
                 </x-ui.dropdown-item>
                 
                 <x-ui.dropdown-item wire:click="openCreatePermission">
-                    <i class="fas fa-clock me-2 text-[color:var(--brand-from)]"></i> {{ tr('New Permission') }}
+                    <i class="fas fa-clock me-2 text-[color:var(--warning)]"></i> {{ tr('New Permission') }}
                 </x-ui.dropdown-item>
 
                 <x-ui.dropdown-item wire:click="openCreateMission">
-                    <i class="fas fa-briefcase me-2 text-[color:var(--brand-from)]"></i> {{ tr('New Mission Request') }}
+                    <i class="fas fa-briefcase me-2 text-[color:var(--accent-orange)]"></i> {{ tr('New Mission Request') }}
                 </x-ui.dropdown-item>
                 
                 <div class="border-t border-gray-100 my-1"></div>
@@ -127,7 +136,7 @@
                 <div class="border-t border-gray-100 my-1"></div>
 
                 <x-ui.dropdown-item wire:click="openCutLeave">
-                    <i class="fas fa-cut me-2 text-red-500"></i> {{ tr('Cut Leave') }}
+                    <i class="fas fa-cut me-2 text-[color:var(--error)]"></i> {{ tr('Cut Leave') }}
                 </x-ui.dropdown-item>
             </x-ui.dropdown-menu>
         </div>
@@ -275,42 +284,42 @@
             <div class="flex items-center gap-6 border-b border-gray-200">
                 <button wire:click="setPendingSubTab('leaves')" 
                     onclick="showTabLoadingBar()"
-                    class="pb-3 text-sm font-bold transition-all relative {{ $pendingSubTab === 'leaves' ? 'text-[color:var(--brand-from)]' : 'text-gray-400 hover:text-gray-600' }}">
+                    class="pb-3 text-sm font-bold transition-all relative {{ $pendingSubTab === 'leaves' ? 'text-[color:var(--accent-orange)]' : 'text-gray-400 hover:text-gray-600' }}">
                     <span>{{ tr('Leave Requests') }}</span>
                     @if($pendingLeaveRequests->total() > 0)
-                        <span class="ms-2 px-1.5 py-0.5 rounded-full bg-orange-50 text-[color:var(--brand-from)] text-[10px]">{{ $pendingLeaveRequests->total() }}</span>
+                        <span class="ms-2 px-1.5 py-0.5 rounded-full bg-[color:var(--accent-orange)]/10 text-[color:var(--accent-orange)] text-[10px]">{{ $pendingLeaveRequests->total() }}</span>
                     @endif
-                    @if($pendingSubTab === 'leaves') <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-[color:var(--brand-from)] rounded-full"></div> @endif
+                    @if($pendingSubTab === 'leaves') <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-[color:var(--accent-orange)] rounded-full"></div> @endif
                 </button>
 
                 <button wire:click="setPendingSubTab('permissions')" 
                     onclick="showTabLoadingBar()"
-                    class="pb-3 text-sm font-bold transition-all relative {{ $pendingSubTab === 'permissions' ? 'text-[color:var(--brand-from)]' : 'text-gray-400 hover:text-gray-600' }}">
+                    class="pb-3 text-sm font-bold transition-all relative {{ $pendingSubTab === 'permissions' ? 'text-[color:var(--accent-orange)]' : 'text-gray-400 hover:text-gray-600' }}">
                     <span>{{ tr('Permission Requests') }}</span>
                     @if($pendingPermissionRequests->total() > 0)
-                        <span class="ms-2 px-1.5 py-0.5 rounded-full bg-orange-50 text-[color:var(--brand-from)] text-[10px]">{{ $pendingPermissionRequests->total() }}</span>
+                        <span class="ms-2 px-1.5 py-0.5 rounded-full bg-[color:var(--accent-orange)]/10 text-[color:var(--accent-orange)] text-[10px]">{{ $pendingPermissionRequests->total() }}</span>
                     @endif
-                    @if($pendingSubTab === 'permissions') <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-[color:var(--brand-from)] rounded-full"></div> @endif
+                    @if($pendingSubTab === 'permissions') <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-[color:var(--accent-orange)] rounded-full"></div> @endif
                 </button>
 
                 <button wire:click="setPendingSubTab('cuts')" 
                     onclick="showTabLoadingBar()"
-                    class="pb-3 text-sm font-bold transition-all relative {{ $pendingSubTab === 'cuts' ? 'text-[color:var(--brand-from)]' : 'text-gray-400 hover:text-gray-600' }}">
+                    class="pb-3 text-sm font-bold transition-all relative {{ $pendingSubTab === 'cuts' ? 'text-[color:var(--accent-orange)]' : 'text-gray-400 hover:text-gray-600' }}">
                     <span>{{ tr('Cut Requests') }}</span>
                     @if($pendingCutLeaveRequests->total() > 0)
-                        <span class="ms-2 px-1.5 py-0.5 rounded-full bg-orange-50 text-[color:var(--brand-from)] text-[10px]">{{ $pendingCutLeaveRequests->total() }}</span>
+                        <span class="ms-2 px-1.5 py-0.5 rounded-full bg-[color:var(--accent-orange)]/10 text-[color:var(--accent-orange)] text-[10px]">{{ $pendingCutLeaveRequests->total() }}</span>
                     @endif
-                    @if($pendingSubTab === 'cuts') <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-[color:var(--brand-from)] rounded-full"></div> @endif
+                    @if($pendingSubTab === 'cuts') <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-[color:var(--accent-orange)] rounded-full"></div> @endif
                 </button>
 
                 <button wire:click="setPendingSubTab('missions')" 
                     onclick="showTabLoadingBar()"
-                    class="pb-3 text-sm font-bold transition-all relative {{ $pendingSubTab === 'missions' ? 'text-[color:var(--brand-from)]' : 'text-gray-400 hover:text-gray-600' }}">
+                    class="pb-3 text-sm font-bold transition-all relative {{ $pendingSubTab === 'missions' ? 'text-[color:var(--accent-orange)]' : 'text-gray-400 hover:text-gray-600' }}">
                     <span>{{ tr('Mission Requests') }}</span>
                     @if($pendingMissionRequests->total() > 0)
-                        <span class="ms-2 px-1.5 py-0.5 rounded-full bg-orange-50 text-[color:var(--brand-from)] text-[10px]">{{ $pendingMissionRequests->total() }}</span>
+                        <span class="ms-2 px-1.5 py-0.5 rounded-full bg-[color:var(--accent-orange)]/10 text-[color:var(--accent-orange)] text-[10px]">{{ $pendingMissionRequests->total() }}</span>
                     @endif
-                    @if($pendingSubTab === 'missions') <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-[color:var(--brand-from)] rounded-full"></div> @endif
+                    @if($pendingSubTab === 'missions') <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-[color:var(--accent-orange)] rounded-full"></div> @endif
                 </button>
             </div>
 
@@ -355,15 +364,15 @@
                                             </span>
                                             <div class="mt-1">
                                                 @if($r->replacement_status === 'pending')
-                                                    <span class="text-amber-600 font-bold bg-amber-50 px-1.5 py-0.5 rounded border border-amber-100">
+                                                    <span class="text-[color:var(--warning)] font-bold bg-[color:var(--warning)]/10 px-1.5 py-0.5 rounded border border-[color:var(--warning)]/20">
                                                         <i class="fas fa-clock mr-1"></i> {{ tr('Waiting Response') }}
                                                     </span>
                                                 @elseif($r->replacement_status === 'approved')
-                                                    <span class="text-green-600 font-bold bg-green-50 px-1.5 py-0.5 rounded border border-green-100">
+                                                    <span class="text-[color:var(--success)] font-bold bg-[color:var(--success)]/10 px-1.5 py-0.5 rounded border border-[color:var(--success)]/20">
                                                         <i class="fas fa-check-circle mr-1"></i> {{ tr('Accepted') }}
                                                     </span>
                                                 @elseif($r->replacement_status === 'rejected')
-                                                    <span class="text-red-600 font-bold bg-red-50 px-1.5 py-0.5 rounded border border-red-100">
+                                                    <span class="text-[color:var(--error)] font-bold bg-[color:var(--error)]/10 px-1.5 py-0.5 rounded border border-[color:var(--error)]/20">
                                                         <i class="fas fa-times-circle mr-1"></i> {{ tr('Rejected') }}
                                                     </span>
                                                 @endif
@@ -397,12 +406,12 @@
                                     @endphp
                                     @if($r->policy)
                                     <div class="mt-1 text-[10px] text-gray-500 font-bold">
-                                        {{ tr('Remaining Balance') }}: <span class="{{ $remaining > 0 ? 'text-green-600' : 'text-red-600' }}">{{ $smartNumber($remaining) }}</span>
+                                        {{ tr('Remaining Balance') }}: <span class="{{ $remaining > 0 ? 'text-[color:var(--success)]' : 'text-[color:var(--error)]' }}">{{ $smartNumber($remaining) }}</span>
                                     </div>
                                     @endif
                                     @if($r->is_exception && $r->exception_status === 'pending_hr')
                                         <div class="mt-1">
-                                            <x-ui.badge class="text-[10px] bg-amber-100 text-amber-800 border border-amber-200">
+                                            <x-ui.badge class="text-[10px] bg-[color:var(--warning)]/10 text-[color:var(--warning)] border border-[color:var(--warning)]/20">
                                                 <i class="fas fa-exclamation-triangle mr-1"></i> {{ tr('Limit Exceeded - Exception') }}
                                             </x-ui.badge>
                                         </div>
@@ -435,7 +444,7 @@
                                         <div class="flex -space-x-2 overflow-hidden">
                                             @foreach($r->approvalTasks as $task)
                                                 <div class="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm transition-all hover:scale-110 hover:z-10
-                                                    {{ $task->status === 'approved' ? 'bg-green-500' : ($task->status === 'rejected' ? 'bg-red-500' : ($task->status === 'pending' ? 'bg-blue-500 animate-pulse' : 'bg-gray-300')) }}"
+                                                    {{ $approvalTaskClass($task->status) }}"
                                                     title="{{ ($task->approver?->name ?? $task->approver_name) . ': ' . tr($task->status) }}">
                                                     @if($task->status === 'approved') <i class="fas fa-check"></i>
                                                     @elseif($task->status === 'rejected') <i class="fas fa-times"></i>
@@ -444,7 +453,7 @@
                                                 </div>
                                             @endforeach
                                         </div>
-                                        <button wire:click="openWorkflow('leave', {{ $r->id }})" class="p-1.5 text-[color:var(--brand-via)] hover:bg-orange-50 rounded-lg transition-all" title="{{ tr('View sequence') }}">
+                                        <button wire:click="openWorkflow('leave', {{ $r->id }})" class="p-1.5 text-[color:var(--accent-orange)] hover:bg-[color:var(--accent-orange)]/10 rounded-lg transition-all" title="{{ tr('View sequence') }}">
                                             <i class="fas fa-project-diagram text-base"></i>
                                         </button>
                                     </div>
@@ -455,7 +464,7 @@
                                     <div class="flex flex-wrap items-center gap-1.5">
                                         @if($r->attachment_path)
                                             <a href="{{ asset('storage/' . $r->attachment_path) }}" target="_blank"
-                                               class="p-2 text-xs font-bold bg-white text-[color:var(--brand-from)] border border-orange-100 rounded-lg shadow-sm hover:bg-orange-50 transition-all"
+                                               class="p-2 text-xs font-bold bg-white text-[color:var(--accent-orange)] border border-[color:var(--accent-orange)]/20 rounded-lg shadow-sm hover:bg-[color:var(--accent-orange)]/10 transition-all"
                                                title="{{ $r->attachment_name ?: tr('View Attachment') }}">
                                                 <i class="fas fa-paperclip"></i>
                                             </a>
@@ -470,7 +479,7 @@
                                             <x-ui.primary-button
                                                 type="button"
                                                 wire:click.prevent="respondToReplacementRequest({{ $r->id }}, 'approve')"
-                                                class="px-4 py-1.5 text-xs font-bold bg-green-600 hover:bg-green-700 text-white !rounded-lg"
+                                                class="px-4 py-1.5 text-xs font-bold bg-[color:var(--success)] hover:brightness-95 text-white !rounded-lg"
                                             >
                                                 {{ tr('Accept Coverage') }}
                                             </x-ui.primary-button>
@@ -478,7 +487,7 @@
                                             <x-ui.secondary-button
                                                 type="button"
                                                 wire:click.prevent="openReject('replacement', {{ $r->id }})"
-                                                class="px-4 py-1.5 text-xs font-bold bg-red-50 text-red-600 border-red-100 hover:bg-red-100 !rounded-lg"
+                                                class="px-4 py-1.5 text-xs font-bold bg-[color:var(--error)]/10 text-[color:var(--error)] border-[color:var(--error)]/20 hover:bg-[color:var(--error)]/15 !rounded-lg"
                                             >
                                                 {{ tr('Reject Coverage') }}
                                             </x-ui.secondary-button>
@@ -497,7 +506,7 @@
                                             <x-ui.secondary-button
                                                 type="button"
                                                 wire:click.prevent="openReject('leave', {{ $r->id }})"
-                                                class="px-4 py-2 text-xs font-bold !text-red-500 !border-red-200 hover:!bg-red-50 !rounded-lg"
+                                                class="px-4 py-2 text-xs font-bold !text-[color:var(--error)] !border-[color:var(--error)]/30 hover:!bg-[color:var(--error)]/10 !rounded-lg"
                                             >
                                                 <i class="fas fa-times me-2"></i> {{ tr('Reject') }}
                                             </x-ui.secondary-button>
@@ -591,7 +600,7 @@
                                         <div class="flex -space-x-2 overflow-hidden">
                                             @foreach($r->approvalTasks as $task)
                                                 <div class="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm transition-all hover:scale-110 hover:z-10
-                                                    {{ $task->status === 'approved' ? 'bg-green-500' : ($task->status === 'rejected' ? 'bg-red-500' : ($task->status === 'pending' ? 'bg-blue-500 animate-pulse' : 'bg-gray-300')) }}"
+                                                    {{ $approvalTaskClass($task->status) }}"
                                                     title="{{ ($task->approver?->name ?? $task->approver_name) . ': ' . tr($task->status) }}">
                                                     @if($task->status === 'approved') <i class="fas fa-check"></i>
                                                     @elseif($task->status === 'rejected') <i class="fas fa-times"></i>
@@ -600,7 +609,7 @@
                                                 </div>
                                             @endforeach
                                         </div>
-                                        <button wire:click="openWorkflow('permission', {{ $r->id }})" class="p-1.5 text-[color:var(--brand-via)] hover:bg-orange-50 rounded-lg transition-all" title="{{ tr('View sequence') }}">
+                                        <button wire:click="openWorkflow('permission', {{ $r->id }})" class="p-1.5 text-[color:var(--accent-orange)] hover:bg-[color:var(--accent-orange)]/10 rounded-lg transition-all" title="{{ tr('View sequence') }}">
                                             <i class="fas fa-project-diagram text-base"></i>
                                         </button>
                                     </div>
@@ -611,7 +620,7 @@
                                     <div class="flex flex-wrap items-center gap-1.5">
                                         @if($r->attachment_path)
                                             <a href="{{ asset('storage/' . $r->attachment_path) }}" target="_blank"
-                                               class="p-2 text-xs font-bold bg-white text-[color:var(--brand-from)] border border-orange-100 rounded-lg shadow-sm hover:bg-orange-50 transition-all"
+                                               class="p-2 text-xs font-bold bg-white text-[color:var(--accent-orange)] border border-[color:var(--accent-orange)]/20 rounded-lg shadow-sm hover:bg-[color:var(--accent-orange)]/10 transition-all"
                                                title="{{ $r->attachment_name ?: tr('View Attachment') }}">
                                                 <i class="fas fa-paperclip"></i>
                                             </a>
@@ -637,7 +646,7 @@
                                             <x-ui.secondary-button
                                                 type="button"
                                                 wire:click.prevent="openReject('permission', {{ $r->id }})"
-                                                class="px-4 py-2 text-xs font-bold !text-red-500 !border-red-200 hover:!bg-red-50 !rounded-lg"
+                                                class="px-4 py-2 text-xs font-bold !text-[color:var(--error)] !border-[color:var(--error)]/30 hover:!bg-[color:var(--error)]/10 !rounded-lg"
                                             >
                                                 <i class="fas fa-times me-2"></i> {{ tr('Reject') }}
                                             </x-ui.secondary-button>
@@ -721,7 +730,7 @@
                                         <div class="flex -space-x-2 overflow-hidden">
                                             @foreach($row->approvalTasks as $task)
                                                 <div class="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm transition-all hover:scale-110 hover:z-10
-                                                    {{ $task->status === 'approved' ? 'bg-green-500' : ($task->status === 'rejected' ? 'bg-red-500' : ($task->status === 'pending' ? 'bg-blue-500 animate-pulse' : 'bg-gray-300')) }}"
+                                                    {{ $approvalTaskClass($task->status) }}"
                                                     title="{{ ($task->approver?->name ?? $task->approver_name) . ': ' . tr($task->status) }}">
                                                     @if($task->status === 'approved') <i class="fas fa-check"></i>
                                                     @elseif($task->status === 'rejected') <i class="fas fa-times"></i>
@@ -730,7 +739,7 @@
                                                 </div>
                                             @endforeach
                                         </div>
-                                        <button wire:click="openWorkflow('cut', {{ $row->id }})" class="p-1.5 text-[color:var(--brand-via)] hover:bg-orange-50 rounded-lg transition-all" title="{{ tr('View sequence') }}">
+                                        <button wire:click="openWorkflow('cut', {{ $row->id }})" class="p-1.5 text-[color:var(--accent-orange)] hover:bg-[color:var(--accent-orange)]/10 rounded-lg transition-all" title="{{ tr('View sequence') }}">
                                             <i class="fas fa-project-diagram text-base"></i>
                                         </button>
                                     </div>
@@ -759,7 +768,7 @@
                                             <x-ui.secondary-button
                                                 type="button"
                                                 wire:click.prevent="openReject('cut_leave', {{ (int) $row->id }})"
-                                                class="px-5 py-2.5 text-xs font-bold !text-red-600 !border-red-600 hover:!bg-red-50"
+                                                class="px-5 py-2.5 text-xs font-bold !text-[color:var(--error)] !border-[color:var(--error)] hover:!bg-[color:var(--error)]/10"
                                             >
                                                 {{ tr('Reject') }}
                                             </x-ui.secondary-button>
@@ -859,7 +868,7 @@
                                         <div class="flex -space-x-2 overflow-hidden">
                                             @foreach($r->approvalTasks as $task)
                                                 <div class="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm transition-all hover:scale-110 hover:z-10
-                                                    {{ $task->status === 'approved' ? 'bg-green-500' : ($task->status === 'rejected' ? 'bg-red-500' : ($task->status === 'pending' ? 'bg-blue-500 animate-pulse' : 'bg-gray-300')) }}"
+                                                    {{ $approvalTaskClass($task->status) }}"
                                                     title="{{ ($task->approver?->name ?? $task->approver_name) . ': ' . tr($task->status) }}">
                                                     @if($task->status === 'approved') <i class="fas fa-check"></i>
                                                     @elseif($task->status === 'rejected') <i class="fas fa-times"></i>
@@ -868,7 +877,7 @@
                                                 </div>
                                             @endforeach
                                         </div>
-                                        <button wire:click="openWorkflow('mission', {{ $r->id }})" class="p-1.5 text-[color:var(--brand-via)] hover:bg-orange-50 rounded-lg transition-all" title="{{ tr('View sequence') }}">
+                                        <button wire:click="openWorkflow('mission', {{ $r->id }})" class="p-1.5 text-[color:var(--accent-orange)] hover:bg-[color:var(--accent-orange)]/10 rounded-lg transition-all" title="{{ tr('View sequence') }}">
                                             <i class="fas fa-project-diagram text-base"></i>
                                         </button>
                                     </div>
@@ -878,7 +887,7 @@
                                     <div class="flex flex-wrap items-center gap-1.5">
                                         @if($r->attachment_path)
                                             <a href="{{ asset('storage/' . $r->attachment_path) }}" target="_blank"
-                                               class="p-2 text-xs font-bold bg-white text-[color:var(--brand-from)] border border-orange-100 rounded-lg shadow-sm hover:bg-orange-50 transition-all font-mono"
+                                               class="p-2 text-xs font-bold bg-white text-[color:var(--accent-orange)] border border-[color:var(--accent-orange)]/20 rounded-lg shadow-sm hover:bg-[color:var(--accent-orange)]/10 transition-all font-mono"
                                                title="{{ $r->attachment_name ?: tr('View Attachment') }}">
                                                 <i class="fas fa-paperclip"></i>
                                             </a>
@@ -905,7 +914,7 @@
                                             <x-ui.secondary-button
                                                 type="button"
                                                 wire:click.prevent="openReject('mission', {{ $r->id }})"
-                                                class="px-4 py-2 text-xs font-bold !text-red-500 !border-red-200 hover:!bg-red-50 !rounded-lg"
+                                                class="px-4 py-2 text-xs font-bold !text-[color:var(--error)] !border-[color:var(--error)]/30 hover:!bg-[color:var(--error)]/10 !rounded-lg"
                                             >
                                                 <i class="fas fa-times me-2"></i>
                                                 {{ tr('Reject') }}
@@ -969,7 +978,7 @@
                                 <button
                                     type="button"
                                     x-on:click="expanded[{{ $employeeBalance->id }}] = !expanded[{{ $employeeBalance->id }}]"
-                                    class="w-8 h-8 rounded-lg border border-gray-200 bg-white text-gray-500 hover:text-[color:var(--brand-from)] hover:border-[color:var(--brand-from)] transition-all"
+                                    class="w-8 h-8 rounded-lg border border-gray-200 bg-white text-gray-500 hover:text-[color:var(--accent-orange)] hover:border-[color:var(--accent-orange)] transition-all"
                                     title="{{ tr('Show Details') }}"
                                 >
                                     <i class="fas" x-bind:class="expanded[{{ $employeeBalance->id }}] ? 'fa-chevron-up' : 'fa-chevron-down'"></i>
@@ -1039,7 +1048,7 @@
                                                             <x-ui.secondary-button
                                                                 type="button"
                                                                 wire:click="openBalanceAudit({{ $row->balance_id }})"
-                                                                class="px-2 py-1 text-[10px] font-bold border-blue-200 text-blue-600 hover:bg-orange-50"
+                                                                class="px-2 py-1 text-[10px] font-bold border-[color:var(--accent-orange)]/20 text-[color:var(--accent-orange)] hover:bg-[color:var(--accent-orange)]/10"
                                                                 title="{{ tr('Audit History') }}"
                                                             >
                                                                 <i class="fas fa-history"></i>
@@ -1142,7 +1151,7 @@
                                 <x-ui.secondary-button
                                     type="button"
                                     wire:click="openBalanceAudit({{ $b->id }})"
-                                    class="px-2 py-1 text-[10px] font-bold border-blue-200 text-blue-600 hover:bg-orange-50"
+                                    class="px-2 py-1 text-[10px] font-bold border-[color:var(--accent-orange)]/20 text-[color:var(--accent-orange)] hover:bg-[color:var(--accent-orange)]/10"
                                     title="{{ tr('Audit History') }}"
                                 >
                                     <i class="fas fa-history"></i>
@@ -1173,37 +1182,37 @@
             <div class="flex items-center gap-6 border-b border-gray-200 overflow-x-auto">
                 <button wire:click="setHistorySubTab('leaves')" 
                     onclick="showTabLoadingBar()"
-                    class="pb-3 text-sm font-bold transition-all relative whitespace-nowrap {{ $historySubTab === 'leaves' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600' }}">
+                    class="pb-3 text-sm font-bold transition-all relative whitespace-nowrap {{ $historySubTab === 'leaves' ? 'text-[color:var(--accent-orange)]' : 'text-gray-400 hover:text-gray-600' }}">
                     <span>{{ tr('Previous Leave Requests') }}</span>
-                    @if($historySubTab === 'leaves') <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full"></div> @endif
+                    @if($historySubTab === 'leaves') <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-[color:var(--accent-orange)] rounded-full"></div> @endif
                 </button>
 
                 <button wire:click="setHistorySubTab('permissions')" 
                     onclick="showTabLoadingBar()"
-                    class="pb-3 text-sm font-bold transition-all relative whitespace-nowrap {{ $historySubTab === 'permissions' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600' }}">
+                    class="pb-3 text-sm font-bold transition-all relative whitespace-nowrap {{ $historySubTab === 'permissions' ? 'text-[color:var(--accent-orange)]' : 'text-gray-400 hover:text-gray-600' }}">
                     <span>{{ tr('Previous Permissions') }}</span>
-                    @if($historySubTab === 'permissions') <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full"></div> @endif
+                    @if($historySubTab === 'permissions') <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-[color:var(--accent-orange)] rounded-full"></div> @endif
                 </button>
 
                 <button wire:click="setHistorySubTab('missions')" 
                     onclick="showTabLoadingBar()"
-                    class="pb-3 text-sm font-bold transition-all relative whitespace-nowrap {{ $historySubTab === 'missions' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600' }}">
+                    class="pb-3 text-sm font-bold transition-all relative whitespace-nowrap {{ $historySubTab === 'missions' ? 'text-[color:var(--accent-orange)]' : 'text-gray-400 hover:text-gray-600' }}">
                     <span>{{ tr('Previous Mission Requests') }}</span>
-                    @if($historySubTab === 'missions') <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full"></div> @endif
+                    @if($historySubTab === 'missions') <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-[color:var(--accent-orange)] rounded-full"></div> @endif
                 </button>
 
                 <button wire:click="setHistorySubTab('cuts')" 
                     onclick="showTabLoadingBar()"
-                    class="pb-3 text-sm font-bold transition-all relative whitespace-nowrap {{ $historySubTab === 'cuts' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600' }}">
+                    class="pb-3 text-sm font-bold transition-all relative whitespace-nowrap {{ $historySubTab === 'cuts' ? 'text-[color:var(--accent-orange)]' : 'text-gray-400 hover:text-gray-600' }}">
                     <span>{{ tr('Previous Cut Requests') }}</span>
-                    @if($historySubTab === 'cuts') <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full"></div> @endif
+                    @if($historySubTab === 'cuts') <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-[color:var(--accent-orange)] rounded-full"></div> @endif
                 </button>
 
                 <button wire:click="setHistorySubTab('activity')" 
                     onclick="showTabLoadingBar()"
-                    class="pb-3 text-sm font-bold transition-all relative whitespace-nowrap {{ $historySubTab === 'activity' ? 'text-indigo-600' : 'text-gray-400 hover:text-gray-600' }}">
+                    class="pb-3 text-sm font-bold transition-all relative whitespace-nowrap {{ $historySubTab === 'activity' ? 'text-[color:var(--accent-orange)]' : 'text-gray-400 hover:text-gray-600' }}">
                     <span>{{ tr('Activity Log') }}</span>
-                    @if($historySubTab === 'activity') <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-indigo-600 rounded-full"></div> @endif
+                    @if($historySubTab === 'activity') <div class="absolute bottom-0 left-0 right-0 h-0.5 bg-[color:var(--accent-orange)] rounded-full"></div> @endif
                 </button>
             </div>
 
@@ -1277,7 +1286,7 @@
                                     @endphp
                                     @if($r->policy)
                                         <div class="mt-1 text-[10px] text-gray-500 font-bold">
-                                            {{ tr('Remaining Balance') }}: <span class="{{ $remaining > 0 ? 'text-green-600' : 'text-red-600' }}">{{ $smartNumber($remaining) }}</span>
+                                            {{ tr('Remaining Balance') }}: <span class="{{ $remaining > 0 ? 'text-[color:var(--success)]' : 'text-[color:var(--error)]' }}">{{ $smartNumber($remaining) }}</span>
                                         </div>
                                     @endif
                                 </td>
@@ -1309,7 +1318,7 @@
                                         <div class="flex -space-x-2 overflow-hidden">
                                             @foreach($r->approvalTasks as $task)
                                                 <div class="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm transition-all hover:scale-110 hover:z-10
-                                                    {{ $task->status === 'approved' ? 'bg-green-500' : ($task->status === 'rejected' ? 'bg-red-500' : ($task->status === 'pending' ? 'bg-blue-500 animate-pulse' : 'bg-gray-300')) }}"
+                                                    {{ $approvalTaskClass($task->status) }}"
                                                     title="{{ ($task->approver?->name ?? $task->approver_name) . ': ' . tr($task->status) }}">
                                                     @if($task->status === 'approved') <i class="fas fa-check"></i>
                                                     @elseif($task->status === 'rejected') <i class="fas fa-times"></i>
@@ -1318,7 +1327,7 @@
                                                 </div>
                                             @endforeach
                                         </div>
-                                        <button wire:click="openWorkflow('leave', {{ $r->id }})" class="p-1.5 text-[color:var(--brand-via)] hover:bg-orange-50 rounded-lg transition-all" title="{{ tr('View sequence') }}">
+                                        <button wire:click="openWorkflow('leave', {{ $r->id }})" class="p-1.5 text-[color:var(--accent-orange)] hover:bg-[color:var(--accent-orange)]/10 rounded-lg transition-all" title="{{ tr('View sequence') }}">
                                             <i class="fas fa-project-diagram text-base"></i>
                                         </button>
                                     </div>
@@ -1334,7 +1343,7 @@
                                     <div class="flex items-center gap-1.5">
                                         @if($r->attachment_path)
                                             <a href="{{ asset('storage/' . $r->attachment_path) }}" target="_blank"
-                                               class="p-2 text-xs font-bold bg-white text-[color:var(--brand-from)] border border-orange-100 rounded-lg shadow-sm hover:bg-orange-50 transition-all font-mono"
+                                               class="p-2 text-xs font-bold bg-white text-[color:var(--accent-orange)] border border-[color:var(--accent-orange)]/20 rounded-lg shadow-sm hover:bg-[color:var(--accent-orange)]/10 transition-all font-mono"
                                                title="{{ $r->attachment_name ?: tr('View Attachment') }}">
                                                 <i class="fas fa-paperclip"></i>
                                             </a>
@@ -1345,7 +1354,7 @@
                                             <x-ui.secondary-button
                                                 type="button"
                                                 @click.prevent="$dispatch('open-confirm-cancel-leave-dialog', { id: {{ $r->id }} })"
-                                                class="px-3 py-1.5 text-xs font-bold bg-white text-red-500 border-red-100 hover:bg-red-50 !rounded-lg shadow-sm transition-all"
+                                                class="px-3 py-1.5 text-xs font-bold bg-white text-[color:var(--error)] border-[color:var(--error)]/20 hover:bg-[color:var(--error)]/10 !rounded-lg shadow-sm transition-all"
                                             >
                                                 {{ tr('Cancel') }}
                                             </x-ui.secondary-button>
@@ -1444,7 +1453,7 @@
                                         <div class="flex -space-x-2 overflow-hidden">
                                             @foreach($r->approvalTasks as $task)
                                                 <div class="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm transition-all hover:scale-110 hover:z-10
-                                                    {{ $task->status === 'approved' ? 'bg-green-500' : ($task->status === 'rejected' ? 'bg-red-500' : ($task->status === 'pending' ? 'bg-blue-500 animate-pulse' : 'bg-gray-300')) }}"
+                                                    {{ $approvalTaskClass($task->status) }}"
                                                     title="{{ ($task->approver?->name ?? $task->approver_name) . ': ' . tr($task->status) }}">
                                                     @if($task->status === 'approved') <i class="fas fa-check"></i>
                                                     @elseif($task->status === 'rejected') <i class="fas fa-times"></i>
@@ -1453,7 +1462,7 @@
                                                 </div>
                                             @endforeach
                                         </div>
-                                        <button wire:click="openWorkflow('permission', {{ $r->id }})" class="p-1.5 text-[color:var(--brand-via)] hover:bg-orange-50 rounded-lg transition-all" title="{{ tr('View sequence') }}">
+                                        <button wire:click="openWorkflow('permission', {{ $r->id }})" class="p-1.5 text-[color:var(--accent-orange)] hover:bg-[color:var(--accent-orange)]/10 rounded-lg transition-all" title="{{ tr('View sequence') }}">
                                             <i class="fas fa-project-diagram text-base"></i>
                                         </button>
                                     </div>
@@ -1469,7 +1478,7 @@
                                     <div class="flex items-center gap-1.5">
                                         @if($r->attachment_path)
                                             <a href="{{ asset('storage/' . $r->attachment_path) }}" target="_blank"
-                                               class="p-2 text-xs font-bold bg-white text-[color:var(--brand-from)] border border-orange-100 rounded-lg shadow-sm hover:bg-orange-50 transition-all font-mono"
+                                               class="p-2 text-xs font-bold bg-white text-[color:var(--accent-orange)] border border-[color:var(--accent-orange)]/20 rounded-lg shadow-sm hover:bg-[color:var(--accent-orange)]/10 transition-all font-mono"
                                                title="{{ $r->attachment_name ?: tr('View Attachment') }}">
                                                 <i class="fas fa-paperclip"></i>
                                             </a>
@@ -1554,7 +1563,7 @@
                                         <div class="flex -space-x-2 overflow-hidden">
                                             @foreach($row->approvalTasks as $task)
                                                 <div class="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm transition-all hover:scale-110 hover:z-10
-                                                    {{ $task->status === 'approved' ? 'bg-green-500' : ($task->status === 'rejected' ? 'bg-red-500' : ($task->status === 'pending' ? 'bg-blue-500 animate-pulse' : 'bg-gray-300')) }}"
+                                                    {{ $approvalTaskClass($task->status) }}"
                                                     title="{{ ($task->approver?->name ?? $task->approver_name) . ': ' . tr($task->status) }}">
                                                     @if($task->status === 'approved') <i class="fas fa-check"></i>
                                                     @elseif($task->status === 'rejected') <i class="fas fa-times"></i>
@@ -1563,7 +1572,7 @@
                                                 </div>
                                             @endforeach
                                         </div>
-                                        <button wire:click="openWorkflow('cut', {{ $row->id }})" class="p-1.5 text-[color:var(--brand-via)] hover:bg-orange-50 rounded-lg transition-all" title="{{ tr('View sequence') }}">
+                                        <button wire:click="openWorkflow('cut', {{ $row->id }})" class="p-1.5 text-[color:var(--accent-orange)] hover:bg-[color:var(--accent-orange)]/10 rounded-lg transition-all" title="{{ tr('View sequence') }}">
                                             <i class="fas fa-project-diagram text-base"></i>
                                         </button>
                                     </div>
@@ -1665,7 +1674,7 @@
                                         <div class="flex -space-x-2 overflow-hidden">
                                             @foreach($r->approvalTasks as $task)
                                                 <div class="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm transition-all hover:scale-110 hover:z-10
-                                                    {{ $task->status === 'approved' ? 'bg-green-500' : ($task->status === 'rejected' ? 'bg-red-500' : ($task->status === 'pending' ? 'bg-blue-500 animate-pulse' : 'bg-gray-300')) }}"
+                                                    {{ $approvalTaskClass($task->status) }}"
                                                     title="{{ ($task->approver?->name ?? $task->approver_name) . ': ' . tr($task->status) }}">
                                                     @if($task->status === 'approved') <i class="fas fa-check"></i>
                                                     @elseif($task->status === 'rejected') <i class="fas fa-times"></i>
@@ -1674,7 +1683,7 @@
                                                 </div>
                                             @endforeach
                                         </div>
-                                        <button wire:click="openWorkflow('mission', {{ $r->id }})" class="p-1.5 text-[color:var(--brand-via)] hover:bg-orange-50 rounded-lg transition-all" title="{{ tr('View sequence') }}">
+                                        <button wire:click="openWorkflow('mission', {{ $r->id }})" class="p-1.5 text-[color:var(--accent-orange)] hover:bg-[color:var(--accent-orange)]/10 rounded-lg transition-all" title="{{ tr('View sequence') }}">
                                             <i class="fas fa-project-diagram text-base"></i>
                                         </button>
                                     </div>
@@ -1690,7 +1699,7 @@
                                     <div class="flex items-center gap-1.5">
                                         @if($r->attachment_path)
                                             <a href="{{ asset('storage/' . $r->attachment_path) }}" target="_blank"
-                                               class="p-2 text-xs font-bold bg-white text-[color:var(--brand-from)] border border-orange-100 rounded-lg shadow-sm hover:bg-orange-50 transition-all font-mono"
+                                               class="p-2 text-xs font-bold bg-white text-[color:var(--accent-orange)] border border-[color:var(--accent-orange)]/20 rounded-lg shadow-sm hover:bg-[color:var(--accent-orange)]/10 transition-all font-mono"
                                                title="{{ $r->attachment_name ?: tr('View Attachment') }}">
                                                 <i class="fas fa-paperclip"></i>
                                             </a>
@@ -1803,7 +1812,7 @@
     <x-ui.modal wire:model="createLeaveOpen" max-width="lg">
         <x-slot name="title">
             <div class="flex items-center gap-3">
-                <div class="p-2 bg-orange-50 text-[color:var(--brand-from)] rounded-lg">
+                <div class="p-2 bg-[color:var(--accent-orange)]/10 text-[color:var(--accent-orange)] rounded-lg">
                     <i class="fas fa-calendar-plus text-lg"></i>
                 </div>
                 <div>
@@ -1845,7 +1854,7 @@
 
 
                         @if($employee_id > 0 && $createLeavePolicies->isEmpty())
-                            <div class="text-[11px] text-amber-700 mt-1">
+                            <div class="text-[11px] text-[color:var(--warning)] mt-1">
                                 {{ tr('No leave policies available for this employee.') }}
                             </div>
                         @endif
@@ -1944,17 +1953,17 @@
 
                 {{-- âœ… Policy Note --}}
                 @if(trim($create_leave_note_text) !== '')
-                    <div class="bg-amber-50 border border-amber-100 rounded-xl p-3">
-                        <div class="text-[11px] text-amber-800 font-bold mb-1">
+                    <div class="bg-[color:var(--warning)]/10 border border-[color:var(--warning)]/20 rounded-xl p-3">
+                        <div class="text-[11px] text-[color:var(--warning)] font-bold mb-1">
                             {{ tr('Note') }}
                         </div>
-                        <div class="text-sm text-amber-900 leading-relaxed">
+                        <div class="text-sm text-gray-800 leading-relaxed">
                             {{ $create_leave_note_text }}
                         </div>
 
                         @if($create_leave_note_ack_required)
-                            <label class="flex items-center gap-2 mt-3 text-sm text-amber-900">
-                                <input type="checkbox" wire:model="leave_note_ack" class="rounded border-amber-300" @cannot('attendance.manage') disabled @endcannot />
+                            <label class="flex items-center gap-2 mt-3 text-sm text-gray-800">
+                                <input type="checkbox" wire:model="leave_note_ack" class="rounded border-[color:var(--warning)]/30 text-[color:var(--accent-orange)] focus:ring-[color:var(--accent-orange)]" @cannot('attendance.manage') disabled @endcannot />
                                 <span class="font-semibold">{{ tr('I acknowledge this note') }}</span>
                             </label>
                             @error('leave_note_ack') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
@@ -1984,7 +1993,7 @@
                             â€¢ {{ tr('Max') }}: {{ (int) $create_leave_attachment_max_mb }}MB
                         </div>
 
-                        <div wire:loading wire:target="leave_attachment" class="text-[11px] text-blue-600 mt-2">
+                        <div wire:loading wire:target="leave_attachment" class="text-[11px] text-[color:var(--accent-orange)] mt-2">
                             {{ tr('Uploading...') }}
                         </div>
 
@@ -2044,7 +2053,7 @@
     <x-ui.modal wire:model="createPermissionOpen" max-width="lg">
         <x-slot name="title">
             <div class="flex items-center gap-3">
-                <div class="p-2 bg-amber-50 text-amber-600 rounded-lg">
+                <div class="p-2 bg-[color:var(--warning)]/10 text-[color:var(--warning)] rounded-lg">
                     <i class="fas fa-clock text-lg"></i>
                 </div>
                 <div>
@@ -2181,7 +2190,7 @@
     <x-ui.modal wire:model="createGroupLeaveOpen" max-width="4xl">
         <x-slot name="title">
              <div class="flex items-center gap-3">
-                <div class="p-2 bg-orange-50 text-[color:var(--brand-from)] rounded-lg">
+                <div class="p-2 bg-[color:var(--accent-orange)]/10 text-[color:var(--accent-orange)] rounded-lg">
                     <i class="fas fa-users text-lg"></i>
                 </div>
                 <div>
@@ -2207,7 +2216,7 @@
                     <input
                         type="checkbox"
                         wire:model.live="group_leave_deduct_from_balance"
-                        class="rounded border-gray-300 text-[color:var(--brand-via)] focus:ring-[color:var(--brand-via)]"
+                        class="rounded border-gray-300 text-[color:var(--accent-orange)] focus:ring-[color:var(--accent-orange)]"
                         @cannot('attendance.manage') disabled @endcannot
                     />
                     <span class="font-semibold">{{ tr('Deduct from leave balance') }}</span>
@@ -2367,10 +2376,10 @@
                             @foreach($groupEmployeesForSelect as $e)
                                 <label class="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 border border-transparent hover:border-gray-100 transition-all cursor-pointer group">
                                     <input type="checkbox" value="{{ $e->id }}" wire:model="groupEmployeeIds" 
-                                        class="w-4 h-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                                        class="w-4 h-4 rounded border-gray-300 text-[color:var(--accent-orange)] focus:ring-[color:var(--accent-orange)]"
                                         @cannot('attendance.manage') disabled @endcannot />
                                     <div class="flex flex-col">
-                                        <span class="text-xs font-bold text-gray-800 group-hover:text-indigo-600 transition-colors">
+                                        <span class="text-xs font-bold text-gray-800 group-hover:text-[color:var(--accent-orange)] transition-colors">
                                             {{ $e->name_ar ?? $e->name_en ?? $e->name ?? $e->full_name ?? ('#'.$e->id) }}
                                         </span>
                                         <span class="text-[10px] text-gray-400">#{{ $e->id }}</span>
@@ -2400,7 +2409,7 @@
     <x-ui.modal wire:model="cutLeaveOpen" max-width="lg">
         <x-slot name="title">
              <div class="flex items-center gap-3">
-                <div class="p-2 bg-red-50 text-red-600 rounded-lg">
+                <div class="p-2 bg-[color:var(--error)]/10 text-[color:var(--error)] rounded-lg">
                     <i class="fas fa-cut text-lg"></i>
                 </div>
                 <div>
@@ -2457,7 +2466,7 @@
     <x-ui.modal wire:model="balanceAuditOpen" max-width="2xl">
         <x-slot name="title">
             <div class="flex items-center gap-3">
-                <i class="fas fa-file-invoice-dollar text-[color:var(--brand-via)]"></i>
+                <i class="fas fa-file-invoice-dollar text-[color:var(--accent-orange)]"></i>
                 <span>{{ tr('Leave Balance Audit') }}</span>
             </div>
         </x-slot>
@@ -2489,11 +2498,11 @@
                             </div>
                             <div>
                                 <p class="text-[10px] text-gray-500 uppercase font-bold">{{ tr('Taken') }}</p>
-                                <p class="text-sm font-black text-red-600">{{ number_format((float) ($auditSummary['taken'] ?? 0), 2) }} {{ tr('Days') }}</p>
+                                <p class="text-sm font-black text-[color:var(--error)]">{{ number_format((float) ($auditSummary['taken'] ?? 0), 2) }} {{ tr('Days') }}</p>
                             </div>
                             <div>
                                 <p class="text-[10px] text-gray-500 uppercase font-bold">{{ tr('Remaining') }}</p>
-                                <p class="text-sm font-black text-[color:var(--brand-via)]">{{ number_format((float) ($auditSummary['remaining'] ?? 0), 2) }} {{ tr('Days') }}</p>
+                                <p class="text-sm font-black text-[color:var(--success)]">{{ number_format((float) ($auditSummary['remaining'] ?? 0), 2) }} {{ tr('Days') }}</p>
                             </div>
                         </div>
                     </div>
@@ -2521,7 +2530,7 @@
                                             <td class="p-3 font-mono">
                                                 {{ $log->start_date ? $log->start_date->toDateString() : '-' }} <i class="fas fa-arrow-right text-[8px] mx-1 opacity-50"></i> {{ $log->end_date ? $log->end_date->toDateString() : '-' }}
                                             </td>
-                                            <td class="p-3 text-center font-bold text-red-600">
+                                            <td class="p-3 text-center font-bold text-[color:var(--error)]">
                                                 -{{ number_format($log->requested_days, 2) }}
                                             </td>
                                             <td class="p-3 text-gray-600 truncate max-w-[150px]" title="{{ $log->reason }}">
@@ -2539,10 +2548,10 @@
                                         </tr>
                                     @endforelse
                                 </tbody>
-                                <tfoot class="bg-indigo-50/30">
+                                <tfoot class="bg-[color:var(--accent-orange)]/5">
                                     <tr>
                                         <td class="p-3 font-bold text-gray-900 text-end">{{ tr('Total Consumed') }}:</td>
-                                        <td class="p-3 text-center font-black text-red-700 underline">
+                                        <td class="p-3 text-center font-black text-[color:var(--error)] underline">
                                             {{ number_format((float) ($auditSummary['taken'] ?? 0), 2) }}
                                         </td>
                                         <td colspan="2"></td>
@@ -2567,7 +2576,7 @@
     <x-ui.modal wire:model="createGroupPermissionOpen" max-width="4xl">
         <x-slot name="title">
             <div class="flex items-center gap-3">
-                <div class="p-2 bg-amber-50 text-amber-600 rounded-lg">
+                <div class="p-2 bg-[color:var(--warning)]/10 text-[color:var(--warning)] rounded-lg">
                     <i class="fas fa-users-cog text-lg"></i>
                 </div>
                 <div>
@@ -2678,10 +2687,10 @@
                             @foreach($groupEmployeesForSelect as $e)
                                 <label class="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 border border-transparent hover:border-gray-100 transition-all cursor-pointer group">
                                     <input type="checkbox" value="{{ $e->id }}" wire:model="groupPermissionEmployeeIds" 
-                                        class="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                                        class="w-4 h-4 rounded border-gray-300 text-[color:var(--accent-orange)] focus:ring-[color:var(--accent-orange)]"
                                         @cannot('attendance.manage') disabled @endcannot />
                                     <div class="flex flex-col">
-                                        <span class="text-xs font-bold text-gray-800 group-hover:text-amber-600 transition-colors">
+                                        <span class="text-xs font-bold text-gray-800 group-hover:text-[color:var(--accent-orange)] transition-colors">
                                             {{ $e->name_ar ?? $e->name_en ?? $e->name ?? $e->full_name ?? ('#'.$e->id) }}
                                         </span>
                                         <span class="text-[10px] text-gray-400">#{{ $e->id }}</span>
@@ -2711,8 +2720,8 @@
         <x-slot name="title">
             <div class="flex items-center gap-4">
                 <div class="relative">
-                    <div class="absolute -inset-1 bg-gradient-to-tr from-[color:var(--brand-from)] to-[color:var(--brand-via)] rounded-xl blur opacity-25"></div>
-                    <div class="relative p-2.5 bg-white rounded-xl shadow-sm text-[color:var(--brand-from)] border border-gray-100">
+                    <div class="absolute -inset-1 bg-[color:var(--accent-orange)]/10 rounded-xl blur opacity-80"></div>
+                    <div class="relative p-2.5 bg-white rounded-xl shadow-sm text-[color:var(--accent-orange)] border border-gray-100">
                         <i class="fas fa-project-diagram text-xl"></i>
                     </div>
                 </div>
@@ -2741,14 +2750,14 @@
                                             </div>
                                          @endif
                                     </div>
-                                    <div class="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-green-500 border-2 border-white"></div>
+                                    <div class="absolute -bottom-1 -right-1 w-5 h-5 rounded-full bg-[color:var(--success)] border-2 border-white"></div>
                                 </div>
                                 <div>
                                     <div class="text-base font-black text-gray-900 leading-none mb-1.5 flex items-center gap-2">
                                         {{ $currentRequest->employee->name_ar ?? $currentRequest->employee->name_en ?? $currentRequest->employee->name ?? ('#' . $currentRequest->employee_id) }}
                                     </div>
                                     <div class="flex flex-wrap items-center gap-y-1 gap-x-3">
-                                        <span class="inline-flex items-center gap-1 text-[11px] font-bold text-[color:var(--brand-from)] bg-indigo-50 px-2 py-0.5 rounded-md">
+                                        <span class="inline-flex items-center gap-1 text-[11px] font-bold text-[color:var(--accent-orange)] bg-[color:var(--accent-orange)]/10 px-2 py-0.5 rounded-md">
                                             <i class="fas {{ $currentRequestType === 'leave' ? 'fa-calendar-day' : ($currentRequestType === 'permission' ? 'fa-hourglass-half' : 'fa-briefcase') }} opacity-70"></i>
                                             {{ $currentRequestType === 'leave' ? tr('Leave') : ($currentRequestType === 'permission' ? tr('Permission') : tr('Work Mission')) }}
                                         </span>
@@ -2763,9 +2772,9 @@
                             <div class="flex flex-col items-end gap-2">
                                 @php
                                     $statusClasses = [
-                                        'approved' => 'bg-green-100 text-green-700',
-                                        'rejected' => 'bg-red-100 text-red-700',
-                                        'pending' => 'bg-amber-100 text-amber-700',
+                                        'approved' => 'bg-[color:var(--success)]/10 text-[color:var(--success)]',
+                                        'rejected' => 'bg-[color:var(--error)]/10 text-[color:var(--error)]',
+                                        'pending' => 'bg-[color:var(--warning)]/10 text-[color:var(--warning)]',
                                         'canceled' => 'bg-gray-100 text-gray-700',
                                     ];
                                     $class = $statusClasses[$currentRequest->status] ?? 'bg-gray-100 text-gray-700';
@@ -2792,7 +2801,7 @@
                         @else
                             <div class="py-16 text-center group">
                                 <div class="relative inline-block mb-6">
-                                    <div class="absolute inset-0 bg-indigo-100 blur-2xl rounded-full opacity-30 group-hover:opacity-60 transition-opacity"></div>
+                                    <div class="absolute inset-0 bg-[color:var(--accent-orange)]/10 blur-2xl rounded-full opacity-30 group-hover:opacity-60 transition-opacity"></div>
                                     <i class="fas fa-shield-alt text-6xl text-gray-200 relative"></i>
                                 </div>
                                 <h4 class="text-sm font-black text-gray-600 mb-2">{{ tr('Standard Security Route') }}</h4>
@@ -2819,7 +2828,7 @@
     <x-ui.modal wire:model="createMissionOpen" max-width="lg">
         <x-slot name="title">
             <div class="flex items-center gap-3">
-                <div class="p-2 bg-orange-50 text-[color:var(--brand-from)] rounded-lg">
+                <div class="p-2 bg-[color:var(--accent-orange)]/10 text-[color:var(--accent-orange)] rounded-lg">
                     <i class="fas fa-briefcase text-lg"></i>
                 </div>
                 <div>

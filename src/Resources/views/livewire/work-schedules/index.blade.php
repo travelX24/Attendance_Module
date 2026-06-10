@@ -16,7 +16,7 @@
 <div class="w-full">
     {{-- Top Fixed Loading Bar --}}
     <div wire:loading class="fixed top-0 left-0 right-0 h-[3px] z-[9999] overflow-hidden pointer-events-none">
-        <div class="h-full w-full bg-gradient-to-r from-[color:var(--brand-from)] via-[color:var(--brand-via)] to-[color:var(--brand-to)]">
+        <div class="h-full w-full bg-[color:var(--accent-orange)]">
             <div class="h-full w-full bg-white/30 animate-[loading-sweep_1.5s_infinite]"></div>
         </div>
     </div>
@@ -39,9 +39,9 @@
             <x-ui.card hover
                 wire:click="clearAllFilters"
                 :title="tr('Shows all active employees in the company')"
-                class="flex items-center gap-4 cursor-pointer transition-all border-2 {{ $filterWarning === 'all' && $schedule_type === 'all' ? 'border-[color:var(--brand-via)] bg-[color:var(--brand-via)]/5' : 'border-transparent' }}"
+                class="flex items-center gap-4 cursor-pointer transition-all border-2 {{ $filterWarning === 'all' && $schedule_type === 'all' ? 'border-[color:var(--accent-orange)] bg-[color:var(--accent-orange)]/5' : 'border-transparent' }}"
             >
-                <div class="p-3 bg-indigo-50 text-[color:var(--brand-via)] rounded-xl">
+                <div class="p-3 bg-[color:var(--app-soft-bg)] text-[color:var(--brand-via)] rounded-xl border border-[color:var(--border-soft)]">
                     <i class="fas fa-users-cog fa-lg"></i>
                 </div>
                 <div>
@@ -56,9 +56,9 @@
             <x-ui.card hover
                 wire:click="$set('schedule_type', 'linked')"
                 :title="tr('Employees who have an active work schedule assigned')"
-                class="flex items-center gap-4 cursor-pointer transition-all border-2 {{ $schedule_type === 'linked' ? 'border-blue-500 bg-blue-50' : 'border-transparent' }}"
+                class="flex items-center gap-4 cursor-pointer transition-all border-2 {{ $schedule_type === 'linked' ? 'border-[color:var(--success)] bg-[color:var(--success)]/5' : 'border-transparent' }}"
             >
-                <div class="p-3 bg-blue-50 text-blue-600 rounded-xl">
+                <div class="p-3 bg-[color:var(--success)]/10 text-[color:var(--success)] rounded-xl">
                     <i class="fas fa-calendar-check fa-lg"></i>
                 </div>
                 <div class="flex-1">
@@ -73,9 +73,9 @@
             <x-ui.card hover
                 wire:click="$set('schedule_type', 'unlinked')"
                 :title="tr('Employees who are not yet assigned to any work schedule')"
-                class="flex items-center gap-4 cursor-pointer transition-all border-2 {{ $schedule_type === 'unlinked' || $filterWarning === 'no_schedule' ? 'border-red-500 bg-red-50' : 'border-transparent' }}"
+                class="flex items-center gap-4 cursor-pointer transition-all border-2 {{ $schedule_type === 'unlinked' || $filterWarning === 'no_schedule' ? 'border-[color:var(--error)] bg-[color:var(--error)]/5' : 'border-transparent' }}"
             >
-                <div class="p-3 bg-red-50 text-red-600 rounded-xl">
+                <div class="p-3 bg-[color:var(--error)]/10 text-[color:var(--error)] rounded-xl">
                     <i class="fas fa-user-slash fa-lg"></i>
                 </div>
                 <div class="flex-1">
@@ -90,9 +90,9 @@
             <x-ui.card hover
                 wire:click="setWarningFilter('ending_soon')"
                 :title="tr('Employees whose current schedule expires within the next 3 business days')"
-                class="flex items-center gap-4 cursor-pointer transition-all border-2 {{ $filterWarning === 'ending_soon' ? 'border-yellow-500 bg-yellow-50' : 'border-transparent' }}"
+                class="flex items-center gap-4 cursor-pointer transition-all border-2 {{ $filterWarning === 'ending_soon' ? 'border-[color:var(--warning)] bg-[color:var(--warning)]/5' : 'border-transparent' }}"
             >
-                <div class="p-3 bg-yellow-50 text-yellow-600 rounded-xl">
+                <div class="p-3 bg-[color:var(--warning)]/10 text-[color:var(--warning)] rounded-xl">
                     <i class="fas fa-hourglass-half fa-lg"></i>
                 </div>
                 <div class="flex-1">
@@ -107,9 +107,9 @@
             <x-ui.card hover
                 wire:click="setWarningFilter('changed_too_much')"
                 :title="tr('Employees with more than two schedule changes during the current month')"
-                class="flex items-center gap-4 cursor-pointer transition-all border-2 {{ $filterWarning === 'changed_too_much' ? 'border-orange-500 bg-orange-50' : 'border-transparent' }}"
+                class="flex items-center gap-4 cursor-pointer transition-all border-2 {{ $filterWarning === 'changed_too_much' ? 'border-[color:var(--accent-orange)] bg-[color:var(--accent-orange)]/5' : 'border-transparent' }}"
             >
-                <div class="p-3 bg-orange-50 text-orange-600 rounded-xl">
+                <div class="p-3 bg-[color:var(--accent-orange)]/10 text-[color:var(--accent-orange)] rounded-xl">
                     <i class="fas fa-history fa-lg"></i>
                 </div>
                 <div class="flex-1">
@@ -129,14 +129,14 @@
         <div class="flex items-center gap-1 bg-white p-1 rounded-xl shadow-sm border border-gray-100 w-fit">
             <button 
                 wire:click="setTab('list')"
-                class="px-6 py-2 rounded-lg text-sm font-bold transition-all {{ $activeTab === 'list' ? 'bg-[color:var(--brand-via)] text-white shadow-md' : 'text-gray-500 hover:bg-gray-50' }}"
+                class="px-6 py-2 rounded-lg text-sm font-bold transition-all {{ $activeTab === 'list' ? 'bg-[color:var(--accent-orange)] text-white shadow-md' : 'text-gray-500 hover:bg-gray-50' }}"
             >
                 <i class="fas fa-list me-2"></i>
                 {{ tr('Employee List') }}
             </button>
             <button 
                 wire:click="setTab('summary')"
-                class="px-6 py-2 rounded-lg text-sm font-bold transition-all {{ $activeTab === 'summary' ? 'bg-[color:var(--brand-via)] text-white shadow-md' : 'text-gray-500 hover:bg-gray-50' }}"
+                class="px-6 py-2 rounded-lg text-sm font-bold transition-all {{ $activeTab === 'summary' ? 'bg-[color:var(--accent-orange)] text-white shadow-md' : 'text-gray-500 hover:bg-gray-50' }}"
             >
                 <i class="fas fa-th-list me-2"></i>
                 {{ tr('Schedules Summary') }}
@@ -153,10 +153,10 @@
             x-transition:leave="transition ease-in duration-200"
             x-transition:leave-start="opacity-100 translate-x-0"
             x-transition:leave-end="opacity-0 translate-x-4"
-            class="flex items-center gap-3 bg-[color:var(--brand-via)] text-white px-4 py-2 rounded-2xl shadow-xl shadow-[color:var(--brand-via)]/30 border border-white/20"
+            class="flex items-center gap-3 bg-[color:var(--accent-orange)] text-white px-4 py-2 rounded-2xl shadow-xl shadow-[color:var(--accent-orange)]/25 border border-white/20"
         >
             <div class="flex items-center gap-2 border-e border-white/20 pe-4 me-1">
-                <div class="w-8 h-8 rounded-full bg-white flex items-center justify-center text-[color:var(--brand-via)] text-xs font-black shadow-lg">
+                <div class="w-8 h-8 rounded-full bg-white flex items-center justify-center text-[color:var(--accent-orange)] text-xs font-black shadow-lg">
                     <span x-text="selectionCount"></span>
                 </div>
                 <span class="text-xs font-bold text-white/90">{{ tr('Selected') }}</span>
@@ -167,7 +167,7 @@
                     x-on:click="$dispatch('triggerOpenBulkModal')"
                     class="group flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-xl transition-all active:scale-95"
                 >
-                    <i class="fas fa-calendar-plus text-blue-400 group-hover:scale-110 transition-transform"></i>
+                    <i class="fas fa-calendar-plus text-white/80 group-hover:scale-110 transition-transform"></i>
                     <span>{{ tr('Assign Schedule') }}</span>
                 </button>
 
@@ -175,7 +175,7 @@
                     x-on:click="$dispatch('triggerOpenRotationModal')"
                     class="group flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white text-xs font-bold rounded-xl transition-all active:scale-95 border border-dashed border-white/30 hover:border-white/60"
                 >
-                    <i class="fas fa-sync-alt text-amber-300 group-hover:rotate-45 transition-transform"></i>
+                    <i class="fas fa-sync-alt text-white/80 group-hover:rotate-45 transition-transform"></i>
                     <span>{{ tr('Assign Rotation') }}</span>
                 </button>
 
@@ -351,13 +351,13 @@
                     <div class="flex items-center gap-2 bg-gray-50 p-1 rounded-lg border border-gray-200 w-full sm:w-auto">
                         <button
                             wire:click="setSummaryPeriod('weekly')"
-                            class="flex-1 sm:flex-none justify-center px-4 py-1.5 rounded-md text-xs font-bold transition-all {{ $summaryPeriod === 'weekly' ? 'bg-white text-[color:var(--brand-via)] shadow-sm' : 'text-gray-500 hover:bg-white/50' }}"
+                            class="flex-1 sm:flex-none justify-center px-4 py-1.5 rounded-md text-xs font-bold transition-all {{ $summaryPeriod === 'weekly' ? 'bg-white text-[color:var(--accent-orange)] shadow-sm' : 'text-gray-500 hover:bg-white/50' }}"
                         >
                             {{ tr('Weekly') }}
                         </button>
                         <button
                             wire:click="setSummaryPeriod('monthly')"
-                            class="flex-1 sm:flex-none justify-center px-4 py-1.5 rounded-md text-xs font-bold transition-all {{ $summaryPeriod === 'monthly' ? 'bg-white text-[color:var(--brand-via)] shadow-sm' : 'text-gray-500 hover:bg-white/50' }}"
+                            class="flex-1 sm:flex-none justify-center px-4 py-1.5 rounded-md text-xs font-bold transition-all {{ $summaryPeriod === 'monthly' ? 'bg-white text-[color:var(--accent-orange)] shadow-sm' : 'text-gray-500 hover:bg-white/50' }}"
                         >
                             {{ tr('Monthly') }}
                         </button>
@@ -370,7 +370,7 @@
                             </button>
 
                             <div class="flex-1 sm:flex-none flex items-center justify-center gap-2 px-2 sm:px-4 h-10 bg-gray-50 rounded-lg border border-gray-200 font-bold text-gray-700 text-[10px] sm:text-sm text-center">
-                                <i class="far fa-calendar-alt text-[color:var(--brand-via)] hidden sm:block"></i>
+                                <i class="far fa-calendar-alt text-[color:var(--accent-orange)] hidden sm:block"></i>
                                 @php
                                     $cId = $this->getCompanyId();
                                     $currentCarbon = \Carbon\Carbon::parse($summaryDate);
@@ -425,13 +425,13 @@
                 @endphp
                 <tr class="hover:bg-gray-50/50 transition-colors">
                     <td class="px-6 py-4">
-                        <input type="checkbox" wire:model.live="selectedEmployees" value="{{ $employee->id }}" class="w-4 h-4 text-[color:var(--brand-via)] border-gray-300 rounded focus:ring-[color:var(--brand-via)]" @cannot('attendance.manage') disabled @endcannot>
+                        <input type="checkbox" wire:model.live="selectedEmployees" value="{{ $employee->id }}" class="w-4 h-4 text-[color:var(--accent-orange)] border-gray-300 rounded focus:ring-[color:var(--accent-orange)]" @cannot('attendance.manage') disabled @endcannot>
                     </td>
 
                     <td class="px-6 py-4">
                         <div class="flex items-center gap-3">
                             <div class="relative">
-                                <div class="w-10 h-10 rounded-full bg-[color:var(--brand-via)]/10 flex items-center justify-center text-[color:var(--brand-via)] font-bold shrink-0">
+                                <div class="w-10 h-10 rounded-full bg-[color:var(--app-soft-bg)] flex items-center justify-center text-[color:var(--brand-via)] font-bold shrink-0 border border-[color:var(--border-soft)]">
                                     {{ mb_substr($employee->name_ar ?? $employee->name_en, 0, 1) }}
                                 </div>
 
@@ -443,7 +443,7 @@
                                         || in_array($employee->id, $warningIds['inactive_schedule'] ?? []);
                                 @endphp
 
-                                <div class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center border-2 border-white {{ $hasIssue ? 'bg-red-500' : 'bg-green-500' }}">
+                                <div class="absolute -bottom-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center border-2 border-white {{ $hasIssue ? 'bg-[color:var(--error)]' : 'bg-[color:var(--success)]' }}">
                                     <i class="fas {{ $hasIssue ? 'fa-times' : 'fa-check' }} text-[8px] text-white"></i>
                                 </div>
                             </div>
@@ -452,7 +452,7 @@
                                 <p class="text-sm font-semibold text-gray-900">{{ $employee->name_ar ?: $employee->name_en }}</p>
                                 <p class="text-xs text-gray-500">#{{ $employee->employee_no }}</p>
                                 @if($isContractExpired)
-                                    <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-700"
+                                    <span class="mt-1 inline-flex items-center gap-1 rounded-full border border-[color:var(--error)]/25 bg-[color:var(--error)]/10 px-2 py-0.5 text-[10px] font-bold text-[color:var(--error)]"
                                           title="{{ $contractEndLabel ? (tr('Expiry Date') . ': ' . $contractEndLabel) : $expiredContractLabel }}">
                                         <i class="fas fa-exclamation-triangle text-[9px]"></i>
                                         {{ $expiredContractLabel }}
@@ -484,7 +484,7 @@
                                     <x-ui.badge type="info" class="flex items-center gap-1.5">
                                         {{ $employee->current_schedule_name }}
                                         @if($employee->current_assignment_type === 'rotation')
-                                            <i class="fas fa-sync-alt text-amber-300 text-[10px]" title="{{ tr('Rotation Schedule') }}"></i>
+                                            <i class="fas fa-sync-alt text-[color:var(--warning)] text-[10px]" title="{{ tr('Rotation Schedule') }}"></i>
                                         @endif
                                     </x-ui.badge>
                                     <x-ui.badge :type="$employee->current_schedule_end ? 'warning' : 'success'" size="xs" outline>
@@ -505,7 +505,7 @@
                             <button
                                 type="button"
                                 wire:click="openScheduleEyeModal({{ $employee->id }})"
-                                class="inline-flex items-center gap-1 text-xs font-bold text-gray-400 hover:text-[color:var(--brand-via)] transition-colors"
+                                class="inline-flex items-center gap-1 text-xs font-bold text-gray-400 hover:text-[color:var(--accent-orange)] transition-colors"
                                 title="{{ tr('View all schedules') }}"
                             >
                                 <i class="fas fa-eye shadow-sm"></i>
@@ -533,20 +533,26 @@
                             $status = strtoupper($employee->status ?? 'ACTIVE');
                             $statusColor = \Athka\Employees\Support\EmployeeStatus::color($status);
                             $statusLabel = \Athka\Employees\Support\EmployeeStatus::label($status);
+                            $statusCssVar = match ($statusColor) {
+                                'green' => '--success',
+                                'red' => '--error',
+                                'yellow', 'amber', 'orange' => '--warning',
+                                default => '--text-secondary',
+                            };
                         @endphp
                         @if($isContractExpired)
                             <div class="space-y-1">
-                                <div class="inline-flex items-center gap-1.5 rounded-full border border-red-200 bg-red-50 px-2 py-1"
+                                <div class="inline-flex items-center gap-1.5 rounded-full border border-[color:var(--error)]/25 bg-[color:var(--error)]/10 px-2 py-1"
                                      title="{{ $contractEndLabel ? (tr('Expiry Date') . ': ' . $contractEndLabel) : $expiredContractLabel }}">
-                                    <div class="w-2 h-2 rounded-full bg-red-500"></div>
-                                    <span class="text-xs text-red-700 font-bold">{{ $expiredContractLabel }}</span>
+                                    <div class="w-2 h-2 rounded-full bg-[color:var(--error)]"></div>
+                                    <span class="text-xs text-[color:var(--error)] font-bold">{{ $expiredContractLabel }}</span>
                                 </div>
                                 <div class="text-[10px] text-gray-400 font-semibold">{{ $statusLabel }}</div>
                             </div>
                         @else
                             <div class="flex items-center gap-1.5">
-                                <div class="w-2 h-2 rounded-full bg-{{ $statusColor }}-500"></div>
-                                <span class="text-xs text-{{ $statusColor }}-700 font-bold">{{ $statusLabel }}</span>
+                                <div class="w-2 h-2 rounded-full" style="background-color: var({{ $statusCssVar }});"></div>
+                                <span class="text-xs font-bold" style="color: var({{ $statusCssVar }});">{{ $statusLabel }}</span>
                             </div>
                         @endif
                     </td>
@@ -565,13 +571,13 @@
 
                             @if($isInactiveSchedule)
                                 <div class="flex items-center gap-1.5" title="{{ tr('The underlying schedule in settings is disabled!') }}">
-                                    <div class="w-2 h-2 rounded-full bg-red-600 shadow-sm shadow-red-200"></div>
-                                    <span class="text-xs text-red-700 font-bold">{{ tr('Disabled') }}</span>
+                                    <div class="w-2 h-2 rounded-full bg-[color:var(--error)] shadow-sm shadow-[color:var(--error)]/20"></div>
+                                    <span class="text-xs text-[color:var(--error)] font-bold">{{ tr('Disabled') }}</span>
                                 </div>
                             @elseif($isFuture)
                                 <div class="flex items-center gap-1.5">
-                                    <div class="w-2 h-2 rounded-full bg-blue-500 shadow-sm shadow-blue-200"></div>
-                                    <span class="text-xs text-blue-700 font-semibold">{{ tr('Future') }}</span>
+                                    <div class="w-2 h-2 rounded-full bg-[color:var(--text-light)] shadow-sm"></div>
+                                    <span class="text-xs text-[color:var(--text-secondary)] font-semibold">{{ tr('Future') }}</span>
                                 </div>
                             @elseif($isPast)
                                 <div class="flex items-center gap-1.5">
@@ -580,8 +586,8 @@
                                 </div>
                             @else
                                 <div class="flex items-center gap-1.5">
-                                    <div class="w-2 h-2 rounded-full {{ $isEndingSoon ? 'bg-yellow-500 animate-pulse' : ($isTooManyChanges ? 'bg-orange-500' : 'bg-green-500 shadow-sm shadow-green-200') }}"></div>
-                                    <span class="text-xs {{ $isEndingSoon ? 'text-yellow-700 font-bold' : ($isTooManyChanges ? 'text-orange-700' : 'text-green-700') }} font-semibold">
+                                    <div class="w-2 h-2 rounded-full {{ $isEndingSoon ? 'bg-[color:var(--warning)] animate-pulse' : ($isTooManyChanges ? 'bg-[color:var(--accent-orange)]' : 'bg-[color:var(--success)] shadow-sm shadow-[color:var(--success)]/20') }}"></div>
+                                    <span class="text-xs {{ $isEndingSoon ? 'text-[color:var(--warning)] font-bold' : ($isTooManyChanges ? 'text-[color:var(--accent-orange)]' : 'text-[color:var(--success)]') }} font-semibold">
                                         {{ $isEndingSoon ? tr('Ending Soon') : ($isTooManyChanges ? tr('Changes') : tr('Active')) }}
                                     </span>
                                 </div>
@@ -592,8 +598,8 @@
                             @endphp
 
                             <div class="flex items-center gap-1.5">
-                                <div class="w-2 h-2 rounded-full bg-red-500 {{ $isNoScheduleOverdue ? 'animate-ping' : 'animate-pulse' }}"></div>
-                                <span class="text-xs {{ $isNoScheduleOverdue ? 'text-red-700 font-black' : 'text-red-500' }} font-bold">
+                                <div class="w-2 h-2 rounded-full bg-[color:var(--error)] {{ $isNoScheduleOverdue ? 'animate-ping' : 'animate-pulse' }}"></div>
+                                <span class="text-xs text-[color:var(--error)] {{ $isNoScheduleOverdue ? 'font-black' : '' }} font-bold">
                                     {{ $isNoScheduleOverdue ? tr('Overdue') : tr('Required') }}
                                 </span>
                             </div>
@@ -606,7 +612,7 @@
                            <button type="button" 
                                wire:click="openBulkModalForSingleEmployee({{ $employee->id }})" 
                                wire:loading.attr="disabled" 
-                               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border active:scale-95 group shadow-sm {{ $isContractExpired ? 'bg-red-50 text-red-600 border-red-100 hover:bg-red-100 hover:border-red-200 cursor-not-allowed' : 'bg-blue-50 text-blue-700 hover:bg-blue-600 hover:text-white border-blue-100 hover:border-blue-600' }}" 
+                               class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border active:scale-95 group shadow-sm {{ $isContractExpired ? 'bg-[color:var(--error)]/10 text-[color:var(--error)] border-[color:var(--error)]/20 hover:bg-[color:var(--error)]/15 cursor-not-allowed' : 'bg-[color:var(--accent-orange)]/10 text-[color:var(--accent-orange)] hover:bg-[color:var(--accent-orange)] hover:text-white border-[color:var(--accent-orange)]/20 hover:border-[color:var(--accent-orange)]' }}" 
                                title="{{ $isContractExpired ? $expiredContractMessage : tr('Assign or change schedule') }}"
                             >
                                 <i class="fas fa-calendar-plus opacity-70 group-hover:scale-110 transition-transform"></i>
@@ -616,7 +622,7 @@
                             <button type="button" 
                                 wire:click="openRotationModalForSingleEmployee({{ $employee->id }})" 
                                 wire:loading.attr="disabled" 
-                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border active:scale-95 group shadow-sm {{ $isContractExpired ? 'bg-red-50 text-red-600 border-red-100 hover:bg-red-100 hover:border-red-200 cursor-not-allowed' : 'bg-purple-50 text-purple-700 hover:bg-purple-600 hover:text-white border-purple-100 hover:border-purple-600' }}" 
+                                class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all border active:scale-95 group shadow-sm {{ $isContractExpired ? 'bg-[color:var(--error)]/10 text-[color:var(--error)] border-[color:var(--error)]/20 hover:bg-[color:var(--error)]/15 cursor-not-allowed' : 'bg-[color:var(--app-soft-bg)] text-[color:var(--brand-via)] hover:bg-[color:var(--accent-orange)] hover:text-white border-[color:var(--border-soft)] hover:border-[color:var(--accent-orange)]' }}" 
                                 title="{{ $isContractExpired ? $expiredContractMessage : tr('Assign rotation schedule') }}"
                             >
                                 <i class="fas fa-sync-alt opacity-70 group-hover:rotate-45 transition-transform"></i>
@@ -669,7 +675,7 @@
                                 {{ tr('Employee') }}
                             </th>
                             @foreach($summaryDays as $day)
-                                <th class="px-2 py-3 text-center text-[10px] font-bold {{ $day['is_today'] ? 'text-[color:var(--brand-via)] bg-[color:var(--brand-via)]/5' : 'text-gray-500' }} border-r border-gray-100 min-w-[100px]">
+                                <th class="px-2 py-3 text-center text-[10px] font-bold {{ $day['is_today'] ? 'text-[color:var(--accent-orange)] bg-[color:var(--accent-orange)]/5' : 'text-gray-500' }} border-r border-gray-100 min-w-[100px]">
                                     <div>{{ $day['label'] }}</div>
                                 </th>
                             @endforeach
@@ -680,7 +686,7 @@
                             <tr class="hover:bg-gray-50/30 transition-colors">
                                 <td class="sticky {{ $isRtl ? 'right-0' : 'left-0' }} z-10 bg-white group-hover:bg-gray-50 px-4 py-3 border-{{ $isRtl ? 'left' : 'right' }} border-gray-200 shadow-[{{ $isRtl ? '-2px' : '2px' }}_0_5px_rgba(0,0,0,0.05)]">
                                     <div class="flex items-center gap-2">
-                                        <div class="w-7 h-7 rounded-full bg-[color:var(--brand-via)]/10 flex items-center justify-center text-[color:var(--brand-via)] text-[10px] font-bold">
+                                        <div class="w-7 h-7 rounded-full bg-[color:var(--app-soft-bg)] flex items-center justify-center text-[color:var(--brand-via)] text-[10px] font-bold border border-[color:var(--border-soft)]">
                                             {{ mb_substr($employee->name_ar ?? $employee->name_en, 0, 1) }}
                                         </div>
                                         <div>
@@ -693,7 +699,7 @@
                                     @php
                                         $dayData = collect($summaryData[$employee->id] ?? [])->firstWhere('date', $day['date']);
                                     @endphp
-                                    <td class="px-1 py-2 text-center border-r border-gray-50 {{ $day['is_today'] ? 'bg-[color:var(--brand-via)]/[0.02]' : '' }}">
+                                    <td class="px-1 py-2 text-center border-r border-gray-50 {{ $day['is_today'] ? 'bg-[color:var(--accent-orange)]/[0.02]' : '' }}">
                                         @if($dayData && $dayData['type'] !== 'none')
                                             @php
                                                 $isHoliday = $dayData['type'] === 'holiday';
@@ -703,12 +709,12 @@
                                                 $bgClass = $dayData['disabled'] 
                                                     ? 'bg-gray-100 text-gray-400' 
                                                     : ($isExcept
-                                                        ? 'bg-amber-50 text-amber-700 border-amber-200'
+                                                        ? 'bg-[color:var(--warning)]/10 text-[color:var(--warning)] border-[color:var(--warning)]/25'
                                                         : ($isHoliday 
                                                             ? 'bg-slate-50 text-slate-400 border-slate-100' 
                                                             : ($isLeave 
-                                                                ? 'bg-blue-50 text-blue-600 border-blue-100' 
-                                                                : 'bg-[color:var(--brand-via)]/10 text-[color:var(--brand-via)] border-[color:var(--brand-via)]/20')));
+                                                                ? 'bg-[color:var(--app-soft-bg)] text-[color:var(--text-secondary)] border-[color:var(--border-soft)]' 
+                                                                : 'bg-[color:var(--accent-orange)]/10 text-[color:var(--accent-orange)] border-[color:var(--accent-orange)]/20')));
                                             @endphp
                                             <div
                                                 class="mx-auto px-2 py-1.5 rounded-md text-[9px] leading-tight font-bold {{ $bgClass }} border shadow-sm"

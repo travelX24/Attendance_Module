@@ -136,7 +136,7 @@
                                             type="checkbox"
                                             wire:model.live="criteriaPreviewSelected"
                                             value="{{ $row['id'] }}"
-                                            class="w-4 h-4 text-[color:var(--brand-via)] border-gray-300 rounded focus:ring-[color:var(--brand-via)]"
+                                            class="w-4 h-4 text-[color:var(--accent-orange)] border-gray-300 rounded focus:ring-[color:var(--accent-orange)]"
                                             @cannot('attendance.manage') disabled @endcannot
                                         >
                                     </td>

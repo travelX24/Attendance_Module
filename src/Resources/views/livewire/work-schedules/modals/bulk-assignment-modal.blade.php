@@ -10,7 +10,7 @@
         @endphp
 
         <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-[color:var(--brand-via)]/10 text-[color:var(--brand-via)] rounded-xl flex items-center justify-center text-lg border border-[color:var(--brand-via)]/20 shadow-sm">
+            <div class="w-10 h-10 bg-[color:var(--accent-orange)]/10 text-[color:var(--accent-orange)] rounded-xl flex items-center justify-center text-lg border border-[color:var(--accent-orange)]/20 shadow-sm">
                 <i class="fas fa-calendar-alt"></i>
             </div>
 
@@ -91,25 +91,25 @@
 
         <div class="space-y-5">
             @if($contractMessage)
-                <div class="flex items-start gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100 shadow-sm">
-                    <div class="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
+                <div class="flex items-start gap-3 p-3 bg-[color:var(--app-soft-bg)] rounded-xl border border-[color:var(--border-soft)] shadow-sm">
+                    <div class="w-8 h-8 rounded-full bg-[color:var(--accent-orange)]/10 text-[color:var(--accent-orange)] flex items-center justify-center shrink-0">
                         <i class="fas fa-file-contract text-sm"></i>
                     </div>
                     <div class="flex-1">
-                        <p class="text-xs text-blue-900 font-bold leading-relaxed">
+                        <p class="text-xs text-[color:var(--text-primary)] font-bold leading-relaxed">
                             {{ tr('Contract Insight') }}:
                         </p>
-                        <p class="text-[11px] text-blue-700 mt-0.5">
+                        <p class="text-[11px] text-[color:var(--text-secondary)] mt-0.5">
                             {{ $contractMessage }}
                         </p>
                     </div>
                 </div>
             @endif
 
-            <div class="flex items-center justify-between gap-3 p-3 bg-indigo-50 rounded-xl border border-indigo-100">
+            <div class="flex items-center justify-between gap-3 p-3 bg-[color:var(--accent-orange)]/5 rounded-xl border border-[color:var(--accent-orange)]/15">
                 <div class="flex items-center gap-3">
-                    <i class="fas fa-info-circle text-[color:var(--brand-via)]"></i>
-                    <p class="text-xs text-indigo-900 font-medium">
+                    <i class="fas fa-info-circle text-[color:var(--accent-orange)]"></i>
+                    <p class="text-xs text-[color:var(--text-primary)] font-medium">
                         {{ tr('Changes will apply to') }}:
                         <span class="font-bold underline">{{ count($selectedEmployees) }}</span>
                         {{ tr('selected employees') }}
@@ -117,11 +117,11 @@
                 </div>
                 
                 {{-- Toggle Override --}}
-                <div class="flex items-center gap-2 px-2 py-1 bg-white rounded-lg border border-indigo-200 shadow-sm">
+                <div class="flex items-center gap-2 px-2 py-1 bg-white rounded-lg border border-[color:var(--accent-orange)]/20 shadow-sm">
                     <span class="text-[10px] font-bold text-gray-500 uppercase tracking-tight">{{ tr('Manual Override') }}</span>
                     <label class="relative inline-flex items-center cursor-pointer">
                         <input type="checkbox" wire:model.live="overrideContractDates" class="sr-only peer">
-                        <div class="w-7 h-4 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-blue-600"></div>
+                        <div class="w-7 h-4 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-3 after:w-3 after:transition-all peer-checked:bg-[color:var(--accent-orange)]"></div>
                     </label>
                 </div>
             </div>
@@ -207,13 +207,13 @@
                 @if($scheduleA && !empty($periodsA))
                     <div class="space-y-2 animate-in fade-in slide-in-from-top-2 duration-300">
                         <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-                            <i class="fas fa-clock text-[color:var(--brand-via)]"></i>
+                            <i class="fas fa-clock text-[color:var(--accent-orange)]"></i>
                             {{ tr('Assign Periods') }}
                         </label>
                         <div class="grid grid-cols-1 gap-2">
                             @foreach($periodsA as $pId => $pLabel)
-                                <label class="flex items-center gap-3 p-2.5 bg-gray-50 border border-gray-100 rounded-xl cursor-pointer hover:border-[color:var(--brand-via)]/30 hover:bg-white transition-all group">
-                                    <input type="checkbox" wire:model="bulkFormData.work_periods" value="{{ $pId }}" class="w-4 h-4 text-[color:var(--brand-via)] border-gray-300 rounded focus:ring-[color:var(--brand-via)]">
+                                <label class="flex items-center gap-3 p-2.5 bg-gray-50 border border-gray-100 rounded-xl cursor-pointer hover:border-[color:var(--accent-orange)]/30 hover:bg-white transition-all group">
+                                    <input type="checkbox" wire:model="bulkFormData.work_periods" value="{{ $pId }}" class="w-4 h-4 text-[color:var(--accent-orange)] border-gray-300 rounded focus:ring-[color:var(--accent-orange)]">
                                     <span class="text-xs font-bold text-gray-700 group-hover:text-gray-900">{{ $pLabel }}</span>
                                 </label>
                             @endforeach
@@ -240,14 +240,14 @@
                     @if($scheduleB && !empty($periodsB))
                         <div class="space-y-2 mt-2 animate-in fade-in slide-in-from-top-2 duration-300">
                             <label class="block text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-                                <i class="fas fa-clock text-amber-500"></i>
+                                <i class="fas fa-clock text-[color:var(--warning)]"></i>
                                 {{ tr('Assign Periods (B)') }}
                             </label>
                             <div class="grid grid-cols-1 gap-2">
                                 @foreach($periodsB as $pId => $pLabel)
-                                    <label class="flex items-center gap-3 p-2.5 bg-gray-50 border border-gray-100 rounded-xl cursor-pointer hover:border-amber-400 hover:bg-amber-50/30 transition-all group">
-                                        <input type="checkbox" wire:model="bulkFormData.work_periods_b" value="{{ $pId }}" class="w-4 h-4 text-amber-600 border-gray-300 rounded focus:ring-amber-500">
-                                        <span class="text-xs font-bold text-gray-700 group-hover:text-amber-900">{{ $pLabel }}</span>
+                                    <label class="flex items-center gap-3 p-2.5 bg-gray-50 border border-gray-100 rounded-xl cursor-pointer hover:border-[color:var(--warning)]/40 hover:bg-[color:var(--warning)]/5 transition-all group">
+                                        <input type="checkbox" wire:model="bulkFormData.work_periods_b" value="{{ $pId }}" class="w-4 h-4 text-[color:var(--warning)] border-gray-300 rounded focus:ring-[color:var(--warning)]">
+                                        <span class="text-xs font-bold text-gray-700 group-hover:text-[color:var(--warning)]">{{ $pLabel }}</span>
                                     </label>
                                 @endforeach
                             </div>

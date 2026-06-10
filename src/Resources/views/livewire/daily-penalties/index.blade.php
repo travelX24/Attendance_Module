@@ -17,7 +17,7 @@
     {{-- Quick Stats --}}
     <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
         <x-ui.card hover class="flex items-center gap-4">
-            <div class="p-3 bg-red-50 text-red-600 rounded-xl">
+            <div class="p-3 bg-[color:var(--error)]/10 text-[color:var(--error)] rounded-xl">
                 <i class="fas fa-calculator fa-lg"></i>
             </div>
             <div>
@@ -29,7 +29,7 @@
         </x-ui.card>
 
         <x-ui.card hover class="flex items-center gap-4">
-            <div class="p-3 bg-yellow-50 text-yellow-600 rounded-xl">
+            <div class="p-3 bg-[color:var(--warning)]/10 text-[color:var(--warning)] rounded-xl">
                 <i class="fas fa-hand-holding-usd fa-lg"></i>
             </div>
             <div>
@@ -41,7 +41,7 @@
         </x-ui.card>
 
         <x-ui.card hover class="flex items-center gap-4">
-            <div class="p-3 bg-green-50 text-green-600 rounded-xl">
+            <div class="p-3 bg-[color:var(--success)]/10 text-[color:var(--success)] rounded-xl">
                 <i class="fas fa-file-invoice-dollar fa-lg"></i>
             </div>
             <div>
@@ -53,7 +53,7 @@
         </x-ui.card>
 
         <x-ui.card hover class="flex items-center gap-4">
-            <div class="p-3 bg-blue-50 text-blue-600 rounded-xl">
+            <div class="p-3 bg-[color:var(--accent-orange)]/10 text-[color:var(--accent-orange)] rounded-xl">
                 <i class="fas fa-user-tag fa-lg"></i>
             </div>
             <div>
@@ -102,7 +102,7 @@
                             <button
                                 type="button"
                                 wire:click="goToPreviousDay"
-                                class="h-11 w-11 shrink-0 inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 hover:text-[color:var(--brand-via)] hover:border-[color:var(--brand-via)]/30 transition"
+                                class="h-11 w-11 shrink-0 inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 hover:text-[color:var(--accent-orange)] hover:border-[color:var(--accent-orange)]/30 transition"
                                 @disabled(!$canManagePenalties)
                                 title="{{ tr('Previous day') }}"
                             >
@@ -121,14 +121,14 @@
                                     <span class="text-sm font-bold text-gray-800">
                                         {{ company_date($date_from, 'yyyy/MM/dd') }}
                                     </span>
-                                    <i class="fas fa-calendar-alt text-[color:var(--brand-via)] text-sm"></i>
+                                    <i class="fas fa-calendar-alt text-[color:var(--accent-orange)] text-sm"></i>
                                 </div>
                             </label>
 
                             <button
                                 type="button"
                                 wire:click="goToNextDay"
-                                class="h-11 w-11 shrink-0 inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 hover:text-[color:var(--brand-via)] hover:border-[color:var(--brand-via)]/30 transition"
+                                class="h-11 w-11 shrink-0 inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 hover:text-[color:var(--accent-orange)] hover:border-[color:var(--accent-orange)]/30 transition"
                                 @disabled(!$canManagePenalties)
                                 title="{{ tr('Next day') }}"
                             >
@@ -264,15 +264,15 @@
                 {{-- Bulk Actions --}}
                 <div class="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto order-2 sm:order-1">
                     @if(!empty($selectedPenalties))
-                        <div class="flex items-center justify-center sm:justify-start gap-2 px-3 py-2 sm:py-1.5 bg-[color:var(--brand-via)]/5 rounded-xl border border-[color:var(--brand-via)]/10">
-                            <span class="text-xs font-bold text-[color:var(--brand-via)]">{{ count($selectedPenalties) }} {{ tr('Selected') }}</span>
-                            <div class="w-px h-4 bg-[color:var(--brand-via)]/20 mx-1"></div>
+                        <div class="flex items-center justify-center sm:justify-start gap-2 px-3 py-2 sm:py-1.5 bg-[color:var(--accent-orange)]/5 rounded-xl border border-[color:var(--accent-orange)]/15">
+                            <span class="text-xs font-bold text-[color:var(--accent-orange)]">{{ count($selectedPenalties) }} {{ tr('Selected') }}</span>
+                            <div class="w-px h-4 bg-[color:var(--accent-orange)]/20 mx-1"></div>
                             @if($canManagePenalties)
-                                <button wire:click="bulkConfirm" class="text-xs font-bold text-green-600 hover:text-green-700 flex items-center gap-1 transition-colors">
+                                <button wire:click="bulkConfirm" class="text-xs font-bold text-[color:var(--success)] hover:brightness-90 flex items-center gap-1 transition-colors">
                                     <i class="fas fa-check-double"></i>
                                     {{ tr('Confirm All') }}
                                 </button>
-                                <button wire:click="bulkDelete" class="text-xs font-bold text-red-600 hover:text-red-700 flex items-center gap-1 transition-colors">
+                                <button wire:click="bulkDelete" class="text-xs font-bold text-[color:var(--error)] hover:brightness-90 flex items-center gap-1 transition-colors">
                                     <i class="fas fa-trash-alt"></i>
                                     {{ tr('Delete') }}
                                 </button>
@@ -332,7 +332,7 @@
 
         @php
             $headers = [
-                tr('<div class="flex items-center justify-center"><input type="checkbox" wire:model.live="selectAll" class="w-4 h-4 rounded-md border-gray-300 text-[color:var(--brand-via)] focus:ring-[color:var(--brand-via)] transition-all cursor-pointer" ' . (!$canManagePenalties ? 'disabled' : '') . '></div>'),
+                tr('<div class="flex items-center justify-center"><input type="checkbox" wire:model.live="selectAll" class="w-4 h-4 rounded-md border-gray-300 text-[color:var(--accent-orange)] focus:ring-[color:var(--accent-orange)] transition-all cursor-pointer" ' . (!$canManagePenalties ? 'disabled' : '') . '></div>'),
                 tr('Employee'),
                 tr('Dept/Job'),
                 tr('Date'),
@@ -373,13 +373,19 @@
                         $employeeStatus = strtoupper($penalty->employee->status ?? 'ACTIVE');
                         $employeeStatusColor = \Athka\Employees\Support\EmployeeStatus::color($employeeStatus);
                         $employeeStatusLabel = \Athka\Employees\Support\EmployeeStatus::label($employeeStatus);
+                        $employeeStatusCssVar = match($employeeStatusColor) {
+                            'green' => '--success',
+                            'yellow', 'amber', 'orange' => '--warning',
+                            'red' => '--error',
+                            default => '--text-secondary',
+                        };
                     @endphp
 
                     @if($currentPenaltyDate !== $lastPenaltyDate)
                         <tr class="bg-gray-50/80 border-y border-gray-100">
                             <td colspan="12" class="px-6 py-2">
-                                <div class="flex items-center gap-2 text-[color:var(--brand-via)]">
-                                    <div class="w-8 h-8 rounded-lg bg-[color:var(--brand-via)]/10 flex items-center justify-center">
+                                <div class="flex items-center gap-2 text-[color:var(--accent-orange)]">
+                                    <div class="w-8 h-8 rounded-lg bg-[color:var(--accent-orange)]/10 flex items-center justify-center">
                                         <i class="fas fa-calendar-day text-xs"></i>
                                     </div>
                                     <div class="flex flex-col">
@@ -397,23 +403,23 @@
                     @endif
 
                     <tr wire:key="penalty-{{ $penalty->id }}"
-                        class="group transition-all duration-200 hover:bg-[color:var(--brand-via)]/5 @if(in_array($penalty->id, $selectedPenalties)) bg-[color:var(--brand-via)]/10 @endif">
+                        class="group transition-all duration-200 hover:bg-[color:var(--accent-orange)]/5 @if(in_array($penalty->id, $selectedPenalties)) bg-[color:var(--accent-orange)]/10 @endif">
                         <td class="px-6 py-4 text-center">
                             <input type="checkbox" wire:model.live="selectedPenalties" value="{{ $penalty->id }}"
-                                class="w-4 h-4 rounded-md border-gray-300 text-[color:var(--brand-via)] focus:ring-[color:var(--brand-via)] transition-all cursor-pointer"
+                                class="w-4 h-4 rounded-md border-gray-300 text-[color:var(--accent-orange)] focus:ring-[color:var(--accent-orange)] transition-all cursor-pointer"
                                 @if(!$canManagePenalties) disabled @endif>
                         </td>
                         <td class="px-6 py-4">
                             <div class="flex items-center gap-3">
-                                <div class="w-8 h-8 rounded-full bg-gray-100 flex items-center justify-center text-[color:var(--brand-via)] font-bold">
+                                <div class="w-8 h-8 rounded-full bg-[color:var(--app-soft-bg)] border border-[color:var(--border-soft)] flex items-center justify-center text-[color:var(--brand-via)] font-bold">
                                     {{ mb_substr($penalty->employee->name_ar ?? $penalty->employee->name_en, 0, 1) }}
                                 </div>
                                 <div>
                                     <p class="text-sm font-semibold text-gray-900 whitespace-nowrap">{{ $penalty->employee->name_ar ?? $penalty->employee->name_en }}</p>
                                     <div class="flex flex-wrap items-center gap-1.5 mt-0.5">
                                         <p class="text-xs text-gray-500">#{{ $penalty->employee->employee_no }}</p>
-                                        <span class="inline-flex items-center gap-1 rounded-full bg-{{ $employeeStatusColor }}-50 px-2 py-0.5 text-[10px] font-bold text-{{ $employeeStatusColor }}-700">
-                                            <span class="w-1.5 h-1.5 rounded-full bg-{{ $employeeStatusColor }}-500"></span>
+                                        <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold" style="background-color: color-mix(in srgb, var({{ $employeeStatusCssVar }}) 10%, transparent); color: var({{ $employeeStatusCssVar }});">
+                                            <span class="w-1.5 h-1.5 rounded-full" style="background-color: var({{ $employeeStatusCssVar }});"></span>
                                             {{ $employeeStatusLabel }}
                                         </span>
                                     </div>
@@ -431,8 +437,8 @@
                         </td>
                         <td class="px-6 py-4 text-center">
                             <div class="flex flex-col items-center">
-                                <span class="text-xs text-green-600 font-bold whitespace-nowrap">{{ $penalty->attendanceLog->check_in_time ? \Carbon\Carbon::parse($penalty->attendanceLog->check_in_time)->format('H:i') : '-' }}</span>
-                                <span class="text-xs text-red-600 font-bold whitespace-nowrap">{{ $penalty->attendanceLog->check_out_time ? \Carbon\Carbon::parse($penalty->attendanceLog->check_out_time)->format('H:i') : '-' }}</span>
+                                <span class="text-xs text-[color:var(--success)] font-bold whitespace-nowrap">{{ $penalty->attendanceLog->check_in_time ? \Carbon\Carbon::parse($penalty->attendanceLog->check_in_time)->format('H:i') : '-' }}</span>
+                                <span class="text-xs text-[color:var(--error)] font-bold whitespace-nowrap">{{ $penalty->attendanceLog->check_out_time ? \Carbon\Carbon::parse($penalty->attendanceLog->check_out_time)->format('H:i') : '-' }}</span>
                             </div>
                         </td>
                         <td class="px-6 py-4 text-center whitespace-nowrap">
@@ -442,12 +448,12 @@
                             <span class="text-sm font-semibold text-gray-700 whitespace-nowrap">{{ $penalty->violation_minutes }} {{ tr('min') }}</span>
                         </td>
                         <td class="px-6 py-4 text-center">
-                            <span class="text-sm font-bold text-red-600 whitespace-nowrap">{{ number_format($penalty->calculated_amount, 2) }}</span>
+                            <span class="text-sm font-bold text-[color:var(--error)] whitespace-nowrap">{{ number_format($penalty->calculated_amount, 2) }}</span>
                         </td>
                         <td class="px-6 py-4 text-center">
                             @if($penalty->exemption_amount > 0)
                                 <div class="flex flex-col">
-                                    <span class="text-sm font-semibold text-yellow-600 whitespace-nowrap">-{{ number_format($penalty->exemption_amount, 2) }}</span>
+                                    <span class="text-sm font-semibold text-[color:var(--warning)] whitespace-nowrap">-{{ number_format($penalty->exemption_amount, 2) }}</span>
                                     <span class="text-[10px] text-gray-400 whitespace-nowrap">{{ $penalty->exemption_reason }}</span>
                                 </div>
                             @else
@@ -460,7 +466,7 @@
                         <td class="px-6 py-4 text-center whitespace-nowrap">
                             <x-ui.badge :type="$statusBadge['type']">{{ $statusBadge['label'] }}</x-ui.badge>
                             @if($penalty->exemption_attachment)
-                                <a href="{{ asset('storage/'.$penalty->exemption_attachment) }}" target="_blank" class="mt-1 block text-[10px] text-[color:var(--brand-via)] hover:underline whitespace-nowrap">
+                                <a href="{{ asset('storage/'.$penalty->exemption_attachment) }}" target="_blank" class="mt-1 block text-[10px] text-[color:var(--accent-orange)] hover:underline whitespace-nowrap">
                                     <i class="fas fa-paperclip me-1"></i> {{ tr('Attachment') }}
                                 </a>
                             @endif
@@ -469,11 +475,11 @@
                             <x-ui.actions-menu>
                                 @if($canManagePenalties)
                                     <x-ui.dropdown-item wire:click="openExemptionModal({{ $penalty->id }})" :disabled="$penalty->status === 'confirmed'">
-                                        <i class="fas fa-gift me-2 text-yellow-500"></i>
+                                        <i class="fas fa-gift me-2 text-[color:var(--warning)]"></i>
                                         <span>{{ tr('Exempt/Waive') }}</span>
                                     </x-ui.dropdown-item>
                                     <x-ui.dropdown-item wire:click="openConfirmModal({{ $penalty->id }})" :disabled="$penalty->status !== 'pending'">
-                                        <i class="fas fa-check-circle me-2 text-green-500"></i>
+                                        <i class="fas fa-check-circle me-2 text-[color:var(--success)]"></i>
                                         <span>{{ tr('Confirm for Payroll') }}</span>
                                     </x-ui.dropdown-item>
                                     <x-ui.dropdown-item danger wire:click="deletePenalty({{ $penalty->id }})" :disabled="$penalty->status === 'confirmed'">
@@ -545,7 +551,7 @@
                         <div class="space-y-1 text-center">
                             <i class="fas fa-cloud-upload-alt fa-2x text-gray-400 mb-2"></i>
                             <div class="flex text-sm text-gray-600">
-                                <label for="file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-[color:var(--brand-via)] hover:text-[color:var(--brand-via)]/80">
+                                <label for="file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-[color:var(--accent-orange)] hover:brightness-90">
                                     <span>{{ tr('Upload a file') }}</span>
                                     <input id="file-upload" type="file" wire:model="exemptionForm.attachment" class="sr-only" @if(!$canManagePenalties) disabled @endif>
                                 </label>
@@ -554,7 +560,7 @@
                         </div>
                     </div>
                     @if ($exemptionForm['attachment'])
-                        <div class="mt-2 text-xs text-green-600 font-bold flex items-center gap-1">
+                        <div class="mt-2 text-xs text-[color:var(--success)] font-bold flex items-center gap-1">
                             <i class="fas fa-check-circle"></i>
                             {{ $exemptionForm['attachment']->getClientOriginalName() }}
                         </div>
@@ -574,7 +580,7 @@
     <x-ui.modal wire:model="showConfirmModal" :title="tr('Confirm Penalty')">
         <x-slot name="content">
             <div class="flex flex-col items-center text-center p-4">
-                <div class="w-16 h-16 bg-yellow-50 text-yellow-500 rounded-full flex items-center justify-center mb-4">
+                <div class="w-16 h-16 bg-[color:var(--warning)]/10 text-[color:var(--warning)] rounded-full flex items-center justify-center mb-4">
                     <i class="fas fa-exclamation-triangle fa-2x"></i>
                 </div>
                 <h3 class="text-lg font-bold text-gray-900 mb-2">{{ tr('Confirm for Payroll?') }}</h3>
@@ -586,7 +592,7 @@
                     @php $p = \Athka\Attendance\Models\AttendanceDailyPenalty::find($confirmPenaltyId); @endphp
                     @if($p)
                         <div class="mt-4 p-3 bg-gray-50 rounded-xl w-full border border-gray-100">
-                            <p class="text-lg font-bold text-red-600">{{ number_format($p->net_amount, 2) }}</p>
+                            <p class="text-lg font-bold text-[color:var(--error)]">{{ number_format($p->net_amount, 2) }}</p>
                             <p class="text-xs text-gray-500">{{ $p->employee->name_ar ?? $p->employee->name_en }} ({{ company_date($p->attendance_date) }})</p>
                         </div>
                     @endif

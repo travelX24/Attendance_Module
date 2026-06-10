@@ -5,7 +5,7 @@
 >
     <x-slot name="title">
         <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-[color:var(--brand-via)]/10 text-[color:var(--brand-via)] rounded-xl flex items-center justify-center text-lg border border-[color:var(--brand-via)]/20 shadow-sm">
+            <div class="w-10 h-10 bg-[color:var(--accent-orange)]/10 text-[color:var(--accent-orange)] rounded-xl flex items-center justify-center text-lg border border-[color:var(--accent-orange)]/20 shadow-sm">
                 <i class="fas fa-history"></i>
             </div>
             <h3 class="font-bold text-gray-900 text-lg leading-tight">{{ tr('Schedule Assignment History') }}</h3>
@@ -41,7 +41,7 @@
                     @forelse($historyList as $log)
                         <div class="relative group">
                             {{-- Timeline Dot --}}
-                            <div class="absolute top-4 {{ app()->isLocale('ar') ? '-right-[9px]' : '-left-[9px]' }} w-4 h-4 rounded-full bg-white border-4 border-[color:var(--brand-via)] box-content shadow-sm z-10 group-hover:scale-110 transition-transform"></div>
+                            <div class="absolute top-4 {{ app()->isLocale('ar') ? '-right-[9px]' : '-left-[9px]' }} w-4 h-4 rounded-full bg-white border-4 border-[color:var(--accent-orange)] box-content shadow-sm z-10 group-hover:scale-110 transition-transform"></div>
 
                             <x-ui.card class="ms-4 !p-0 overflow-hidden hover:shadow-md transition-all duration-300 border-gray-200">
                                 <div class="p-4 border-b border-gray-50 bg-gray-50/50 flex items-center justify-between gap-4">
@@ -63,11 +63,11 @@
                                     <div class="flex items-center gap-3">
                                         <span class="text-xs text-gray-600 font-bold flex items-center gap-3 bg-white px-3 py-1.5 rounded-xl border border-gray-100 shadow-sm">
                                             <div class="flex items-center">
-                                                <i class="far fa-calendar-alt me-2 text-blue-400"></i>
+                                                <i class="far fa-calendar-alt me-2 text-[color:var(--accent-orange)]"></i>
                                                 {{ company_date($log->created_at) }}
                                             </div>
                                             <div class="flex items-center border-s border-gray-200 ps-3">
-                                                <i class="far fa-clock me-2 text-[color:var(--brand-via)]"></i>
+                                                <i class="far fa-clock me-2 text-[color:var(--accent-orange)]"></i>
                                                 {{ company_time($log->created_at) }}
                                             </div>
                                         </span>
@@ -92,19 +92,19 @@
                                     @endphp
 
                                     <div class="flex items-start gap-4">
-                                        <div class="w-10 h-10 rounded-xl {{ $isDeleted ? 'bg-red-50 text-red-500' : 'bg-indigo-50 text-indigo-600' }} flex items-center justify-center text-lg shrink-0 border {{ $isDeleted ? 'border-red-100' : 'border-indigo-100' }}">
+                                        <div class="w-10 h-10 rounded-xl {{ $isDeleted ? 'bg-[color:var(--error)]/10 text-[color:var(--error)] border-[color:var(--error)]/20' : 'bg-[color:var(--accent-orange)]/10 text-[color:var(--accent-orange)] border-[color:var(--accent-orange)]/20' }} flex items-center justify-center text-lg shrink-0 border">
                                             <i class="fas {{ $isDeleted ? 'fa-calendar-times' : 'fa-calendar-check' }}"></i>
                                         </div>
                                         <div class="flex-1">
                                             <div class="flex items-center justify-between gap-2">
-                                                <p class="text-sm font-bold {{ $isDeleted ? 'text-red-700 line-through' : 'text-gray-900' }} flex items-center gap-2">
+                                                <p class="text-sm font-bold {{ $isDeleted ? 'text-[color:var(--error)] line-through' : 'text-gray-900' }} flex items-center gap-2">
                                                     {{ $schName }}
                                                     @if(!$schedule && $scheduleId && !$isDeleted)
-                                                        <i class="fas fa-exclamation-triangle text-amber-500 text-[10px]" title="{{ tr('Schedule no longer exists') }}"></i>
+                                                        <i class="fas fa-exclamation-triangle text-[color:var(--warning)] text-[10px]" title="{{ tr('Schedule no longer exists') }}"></i>
                                                     @endif
                                                 </p>
                                                 @if($isDeleted)
-                                                    <span class="text-[10px] font-black uppercase text-red-600 tracking-widest bg-red-50 px-2 py-0.5 rounded border border-red-200">{{ tr('Removed') }}</span>
+                                                    <span class="text-[10px] font-black uppercase text-[color:var(--error)] tracking-widest bg-[color:var(--error)]/10 px-2 py-0.5 rounded border border-[color:var(--error)]/25">{{ tr('Removed') }}</span>
                                                 @endif
                                             </div>
                                             
@@ -122,7 +122,7 @@
                                                         <span class="font-mono text-gray-800">{{ company_date($endDate) }}</span>
                                                     </div>
                                                 @else
-                                                    <div class="flex items-center gap-1.5 px-2 py-1 bg-purple-50 rounded border border-purple-100 text-purple-700">
+                                                    <div class="flex items-center gap-1.5 px-2 py-1 bg-[color:var(--accent-orange)]/10 rounded border border-[color:var(--accent-orange)]/20 text-[color:var(--accent-orange)]">
                                                         <i class="fas fa-infinity text-[10px]"></i>
                                                         <span class="font-bold">{{ tr('Permanent') }}</span>
                                                     </div>

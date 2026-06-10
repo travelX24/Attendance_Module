@@ -2,7 +2,7 @@
     <x-ui.modal wire:model="showApprovalModal" max-width="2xl">
         <x-slot name="title">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 rounded-xl bg-green-50 flex items-center justify-center text-green-600 border border-green-100 shadow-sm">
+                <div class="w-10 h-10 rounded-xl bg-[color:var(--success)]/10 flex items-center justify-center text-[color:var(--success)] border border-[color:var(--success)]/25 shadow-sm">
                     <i class="fas fa-check-double"></i>
                 </div>
                 <div>
@@ -15,9 +15,9 @@
         <x-slot name="content">
             <div class="space-y-6">
                 {{-- Quick Tip --}}
-                <div class="flex items-center gap-3 p-3 bg-blue-50/50 rounded-xl border border-blue-100/50">
-                    <i class="fas fa-info-circle text-[color:var(--brand-from)]"></i>
-                    <p class="text-[11px] text-[color:var(--brand-from)] leading-relaxed">
+                <div class="flex items-center gap-3 p-3 bg-[color:var(--app-soft-bg)] rounded-xl border border-[color:var(--border-soft)]">
+                    <i class="fas fa-info-circle text-[color:var(--accent-orange)]"></i>
+                    <p class="text-[11px] text-[color:var(--text-secondary)] leading-relaxed">
                         {{ tr('Approved records are locked and used for calculating monthly salaries. Ensure all times and status are correct before proceeding.') }}
                     </p>
                 </div>
@@ -31,7 +31,7 @@
                             {{-- Employee Card --}}
                             <div class="p-4 bg-gray-50 rounded-2xl border border-gray-100">
                                 <div class="flex items-center gap-4">
-                                     <div class="w-14 h-14 rounded-full bg-white border-2 border-[color:var(--brand-via)]/20 flex items-center justify-center text-[color:var(--brand-via)] font-black text-xl shadow-sm">
+                                     <div class="w-14 h-14 rounded-full bg-white border-2 border-[color:var(--border-soft)] flex items-center justify-center text-[color:var(--brand-via)] font-black text-xl shadow-sm">
                                          {{ mb_substr($approvalPreview['employee_name'] ?? '?', 0, 1) }}
                                      </div>
                                      <div class="flex-1">
@@ -60,7 +60,7 @@
                                     <div class="flex gap-1.5">
                                         @php $comp = (float)($approvalPreview['compliance_percentage'] ?? 0); @endphp
                                         @for($i=1; $i<=5; $i++)
-                                            <div class="w-1.5 h-8 rounded-full {{ $comp >= ($i*20) ? 'bg-green-500' : ($comp >= ($i*20)-10 ? 'bg-yellow-400' : 'bg-gray-100') }}"></div>
+                                            <div class="w-1.5 h-8 rounded-full {{ $comp >= ($i*20) ? 'bg-[color:var(--success)]' : ($comp >= ($i*20)-10 ? 'bg-[color:var(--warning)]' : 'bg-gray-100') }}"></div>
                                         @endfor
                                     </div>
                                 </div>
@@ -102,8 +102,8 @@
                                         </div>
                                     </div>
                                     <div class="text-center">
-                                        <p class="text-[10px] font-bold text-[color:var(--brand-via)] uppercase mb-3">{{ tr('Actual (Punch)') }}</p>
-                                        <div class="flex flex-col gap-1 font-mono text-xs text-[color:var(--brand-via)] bg-orange-50 rounded-lg py-2">
+                                        <p class="text-[10px] font-bold text-[color:var(--accent-orange)] uppercase mb-3">{{ tr('Actual (Punch)') }}</p>
+                                        <div class="flex flex-col gap-1 font-mono text-xs text-[color:var(--accent-orange)] bg-[color:var(--accent-orange)]/10 rounded-lg py-2">
                                             <span class="font-bold">{{ $approvalPreview['check_in'] ?? '--:--' }}</span>
                                             <span class="font-black">{{ $approvalPreview['check_out'] ?? '--:--' }}</span>
                                         </div>
@@ -116,7 +116,7 @@
                                 {{-- Critical Issues --}}
                                 @if(!empty($approvalIssues))
                                     @foreach($approvalIssues as $issue)
-                                        <div class="flex items-start gap-3 p-3 bg-red-50 text-red-700 rounded-xl border border-red-100 text-[11px]">
+                                        <div class="flex items-start gap-3 p-3 bg-[color:var(--error)]/10 text-[color:var(--error)] rounded-xl border border-[color:var(--error)]/25 text-[11px]">
                                             <i class="fas fa-exclamation-triangle mt-0.5"></i>
                                             <p>{{ $issue }}</p>
                                         </div>
@@ -140,7 +140,7 @@
                                                             <span class="text-[9px] text-gray-400">{{ $h['at'] }}</span>
                                                         </div>
                                                         <div class="flex items-center gap-2 text-[10px] text-gray-500 bg-white shadow-sm border border-gray-100 rounded-lg px-2 py-1">
-                                                            <span class="font-medium text-[color:var(--brand-via)] uppercase">{{ $h['action'] }}</span>
+                                                            <span class="font-medium text-[color:var(--accent-orange)] uppercase">{{ $h['action'] }}</span>
                                                             @if($h['from_in'] || $h['to_in'])
                                                                 <div class="flex items-center gap-1 font-mono">
                                                                     <span class="text-gray-300">{{ $h['from_in'] ?? '??' }}</span>
@@ -185,10 +185,10 @@
                 </div>
                 <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                      @can('attendance.manage')
-                     <x-ui.secondary-button wire:click="openRejectModal({{ $approvingLogId }})" class="w-full sm:w-auto justify-center !bg-red-50 !text-red-600 !border-red-100 hover:!bg-red-100">
+                     <x-ui.secondary-button wire:click="openRejectModal({{ $approvingLogId }})" class="w-full sm:w-auto justify-center !bg-[color:var(--error)]/10 !text-[color:var(--error)] !border-[color:var(--error)]/25 hover:!bg-[color:var(--error)]/15">
                         {{ tr('Reject') }}
                     </x-ui.secondary-button>
-                    <x-ui.primary-button wire:click="approveSingle" wire:loading.attr="disabled" class="w-full sm:w-auto justify-center gap-2 sm:!px-8 shadow-lg shadow-green-500/20">
+                    <x-ui.primary-button wire:click="approveSingle" wire:loading.attr="disabled" class="w-full sm:w-auto justify-center gap-2 sm:!px-8 shadow-lg shadow-[color:var(--accent-orange)]/20">
                         <i class="fas fa-check-circle" wire:loading.remove></i>
                         <i class="fas fa-spinner fa-spin" wire:loading></i>
                         <span>{{ tr('Approve Record') }}</span>

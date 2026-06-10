@@ -3,9 +3,9 @@
         <x-slot name="title">{{ tr('Add Manual Attendance') }}</x-slot>
         <x-slot name="content">
             <div class="space-y-5">
-                <div class="flex items-center gap-3 p-3 bg-blue-50 rounded-xl border border-blue-100">
-                    <i class="fas fa-info-circle text-blue-600"></i>
-                    <p class="text-xs text-blue-900 font-medium">
+                <div class="flex items-center gap-3 p-3 bg-[color:var(--accent-orange)]/5 rounded-xl border border-[color:var(--accent-orange)]/15">
+                    <i class="fas fa-info-circle text-[color:var(--accent-orange)]"></i>
+                    <p class="text-xs text-[color:var(--text-primary)] font-medium">
                         {{ tr('This will create a manual attendance record that requires approval before payroll processing.') }}
                     </p>
                 </div>
@@ -37,7 +37,7 @@
                         <div class="p-4 bg-gray-50/50 rounded-xl border border-gray-100 space-y-3">
                             @if(count($createForm['periods']) > 1)
                                 <div class="flex items-center gap-2 text-xs font-bold text-gray-500 uppercase tracking-wider">
-                                    <i class="fas fa-clock text-blue-500"></i>
+                                    <i class="fas fa-clock text-[color:var(--accent-orange)]"></i>
                                     <span>{{ tr('Period') }} #{{ $index + 1 }} {{ isset($period['label']) ? '(' . $period['label'] . ')' : '' }}</span>
                                 </div>
                             @endif

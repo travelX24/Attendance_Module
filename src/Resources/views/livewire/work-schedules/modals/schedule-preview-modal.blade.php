@@ -6,7 +6,7 @@
 >
     <x-slot name="title">
         <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-[color:var(--brand-via)]/10 text-[color:var(--brand-via)] rounded-xl flex items-center justify-center text-lg border border-[color:var(--brand-via)]/20 shadow-sm">
+            <div class="w-10 h-10 bg-[color:var(--accent-orange)]/10 text-[color:var(--accent-orange)] rounded-xl flex items-center justify-center text-lg border border-[color:var(--accent-orange)]/20 shadow-sm">
                 <i class="fas fa-calendar-alt"></i>
             </div>
             <div>
@@ -57,7 +57,7 @@
                             :disabled="!auth()->user()->can('attendance.manage')"
                         />
                         @error('previewForm.from')
-                            <p class="text-xs text-red-600 mt-1">{{ $message }}</p>
+                            <p class="text-xs text-[color:var(--error)] mt-1">{{ $message }}</p>
                         @enderror
                     </div>
 
@@ -68,7 +68,7 @@
                             :disabled="!auth()->user()->can('attendance.manage')"
                         />
                         @error('previewForm.to')
-                            <p class="text-xs text-red-600 mt-1">{{ $message }}</p>
+                            <p class="text-xs text-[color:var(--error)] mt-1">{{ $message }}</p>
                         @enderror
                     </div>
 

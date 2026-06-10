@@ -4,9 +4,9 @@
 
         <x-slot name="content">
             <div class="space-y-4">
-                <div class="p-3 rounded-xl border border-red-100 bg-red-50 flex items-start gap-2">
-                    <i class="fas fa-lock text-red-600 mt-0.5"></i>
-                    <div class="text-xs text-red-900 font-medium">
+                <div class="p-3 rounded-xl border border-[color:var(--error)]/25 bg-[color:var(--error)]/10 flex items-start gap-2">
+                    <i class="fas fa-lock text-[color:var(--error)] mt-0.5"></i>
+                    <div class="text-xs text-[color:var(--text-primary)] font-medium">
                         {{ tr('This attendance is already approved. Editing it will move it back to Pending and requires re-approval.') }}
                     </div>
                 </div>
@@ -19,10 +19,10 @@
                 />
 
                 <label class="flex items-center gap-2 text-xs text-gray-700">
-                    <input type="checkbox" wire:model="approvedEditConfirmUnderstood" class="rounded border-gray-300" @cannot('attendance.manage') disabled @endcannot>
+                    <input type="checkbox" wire:model="approvedEditConfirmUnderstood" class="text-[color:var(--accent-orange)] rounded border-gray-300 focus:ring-[color:var(--accent-orange)]" @cannot('attendance.manage') disabled @endcannot>
                     <span>{{ tr('I understand this will reopen the record for re-approval') }}</span>
                 </label>
-                @error('approvedEditConfirmUnderstood') <div class="text-xs text-red-600">{{ $message }}</div> @enderror
+                @error('approvedEditConfirmUnderstood') <div class="text-xs text-[color:var(--error)]">{{ $message }}</div> @enderror
             </div>
         </x-slot>
 

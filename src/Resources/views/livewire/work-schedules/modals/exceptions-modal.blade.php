@@ -5,7 +5,7 @@
 >
     <x-slot name="title">
         <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-[color:var(--brand-via)]/10 text-[color:var(--brand-via)] rounded-xl flex items-center justify-center text-lg border border-[color:var(--brand-via)]/20 shadow-sm">
+            <div class="w-10 h-10 bg-[color:var(--accent-orange)]/10 text-[color:var(--accent-orange)] rounded-xl flex items-center justify-center text-lg border border-[color:var(--accent-orange)]/20 shadow-sm">
                 <i class="fas fa-user-clock"></i>
             </div>
             <h3 class="font-bold text-gray-900 text-lg leading-tight">{{ tr('Employee Exceptions Management') }}</h3>
@@ -20,10 +20,10 @@
 
             {{-- Header Card --}}
             <x-ui.card class="!p-0 overflow-hidden">
-                <div class="p-4 sm:p-5 bg-gradient-to-r from-[color:var(--brand-from)]/10 via-[color:var(--brand-via)]/10 to-[color:var(--brand-to)]/10 border-b border-gray-100">
+                <div class="p-4 sm:p-5 bg-[color:var(--accent-orange)]/5 border-b border-[color:var(--accent-orange)]/10">
                     <div class="flex items-center justify-between gap-4">
                         <div class="flex items-center gap-3">
-                            <div class="w-11 h-11 rounded-2xl bg-[color:var(--brand-via)]/15 text-[color:var(--brand-via)] flex items-center justify-center font-extrabold">
+                            <div class="w-11 h-11 rounded-2xl bg-[color:var(--accent-orange)]/10 text-[color:var(--accent-orange)] flex items-center justify-center font-extrabold">
                                 {{ $initial }}
                             </div>
                             <div>
@@ -31,7 +31,7 @@
                                     {{ tr('Employee') }}: {{ $exceptionsEmployeeName ?: '—' }}
                                 </div>
                                 <div class="text-xs text-gray-600 flex items-center gap-2">
-                                    <i class="fas fa-user-clock text-[color:var(--brand-via)]"></i>
+                                    <i class="fas fa-user-clock text-[color:var(--accent-orange)]"></i>
                                     <span>{{ tr('Manage individual exceptions for a specific date') }}</span>
                                 </div>
                             </div>
@@ -46,8 +46,8 @@
 
                 <div class="flex flex-col gap-4">
             {{-- Info Alert --}}
-            <div class="p-3 bg-indigo-50 border border-indigo-100 rounded-xl flex items-center gap-3 text-indigo-700 text-sm">
-                <i class="fas fa-info-circle"></i>
+            <div class="p-3 bg-[color:var(--app-soft-bg)] border border-[color:var(--border-soft)] rounded-xl flex items-center gap-3 text-[color:var(--text-secondary)] text-sm">
+                <i class="fas fa-info-circle text-[color:var(--accent-orange)]"></i>
                 <p>{{ tr('Selected changes will be applied to') }} <strong>1 {{ tr('Employee') }}</strong></p>
             </div>
 

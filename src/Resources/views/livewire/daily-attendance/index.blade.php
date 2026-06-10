@@ -18,7 +18,7 @@
     <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
         {{-- Present --}}
         <x-ui.card hover class="flex items-center gap-4">
-            <div class="p-3 bg-green-50 text-green-600 rounded-xl">
+            <div class="p-3 bg-[color:var(--success)]/10 text-[color:var(--success)] rounded-xl">
                 <i class="fas fa-user-check fa-lg"></i>
             </div>
             <div>
@@ -32,7 +32,7 @@
 
         {{-- Late --}}
         <x-ui.card hover class="flex items-center gap-4">
-            <div class="p-3 bg-yellow-50 text-yellow-600 rounded-xl">
+            <div class="p-3 bg-[color:var(--warning)]/10 text-[color:var(--warning)] rounded-xl">
                 <i class="fas fa-clock fa-lg"></i>
             </div>
             <div>
@@ -46,7 +46,7 @@
 
         {{-- Absent --}}
         <x-ui.card hover class="flex items-center gap-4">
-            <div class="p-3 bg-red-50 text-red-600 rounded-xl">
+            <div class="p-3 bg-[color:var(--error)]/10 text-[color:var(--error)] rounded-xl">
                 <i class="fas fa-user-times fa-lg"></i>
             </div>
             <div>
@@ -60,7 +60,7 @@
 
         {{-- On Leave --}}
         <x-ui.card hover class="flex items-center gap-4">
-            <div class="p-3 bg-orange-50 text-[color:var(--brand-from)] rounded-xl">
+            <div class="p-3 bg-[color:var(--accent-orange)]/10 text-[color:var(--accent-orange)] rounded-xl">
                 <i class="fas fa-umbrella-beach fa-lg"></i>
             </div>
             <div>
@@ -74,7 +74,7 @@
 
         {{-- Early Departure --}}
         <x-ui.card hover class="flex items-center gap-4">
-            <div class="p-3 bg-orange-50 text-orange-600 rounded-xl">
+            <div class="p-3 bg-[color:var(--accent-orange)]/10 text-[color:var(--accent-orange)] rounded-xl">
                 <i class="fas fa-sign-out-alt fa-lg"></i>
             </div>
             <div>
@@ -88,7 +88,7 @@
 
         {{-- Auto Checkout --}}
         <x-ui.card hover class="flex items-center gap-4">
-            <div class="p-3 bg-gray-50 text-gray-600 rounded-xl">
+            <div class="p-3 bg-[color:var(--app-soft-bg)] text-[color:var(--brand-via)] rounded-xl border border-[color:var(--border-soft)]">
                 <i class="fas fa-robot fa-lg"></i>
             </div>
             <div>
@@ -234,7 +234,7 @@
                             max="200"
                             step="1"
                             wire:model.live="compliance_from"
-                            class="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[color:var(--brand-via)] focus:border-transparent"
+                            class="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[color:var(--accent-orange)] focus:border-transparent"
                             placeholder="0"
                             @disabled(!auth()->user()->can('attendance.manage'))
                         >
@@ -248,7 +248,7 @@
                             max="200"
                             step="1"
                             wire:model.live="compliance_to"
-                            class="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[color:var(--brand-via)] focus:border-transparent"
+                            class="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[color:var(--accent-orange)] focus:border-transparent"
                             placeholder="100"
                             @disabled(!auth()->user()->can('attendance.manage'))
                         >
@@ -326,13 +326,13 @@
                     <div class="flex items-center bg-gray-100 rounded-lg p-1 sm:me-auto w-full sm:w-auto">
                         <button 
                             wire:click="switchView('daily')" 
-                            class="flex-1 sm:flex-none justify-center px-3 py-1.5 sm:py-1 text-xs font-bold rounded-md transition-all {{ $view_mode === 'daily' ? 'bg-white shadow text-[color:var(--brand-via)]' : 'text-gray-500 hover:text-gray-700' }}"
+                            class="flex-1 sm:flex-none justify-center px-3 py-1.5 sm:py-1 text-xs font-bold rounded-md transition-all {{ $view_mode === 'daily' ? 'bg-white shadow text-[color:var(--accent-orange)]' : 'text-gray-500 hover:text-gray-700' }}"
                         >
                             <i class="fas fa-list-ul me-1"></i> {{ tr('Daily Log') }}
                         </button>
                         <button 
                             wire:click="switchView('summary')" 
-                            class="flex-1 sm:flex-none justify-center px-3 py-1.5 sm:py-1 text-xs font-bold rounded-md transition-all {{ $view_mode === 'summary' ? 'bg-white shadow text-[color:var(--brand-via)]' : 'text-gray-500 hover:text-gray-700' }}"
+                            class="flex-1 sm:flex-none justify-center px-3 py-1.5 sm:py-1 text-xs font-bold rounded-md transition-all {{ $view_mode === 'summary' ? 'bg-white shadow text-[color:var(--accent-orange)]' : 'text-gray-500 hover:text-gray-700' }}"
                         >
                             <i class="fas fa-users me-1"></i> {{ tr('Employee Summary') }}
                         </button>
@@ -341,20 +341,20 @@
                     <div class="flex items-center justify-between sm:justify-end gap-2 w-full sm:w-auto">
                         {{-- Refresh --}}
                         <x-ui.secondary-button wire:click="refreshData" wire:loading.attr="disabled" size="sm" class="flex-1 sm:flex-none justify-center gap-1.5 group" title="{{ tr('Refresh') }}">
-                            <i class="fas fa-sync text-xs text-gray-400 group-hover:text-[color:var(--brand-via)]" wire:loading.class="fa-spin"></i>
+                            <i class="fas fa-sync text-xs text-gray-400 group-hover:text-[color:var(--accent-orange)]" wire:loading.class="fa-spin"></i>
                             <span class="text-xs">{{ tr('Refresh') }}</span>
                         </x-ui.secondary-button>
 
                         @can('attendance.manage')
                         {{-- Export Excel --}}
                         <x-ui.secondary-button wire:click="exportExcel" size="sm" class="flex-1 sm:flex-none justify-center gap-1.5 group" title="{{ tr('Export to Excel') }}">
-                            <i class="fas fa-file-excel text-xs text-gray-400 group-hover:text-green-600"></i>
+                            <i class="fas fa-file-excel text-xs text-gray-400 group-hover:text-[color:var(--success)]"></i>
                             <span class="text-xs">{{ tr('Excel') }}</span>
                         </x-ui.secondary-button>
 
                         {{-- Export PDF --}}
                         <x-ui.secondary-button wire:click="exportPDF" size="sm" class="flex-1 sm:flex-none justify-center gap-1.5 group" title="{{ tr('Export to PDF') }}">
-                            <i class="fas fa-file-pdf text-xs text-gray-400 group-hover:text-red-600"></i>
+                            <i class="fas fa-file-pdf text-xs text-gray-400 group-hover:text-[color:var(--error)]"></i>
                             <span class="text-xs">{{ tr('PDF') }}</span>
                         </x-ui.secondary-button>
                         @endcan
@@ -389,7 +389,7 @@
                         <input 
                             type="checkbox" 
                             wire:model.live="selectAll" 
-                            class="w-4 h-4 text-[color:var(--brand-via)] border-gray-300 rounded focus:ring-[color:var(--brand-via)]"
+                            class="w-4 h-4 text-[color:var(--accent-orange)] border-gray-300 rounded focus:ring-[color:var(--accent-orange)]"
                             @disabled(!auth()->user()->can('attendance.manage'))
                         >
                     </td>
@@ -442,21 +442,28 @@
     
                         // Compliance color
                         $compliancePercentage = $log->compliance_percentage ?? 0;
-                        $complianceColor = in_array($log->attendance_status, ['absent','on_leave','day_off'])
-                            ? 'text-gray-500'
-                            : ($compliancePercentage >= 95 ? 'text-green-700' : ($compliancePercentage >= 80 ? 'text-yellow-700' : 'text-red-700'));
+                        $complianceCssVar = in_array($log->attendance_status, ['absent','on_leave','day_off'])
+                            ? '--text-secondary'
+                            : ($compliancePercentage >= 95 ? '--success' : ($compliancePercentage >= 80 ? '--warning' : '--error'));
+
+                        $statusCssVar = match($statusColor) {
+                            'green' => '--success',
+                            'yellow', 'amber', 'orange' => '--warning',
+                            'red' => '--error',
+                            default => '--text-primary',
+                        };
                     @endphp
     
                     @if($currentDate && $currentDate !== $lastDate)
                          <tr class="bg-gray-50/80 border-y border-gray-100">
                              <td colspan="11" class="px-6 py-2">
-                                 <div class="flex items-center gap-2 text-blue-800">
-                                     <div class="w-8 h-8 rounded-lg bg-blue-100 flex items-center justify-center text-blue-600 shadow-sm">
+                                 <div class="flex items-center gap-2 text-[color:var(--accent-orange)]">
+                                     <div class="w-8 h-8 rounded-lg bg-[color:var(--accent-orange)]/10 flex items-center justify-center text-[color:var(--accent-orange)] shadow-sm">
                                          <i class="fas fa-calendar-day text-xs"></i>
                                      </div>
                                      <div class="flex flex-col">
-                                         <span class="text-[10px] text-blue-400 font-bold uppercase tracking-widest leading-none mb-0.5">{{ $log->attendance_date->format('l') }}</span>
-                                         <span class="text-xs font-black text-blue-900 leading-none">{{ company_date($log->attendance_date) }}</span>
+                                         <span class="text-[10px] text-[color:var(--accent-orange)]/70 font-bold uppercase tracking-widest leading-none mb-0.5">{{ $log->attendance_date->format('l') }}</span>
+                                         <span class="text-xs font-black text-[color:var(--text-primary)] leading-none">{{ company_date($log->attendance_date) }}</span>
                                      </div>
                                  </div>
                              </td>
@@ -471,7 +478,7 @@
                                 type="checkbox" 
                                 wire:model.live="selectedLogs" 
                                 value="{{ $log->id }}" 
-                                class="w-4 h-4 text-[color:var(--brand-via)] border-gray-300 rounded focus:ring-[color:var(--brand-via)]"
+                                class="w-4 h-4 text-[color:var(--accent-orange)] border-gray-300 rounded focus:ring-[color:var(--accent-orange)]"
                                 @disabled(!auth()->user()->can('attendance.manage'))
                             >
                         </td>
@@ -479,7 +486,7 @@
                         {{-- Employee --}}
                         <td class="px-6 py-4">
                             <div class="flex items-center gap-3">
-                                <div class="w-10 h-10 rounded-full bg-[color:var(--brand-via)]/10 flex items-center justify-center text-[color:var(--brand-via)] font-bold shrink-0">
+                                <div class="w-10 h-10 rounded-full bg-[color:var(--app-soft-bg)] flex items-center justify-center text-[color:var(--brand-via)] font-bold shrink-0 border border-[color:var(--border-soft)]">
                                     {{ $employee ? mb_substr($employee->name_ar ?? $employee->name_en, 0, 1) : '?' }}
                                 </div>
                                 <div>
@@ -490,21 +497,21 @@
     
                                         {{-- 🔴 No attendance for 3 consecutive days --}}
                                         @if(in_array($log->employee_id, $warningNoAttendanceEmployeeIds ?? [], true))
-                                            <span class="text-red-600" title="{{ tr('No attendance for 3 consecutive days') }}">
+                                            <span class="text-[color:var(--error)]" title="{{ tr('No attendance for 3 consecutive days') }}">
                                                 <i class="fas fa-exclamation-circle"></i>
                                             </span>
                                         @endif
     
                                         {{-- 🟠 Many edits on approved record --}}
                                         @if($log->approval_status === 'approved' && (int)($log->edits_count ?? 0) >= 2)
-                                            <span class="text-orange-600" title="{{ tr('High edits count on approved record') }}">
+                                            <span class="text-[color:var(--accent-orange)]" title="{{ tr('High edits count on approved record') }}">
                                                 <i class="fas fa-history"></i>
                                             </span>
                                         @endif
 
                                         {{-- ⭐ Exceptional Day Badge --}}
                                         @if($log->scheduleException && $log->scheduleException->exception_date->format('Y-m-d') === $log->attendance_date->format('Y-m-d'))
-                                            <span class="text-amber-500 bg-amber-50 px-1.5 py-0.5 rounded-md border border-amber-200 cursor-help" title="{{ tr('Exceptional Day') }}: {{ $log->scheduleException->exception_type }}">
+                                            <span class="text-[color:var(--warning)] bg-[color:var(--warning)]/10 px-1.5 py-0.5 rounded-md border border-[color:var(--warning)]/25 cursor-help" title="{{ tr('Exceptional Day') }}: {{ $log->scheduleException->exception_type }}">
                                                 <i class="fas fa-star text-[10px]"></i>
                                             </span>
                                         @endif
@@ -523,7 +530,7 @@
                                         @endphp
     
                                         @if($lateToday > 60)
-                                            <span class="text-yellow-600" title="{{ tr('Late more than 60 minutes') }}">
+                                            <span class="text-[color:var(--warning)]" title="{{ tr('Late more than 60 minutes') }}">
                                                 <i class="fas fa-clock"></i>
                                             </span>
                                         @endif
@@ -543,10 +550,16 @@
                                 $empStatus = strtoupper($employee->status ?? 'ACTIVE');
                                 $empStatusColor = \Athka\Employees\Support\EmployeeStatus::color($empStatus);
                                 $empStatusLabel = \Athka\Employees\Support\EmployeeStatus::label($empStatus);
+                                $empStatusCssVar = match($empStatusColor) {
+                                    'green' => '--success',
+                                    'yellow', 'amber', 'orange' => '--warning',
+                                    'red' => '--error',
+                                    default => '--text-secondary',
+                                };
                             @endphp
                             <div class="flex items-center gap-1.5 justify-center">
-                                <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
-                                <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ $empStatusLabel }}</span>
+                                <div class="w-2 h-2 rounded-full" style="background-color: var({{ $empStatusCssVar }});"></div>
+                                <span class="text-[10px] font-bold uppercase" style="color: var({{ $empStatusCssVar }});">{{ $empStatusLabel }}</span>
                             </div>
                         </td>
     
@@ -559,7 +572,7 @@
     
                         {{-- Actual Hours --}}
                         <td class="px-6 py-4 text-center">
-                            <span class="text-sm font-bold {{ $complianceColor }}">
+                            <span class="text-sm font-bold" style="color: var({{ $complianceCssVar }});">
                                 {{ number_format($log->actual_hours ?? 0, 2) }}
                             </span>
                         </td>
@@ -569,13 +582,13 @@
                             @if($log->details->isNotEmpty())
                                 <div class="flex flex-col items-center gap-0.5">
                                     @foreach($log->details as $detail)
-                                        <span class="text-sm font-bold {{ $statusColor === 'green' ? 'text-green-700' : ($statusColor === 'yellow' ? 'text-yellow-700' : ($statusColor === 'red' ? 'text-red-700' : 'text-gray-700')) }}">
+                                        <span class="text-sm font-bold" style="color: var({{ $statusCssVar }});">
                                             {{ company_time($detail->check_in_time) ?: '-' }}
                                         </span>
                                     @endforeach
                                 </div>
                             @elseif($log->check_in_time)
-                                <span class="text-sm font-bold {{ $statusColor === 'green' ? 'text-green-700' : ($statusColor === 'yellow' ? 'text-yellow-700' : ($statusColor === 'red' ? 'text-red-700' : 'text-gray-700')) }}">
+                                <span class="text-sm font-bold" style="color: var({{ $statusCssVar }});">
                                     {{ company_time($log->check_in_time) ?: '-' }}
                                 </span>
                             @else
@@ -588,13 +601,13 @@
                             @if($log->details->isNotEmpty())
                                 <div class="flex flex-col items-center gap-0.5">
                                     @foreach($log->details as $detail)
-                                        <span class="text-sm font-bold {{ $statusColor === 'green' ? 'text-green-700' : ($statusColor === 'yellow' ? 'text-yellow-700' : ($statusColor === 'red' ? 'text-red-700' : 'text-gray-700')) }}">
+                                        <span class="text-sm font-bold" style="color: var({{ $statusCssVar }});">
                                             {{ $detail->check_out_time ? \Carbon\Carbon::parse($detail->check_out_time)->format('H:i') : '-' }}
                                         </span>
                                     @endforeach
                                 </div>
                             @elseif($log->check_out_time)
-                                <span class="text-sm font-bold {{ $statusColor === 'green' ? 'text-green-700' : ($statusColor === 'yellow' ? 'text-yellow-700' : ($statusColor === 'red' ? 'text-red-700' : 'text-gray-700')) }}">
+                                <span class="text-sm font-bold" style="color: var({{ $statusCssVar }});">
                                     {{ company_time($log->check_out_time) ?: '-' }}
                                 </span>
                             @else
@@ -619,13 +632,13 @@
                                 {{ $approvalBadge['label'] }}
                             </x-ui.badge>
                             @if($log->is_edited)
-                                <i class="fas fa-pencil-alt text-xs text-orange-500 ml-1" title="{{ tr('Edited') }}"></i>
+                                <i class="fas fa-pencil-alt text-xs text-[color:var(--accent-orange)] ml-1" title="{{ tr('Edited') }}"></i>
                             @endif
                         </td>
     
                         {{-- Compliance Percentage --}}
                         <td class="px-6 py-4 text-center">
-                            <span class="text-sm font-bold {{ $complianceColor }}">
+                            <span class="text-sm font-bold" style="color: var({{ $complianceCssVar }});">
                                 {{ number_format($compliancePercentage, 0) }}%
                             </span>
                         </td>
@@ -704,13 +717,13 @@
                         <td class="px-6 py-4">
                             <div class="flex items-center gap-3">
                                 <div class="relative">
-                                    <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-400 flex items-center justify-center text-white font-bold shadow-md transform group-hover:scale-110 transition-transform">
+                                    <div class="w-10 h-10 rounded-full bg-[color:var(--app-soft-bg)] border border-[color:var(--border-soft)] flex items-center justify-center text-[color:var(--brand-via)] font-bold shadow-sm transform group-hover:scale-110 transition-transform">
                                         {{ mb_substr($employee->name_ar ?? $employee->name_en, 0, 1) }}
                                     </div>
-                                    <div class="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-full"></div>
+                                    <div class="absolute -bottom-1 -right-1 w-4 h-4 bg-[color:var(--success)] border-2 border-white rounded-full"></div>
                                 </div>
                                 <div class="min-w-0">
-                                    <p class="text-sm font-bold text-gray-900 group-hover:text-blue-600 transition-colors">{{ $employee->name_ar ?? $employee->name_en }}</p>
+                                    <p class="text-sm font-bold text-gray-900 group-hover:text-[color:var(--accent-orange)] transition-colors">{{ $employee->name_ar ?? $employee->name_en }}</p>
                                     <p class="text-xs text-gray-500">
                                         <span class="inline-block px-1.5 py-0.5 bg-gray-100 rounded text-[10px] font-mono">#{{ $employee->employee_no }}</span>
                                         <span class="mx-1 text-gray-300">|</span>
@@ -725,10 +738,16 @@
                                 $empStatus = strtoupper($employee->status ?? 'ACTIVE');
                                 $empStatusColor = \Athka\Employees\Support\EmployeeStatus::color($empStatus);
                                 $empStatusLabel = \Athka\Employees\Support\EmployeeStatus::label($empStatus);
+                                $empStatusCssVar = match($empStatusColor) {
+                                    'green' => '--success',
+                                    'yellow', 'amber', 'orange' => '--warning',
+                                    'red' => '--error',
+                                    default => '--text-secondary',
+                                };
                             @endphp
                             <div class="flex items-center gap-1.5 justify-center">
-                                <div class="w-2 h-2 rounded-full bg-{{ $empStatusColor }}-500"></div>
-                                <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ $empStatusLabel }}</span>
+                                <div class="w-2 h-2 rounded-full" style="background-color: var({{ $empStatusCssVar }});"></div>
+                                <span class="text-[10px] font-bold uppercase" style="color: var({{ $empStatusCssVar }});">{{ $empStatusLabel }}</span>
                             </div>
                         </td>
 
@@ -756,40 +775,40 @@
                                      $au = ($employee->summary->auto_checkout_days / $total) * 100;
                                  @endphp
                                  <div class="h-1.5 w-full bg-gray-100 rounded-full flex overflow-hidden shadow-inner">
-                                     <div class="h-full bg-green-500" style="width: {{ $p }}%" title="{{ tr('Present') }}"></div>
-                                     <div class="h-full bg-yellow-400" style="width: {{ $l }}%" title="{{ tr('Late') }}"></div>
-                                     <div class="h-full bg-red-400" style="width: {{ $a }}%" title="{{ tr('Absent') }}"></div>
-                                     <div class="h-full bg-orange-400" style="width: {{ $e }}%" title="{{ tr('Early Departure') }}"></div>
-                                     <div class="h-full bg-blue-400" style="width: {{ $v }}%" title="{{ tr('On Leave') }}"></div>
+                                     <div class="h-full" style="width: {{ $p }}%; background-color: var(--success);" title="{{ tr('Present') }}"></div>
+                                     <div class="h-full" style="width: {{ $l }}%; background-color: var(--warning);" title="{{ tr('Late') }}"></div>
+                                     <div class="h-full" style="width: {{ $a }}%; background-color: var(--error);" title="{{ tr('Absent') }}"></div>
+                                     <div class="h-full" style="width: {{ $e }}%; background-color: var(--accent-orange);" title="{{ tr('Early Departure') }}"></div>
+                                     <div class="h-full" style="width: {{ $v }}%; background-color: var(--text-light);" title="{{ tr('On Leave') }}"></div>
                                      <div class="h-full bg-gray-400" style="width: {{ $au }}%" title="{{ tr('Auto Out') }}"></div>
                                  </div>
 
                                  {{-- Interactive Icons Layout --}}
                                  <div class="grid grid-cols-6 gap-1">
                                      {{-- Present --}}
-                                     <div class="flex flex-col items-center p-1 rounded bg-green-50/50 border border-green-100/50" title="{{ tr('Present') }}">
-                                         <span class="text-[10px] font-bold text-green-700">{{ $employee->summary->present_days }}</span>
-                                         <i class="fas fa-check-circle text-[8px] text-green-400"></i>
+                                     <div class="flex flex-col items-center p-1 rounded bg-[color:var(--success)]/10 border border-[color:var(--success)]/20" title="{{ tr('Present') }}">
+                                         <span class="text-[10px] font-bold text-[color:var(--success)]">{{ $employee->summary->present_days }}</span>
+                                         <i class="fas fa-check-circle text-[8px] text-[color:var(--success)]"></i>
                                      </div>
                                      {{-- Late --}}
-                                     <div class="flex flex-col items-center p-1 rounded bg-yellow-50/50 border border-yellow-100/50" title="{{ tr('Late') }}">
-                                         <span class="text-[10px] font-bold text-yellow-700">{{ $employee->summary->late_days }}</span>
-                                         <i class="fas fa-clock text-[8px] text-yellow-400"></i>
+                                     <div class="flex flex-col items-center p-1 rounded bg-[color:var(--warning)]/10 border border-[color:var(--warning)]/20" title="{{ tr('Late') }}">
+                                         <span class="text-[10px] font-bold text-[color:var(--warning)]">{{ $employee->summary->late_days }}</span>
+                                         <i class="fas fa-clock text-[8px] text-[color:var(--warning)]"></i>
                                      </div>
                                      {{-- Absent --}}
-                                     <div class="flex flex-col items-center p-1 rounded bg-red-50/50 border border-red-100/50" title="{{ tr('Absent') }}">
-                                         <span class="text-[10px] font-bold text-red-700">{{ $employee->summary->absent_days }}</span>
-                                         <i class="fas fa-times-circle text-[8px] text-red-400"></i>
+                                     <div class="flex flex-col items-center p-1 rounded bg-[color:var(--error)]/10 border border-[color:var(--error)]/20" title="{{ tr('Absent') }}">
+                                         <span class="text-[10px] font-bold text-[color:var(--error)]">{{ $employee->summary->absent_days }}</span>
+                                         <i class="fas fa-times-circle text-[8px] text-[color:var(--error)]"></i>
                                      </div>
                                      {{-- Early Out --}}
-                                     <div class="flex flex-col items-center p-1 rounded bg-orange-50/50 border border-orange-100/50" title="{{ tr('Early Departure') }}">
-                                         <span class="text-[10px] font-bold text-orange-700">{{ $employee->summary->early_departure_days }}</span>
-                                         <i class="fas fa-sign-out-alt text-[8px] text-orange-400"></i>
+                                     <div class="flex flex-col items-center p-1 rounded bg-[color:var(--accent-orange)]/10 border border-[color:var(--accent-orange)]/20" title="{{ tr('Early Departure') }}">
+                                         <span class="text-[10px] font-bold text-[color:var(--accent-orange)]">{{ $employee->summary->early_departure_days }}</span>
+                                         <i class="fas fa-sign-out-alt text-[8px] text-[color:var(--accent-orange)]"></i>
                                      </div>
                                      {{-- Leave --}}
-                                     <div class="flex flex-col items-center p-1 rounded bg-blue-50/50 border border-blue-100/50" title="{{ tr('On Leave') }}">
-                                         <span class="text-[10px] font-bold text-blue-700">{{ $employee->summary->on_leave_days }}</span>
-                                         <i class="fas fa-umbrella-beach text-[8px] text-blue-400"></i>
+                                     <div class="flex flex-col items-center p-1 rounded bg-[color:var(--app-soft-bg)] border border-[color:var(--border-soft)]" title="{{ tr('On Leave') }}">
+                                         <span class="text-[10px] font-bold text-[color:var(--text-secondary)]">{{ $employee->summary->on_leave_days }}</span>
+                                         <i class="fas fa-umbrella-beach text-[8px] text-[color:var(--text-light)]"></i>
                                      </div>
                                      {{-- Auto Out --}}
                                      <div class="flex flex-col items-center p-1 rounded bg-gray-50/50 border border-gray-100/50" title="{{ tr('Auto Out') }}">
@@ -808,23 +827,25 @@
                                     <span class="text-[10px] text-gray-500 font-medium">S: <span class="text-gray-900 font-bold">{{ $employee->summary->total_scheduled_hours }}h</span></span>
                                 </div>
                                 <div class="flex items-center gap-2">
-                                    <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
-                                    <span class="text-[10px] text-gray-500 font-medium">A: <span class="text-green-600 font-bold">{{ $employee->summary->total_actual_hours }}h</span></span>
+                                    <span class="w-1.5 h-1.5 rounded-full bg-[color:var(--success)]"></span>
+                                    <span class="text-[10px] text-gray-500 font-medium">A: <span class="text-[color:var(--success)] font-bold">{{ $employee->summary->total_actual_hours }}h</span></span>
                                 </div>
                             </div>
                         </td>
 
                         {{-- Compliance --}}
                         <td class="px-6 py-4 text-center">
-                            @php $comp = $employee->summary->avg_compliance; @endphp
+                            @php
+                                $comp = $employee->summary->avg_compliance;
+                                $compCssVar = $comp >= 90 ? '--success' : ($comp >= 70 ? '--warning' : '--error');
+                            @endphp
                             <div class="relative inline-flex items-center justify-center">
                                 <svg class="w-12 h-12 transform -rotate-90">
                                     <circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="3" fill="transparent" class="text-gray-100" />
                                     <circle cx="24" cy="24" r="20" stroke="currentColor" stroke-width="3" fill="transparent" 
-                                        class="{{ $comp >= 90 ? 'text-green-500' : ($comp >= 70 ? 'text-yellow-500' : 'text-red-500') }}"
-                                        style="stroke-dasharray: 125.6; stroke-dashoffset: {{ 125.6 - (125.6 * $comp) / 100 }}" />
+                                        style="color: var({{ $compCssVar }}); stroke-dasharray: 125.6; stroke-dashoffset: {{ 125.6 - (125.6 * $comp) / 100 }}" />
                                 </svg>
-                                <span class="absolute text-[10px] font-black {{ $comp >= 90 ? 'text-green-700' : ($comp >= 70 ? 'text-yellow-700' : 'text-red-700') }}">
+                                <span class="absolute text-[10px] font-black" style="color: var({{ $compCssVar }});">
                                     {{ round($comp, 0) }}%
                                 </span>
                             </div>

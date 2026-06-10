@@ -2,7 +2,7 @@
     <x-ui.modal wire:model="showEditModal" max-width="2xl">
         <x-slot name="title">
             <div class="flex items-center gap-3">
-                <div class="w-10 h-10 bg-[color:var(--brand-via)]/10 text-[color:var(--brand-via)] rounded-xl flex items-center justify-center text-lg border border-[color:var(--brand-via)]/20 shadow-sm">
+                <div class="w-10 h-10 bg-[color:var(--accent-orange)]/10 text-[color:var(--accent-orange)] rounded-xl flex items-center justify-center text-lg border border-[color:var(--accent-orange)]/20 shadow-sm">
                     <i class="fas fa-edit"></i>
                 </div>
                 <h3 class="font-bold text-gray-900 text-lg leading-tight">{{ tr('Edit Attendance') }}</h3>
@@ -13,7 +13,7 @@
             <div class="space-y-5">
                 {{-- Employee Info Card --}}
                 <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
-                    <div class="w-10 h-10 rounded-full bg-[color:var(--brand-via)]/10 flex items-center justify-center text-[color:var(--brand-via)] font-bold shrink-0">
+                    <div class="w-10 h-10 rounded-full bg-[color:var(--app-soft-bg)] flex items-center justify-center text-[color:var(--brand-via)] font-bold shrink-0 border border-[color:var(--border-soft)]">
                         {{ mb_substr($editingEmployeeName ?? '?', 0, 1) }}
                     </div>
                     <div>
@@ -23,9 +23,9 @@
                     </div>
                 </div>
 
-                <div class="flex items-center gap-3 p-3 bg-yellow-50 rounded-xl border border-yellow-100">
-                    <i class="fas fa-exclamation-triangle text-yellow-600"></i>
-                    <p class="text-xs text-yellow-900 font-medium">
+                <div class="flex items-center gap-3 p-3 bg-[color:var(--warning)]/10 rounded-xl border border-[color:var(--warning)]/25">
+                    <i class="fas fa-exclamation-triangle text-[color:var(--warning)]"></i>
+                    <p class="text-xs text-[color:var(--text-primary)] font-medium">
                         {{ tr('Editing attendance records requires a valid reason and will be logged for audit purposes.') }}
                     </p>
                 </div>
@@ -35,7 +35,7 @@
                     <div class="flex items-center justify-between">
                         <label class="text-sm font-bold text-gray-700">{{ tr('Attendance Periods') }}</label>
                         @can('attendance.manage')
-                        <button type="button" wire:click="addPeriodRow" class="text-xs text-[color:var(--brand-via)] hover:underline font-semibold flex items-center gap-1">
+                        <button type="button" wire:click="addPeriodRow" class="text-xs text-[color:var(--accent-orange)] hover:underline font-semibold flex items-center gap-1">
                             <i class="fas fa-plus-circle"></i> {{ tr('Add Period') }}
                         </button>
                         @endcan
@@ -48,7 +48,7 @@
                             @if(count($editForm['periods']) > 1)
                                 @can('attendance.manage')
                                 <button type="button" wire:click="removePeriodRow({{ $index }})" 
-                                    class="absolute -top-2 -right-2 w-6 h-6 bg-red-50 text-red-500 rounded-full border border-red-100 flex items-center justify-center hover:bg-red-500 hover:text-white transition-colors shadow-sm z-10"
+                                    class="absolute -top-2 -right-2 w-6 h-6 bg-[color:var(--error)]/10 text-[color:var(--error)] rounded-full border border-[color:var(--error)]/20 flex items-center justify-center hover:bg-[color:var(--error)] hover:text-white transition-colors shadow-sm z-10"
                                     title="{{ tr('Remove Period') }}">
                                     <i class="fas fa-times text-xs"></i>
                                 </button>
@@ -57,7 +57,7 @@
 
                             <div class="space-y-1.5">
                                 <label class="block text-xs font-semibold text-gray-700">{{ tr('Check In') }} <span class="text-gray-400 font-light text-[10px]">#{{ $index + 1 }}</span></label>
-                                <div class="flex items-stretch border border-gray-200 rounded-lg overflow-hidden bg-white hover:border-[color:var(--brand-via)] focus-within:border-[color:var(--brand-via)] focus-within:ring-1 focus-within:ring-[color:var(--brand-via)] transition-all h-10">
+                                <div class="flex items-stretch border border-gray-200 rounded-lg overflow-hidden bg-white hover:border-[color:var(--accent-orange)] focus-within:border-[color:var(--accent-orange)] focus-within:ring-1 focus-within:ring-[color:var(--accent-orange)] transition-all h-10">
                                     {{-- Scheduled (Readonly) --}}
                                     <div class="px-2.5 bg-gray-50/50 text-gray-400 text-[10px] font-mono border-r border-gray-100 flex items-center justify-center min-w-[70px]" title="{{ tr('Scheduled Time') }}">
                                         {{ $period['scheduled_in'] ?? '--:--' }}
@@ -72,13 +72,13 @@
                                     >
                                 </div>
                                 @error("editForm.periods.$index.check_in_time") 
-                                    <span class="text-xs text-red-500">{{ $message }}</span> 
+                                    <span class="text-xs text-[color:var(--error)]">{{ $message }}</span> 
                                 @enderror
                             </div>
 
                             <div class="space-y-1.5">
                                 <label class="block text-xs font-semibold text-gray-700">{{ tr('Check Out') }} <span class="text-gray-400 font-light text-[10px]">#{{ $index + 1 }}</span></label>
-                                <div class="flex items-stretch border border-gray-200 rounded-lg overflow-hidden bg-white hover:border-[color:var(--brand-via)] focus-within:border-[color:var(--brand-via)] focus-within:ring-1 focus-within:ring-[color:var(--brand-via)] transition-all h-10">
+                                <div class="flex items-stretch border border-gray-200 rounded-lg overflow-hidden bg-white hover:border-[color:var(--accent-orange)] focus-within:border-[color:var(--accent-orange)] focus-within:ring-1 focus-within:ring-[color:var(--accent-orange)] transition-all h-10">
                                     {{-- Scheduled (Readonly) --}}
                                     <div class="px-2.5 bg-gray-50/50 text-gray-400 text-[10px] font-mono border-r border-gray-100 flex items-center justify-center min-w-[70px]" title="{{ tr('Scheduled Time') }}">
                                         {{ $period['scheduled_out'] ?? '--:--' }}
@@ -93,7 +93,7 @@
                                     >
                                 </div>
                                 @error("editForm.periods.$index.check_out_time") 
-                                    <span class="text-xs text-red-500">{{ $message }}</span> 
+                                    <span class="text-xs text-[color:var(--error)]">{{ $message }}</span> 
                                 @enderror
                             </div>
                         </div>
@@ -117,11 +117,11 @@
                         file:mr-4 file:py-2 file:px-4
                         file:rounded-full file:border-0
                         file:text-sm file:font-semibold
-                        file:bg-orange-50 file:text-[color:var(--brand-from)]
-                        hover:file:bg-blue-100
+                        file:bg-[color:var(--accent-orange)]/10 file:text-[color:var(--accent-orange)]
+                        hover:file:bg-[color:var(--accent-orange)]/15
                         disabled:opacity-50
                      " @cannot('attendance.manage') disabled @endcannot />
-                     @error('editAttachment') <span class="text-xs text-red-500">{{ $message }}</span> @enderror
+                     @error('editAttachment') <span class="text-xs text-[color:var(--error)]">{{ $message }}</span> @enderror
                      <div wire:loading wire:target="editAttachment" class="text-xs text-gray-500 mt-1">
                          <i class="fas fa-spinner fa-spin"></i> {{ tr('Uploading...') }}
                      </div>

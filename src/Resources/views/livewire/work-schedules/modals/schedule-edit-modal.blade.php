@@ -3,7 +3,7 @@
 <x-ui.modal wire:model="showScheduleEditModal" max-width="lg">
     <x-slot name="title">
         <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-[color:var(--brand-via)]/10 text-[color:var(--brand-via)] rounded-xl flex items-center justify-center text-lg border border-[color:var(--brand-via)]/20 shadow-sm">
+            <div class="w-10 h-10 bg-[color:var(--accent-orange)]/10 text-[color:var(--accent-orange)] rounded-xl flex items-center justify-center text-lg border border-[color:var(--accent-orange)]/20 shadow-sm">
                 <i class="fas fa-pen"></i>
             </div>
             <h3 class="font-bold text-gray-900 text-lg leading-tight">
@@ -26,7 +26,7 @@
                     @endforeach
                 </x-ui.select>
                 @error('editScheduleForm.work_schedule_id')
-                    <span class="text-red-500 text-xs mt-1 block">{{ $message }}</span>
+                    <span class="text-[color:var(--error)] text-xs mt-1 block">{{ $message }}</span>
                 @enderror
             </div>
 

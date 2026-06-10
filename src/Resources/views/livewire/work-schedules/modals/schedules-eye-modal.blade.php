@@ -3,7 +3,7 @@
 <x-ui.modal wire:model="showScheduleEyeModal" max-width="xl">
     <x-slot name="title">
         <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-[color:var(--brand-via)]/10 text-[color:var(--brand-via)] rounded-xl flex items-center justify-center text-lg border border-[color:var(--brand-via)]/20 shadow-sm">
+            <div class="w-10 h-10 bg-[color:var(--accent-orange)]/10 text-[color:var(--accent-orange)] rounded-xl flex items-center justify-center text-lg border border-[color:var(--accent-orange)]/20 shadow-sm">
                 <i class="fas fa-eye"></i>
             </div>
 
@@ -47,22 +47,22 @@
                                     @if(!empty($r['rotation_info']))
                                         <div class="flex flex-col gap-2">
                                             <div class="flex items-center gap-2">
-                                                <span class="inline-flex items-center gap-1 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700 border border-amber-100">
+                                                <span class="inline-flex items-center gap-1 rounded-full bg-[color:var(--warning)]/10 px-2 py-0.5 text-[10px] font-bold text-[color:var(--warning)] border border-[color:var(--warning)]/25">
                                                     <i class="fas fa-sync-alt text-[9px]"></i>
                                                     {{ tr('Rotation') }}
                                                 </span>
                                                 <span class="text-[10px] text-gray-500">
-                                                    {{ tr('Every') }} <span class="font-bold text-amber-700">{{ $r['rotation_info']['days'] }}</span> {{ tr('days') }}
+                                                    {{ tr('Every') }} <span class="font-bold text-[color:var(--warning)]">{{ $r['rotation_info']['days'] }}</span> {{ tr('days') }}
                                                 </span>
                                             </div>
 
                                             <div class="space-y-1">
                                                 <div class="flex items-center gap-2 text-xs">
-                                                    <span class="w-5 h-5 rounded-lg bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center font-black">A</span>
+                                                    <span class="w-5 h-5 rounded-lg bg-[color:var(--accent-orange)]/10 text-[color:var(--accent-orange)] border border-[color:var(--accent-orange)]/20 flex items-center justify-center font-black">A</span>
                                                     <span class="font-semibold text-gray-900">{{ $r['rotation_info']['name_a'] ?? '-' }}</span>
                                                 </div>
                                                 <div class="flex items-center gap-2 text-xs">
-                                                    <span class="w-5 h-5 rounded-lg bg-purple-50 text-purple-600 border border-purple-100 flex items-center justify-center font-black">B</span>
+                                                    <span class="w-5 h-5 rounded-lg bg-[color:var(--warning)]/10 text-[color:var(--warning)] border border-[color:var(--warning)]/25 flex items-center justify-center font-black">B</span>
                                                     <span class="font-semibold text-gray-900">{{ $r['rotation_info']['name_b'] ?? '-' }}</span>
                                                 </div>
                                             </div>
@@ -71,7 +71,7 @@
                                         <div class="font-semibold text-gray-900 flex items-center gap-2">
                                             {{ $r['schedule_name'] ?? '-' }}
                                             @if(($r['assignment_type'] ?? '') === 'rotation')
-                                                <i class="fas fa-sync-alt text-amber-500 text-[10px]" title="{{ tr('Rotation') }}"></i>
+                                                <i class="fas fa-sync-alt text-[color:var(--warning)] text-[10px]" title="{{ tr('Rotation') }}"></i>
                                             @endif
                                         </div>
                                     @endif
@@ -115,7 +115,7 @@
                                             <button
                                                 type="button"
                                                 wire:click="openScheduleEditModal({{ (int) $r['id'] }})"
-                                                class="text-xs font-bold text-[color:var(--brand-via)] hover:text-[color:var(--brand-from)] transition-colors"
+                                                class="text-xs font-bold text-[color:var(--accent-orange)] hover:brightness-90 transition-colors"
                                                 title="{{ tr('Edit') }}"
                                             >
                                                 <i class="fas fa-edit"></i>
@@ -126,7 +126,7 @@
                                             <button
                                                 type="button"
                                                 wire:click="confirmDeleteAssignment({{ (int) $r['id'] }})"
-                                                class="text-xs font-bold text-red-500 hover:text-red-700 transition-colors"
+                                                class="text-xs font-bold text-[color:var(--error)] hover:brightness-90 transition-colors"
                                                 title="{{ tr('Delete') }}"
                                             >
                                                 <i class="fas fa-trash-alt"></i>
