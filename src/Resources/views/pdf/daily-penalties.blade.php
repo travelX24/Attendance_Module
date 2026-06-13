@@ -4,14 +4,14 @@
     <meta charset="UTF-8">
     <title>{{ tr('Daily Penalties Report') }}</title>
     <style>
-        body { font-family: 'DejaVu Sans', sans-serif; direction: rtl; font-size: 10px; color: #1E293B; }
+        body { font-family: 'DejaVu Sans', sans-serif; direction: rtl; font-size: 10px; color: #2B2B2B; }
         table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #E2E8F0; padding: 8px; text-align: center; }
-        th { background-color: #F8FAFC; color: #575757; font-weight: bold; }
+        th, td { border: 1px solid #E8DED8; padding: 8px; text-align: center; }
+        th { background-color: #FDFBF7; color: #581845; font-weight: bold; }
         .header { text-align: center; margin-bottom: 30px; }
-        .header h1 { color: #C45A1A; }
+        .header h1 { color: #903749; }
         .stats { margin-bottom: 20px; }
-        .stats strong { color: #C45A1A; }
+        .stats strong { color: #903749; }
         .footer { position: fixed; bottom: 0; width: 100%; text-align: center; font-size: 8px; }
     </style>
 </head>
