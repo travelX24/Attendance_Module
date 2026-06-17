@@ -224,6 +224,21 @@
                     />
                 </div>
 
+                {{-- Branch --}}
+                <div class="">
+                    <x-ui.filter-select
+                        model="location_id"
+                        :label="tr('Branch')"
+                        :placeholder="tr('All Branches')"
+                        :options="array_merge([['value' => 'all', 'label' => tr('All Branches')]], $locations->map(fn($location) => ['value' => (string)$location->id, 'label' => $location->name])->toArray())"
+                        width="full"
+                        :defer="false"
+                        :applyOnChange="true"
+                        class="w-full"
+                        :disabled="!auth()->user()->can('attendance.manage') || !empty($forcedLocationId)"
+                    />
+                </div>
+
                 {{-- Link Status --}}
                 <div class="">
                     <x-ui.filter-select

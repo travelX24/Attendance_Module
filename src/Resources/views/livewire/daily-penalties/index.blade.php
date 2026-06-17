@@ -332,7 +332,7 @@
 
         @php
             $headers = [
-                tr('<div class="flex items-center justify-center"><input type="checkbox" wire:model.live="selectAll" class="w-4 h-4 rounded-md border-gray-300 text-[color:var(--accent-orange)] focus:ring-[color:var(--accent-orange)] transition-all cursor-pointer" ' . (!$canManagePenalties ? 'disabled' : '') . '></div>'),
+                '<div class="flex items-center justify-center"><input type="checkbox" wire:model.live="selectAll" class="w-4 h-4 rounded-md border-gray-300 text-[color:var(--accent-orange)] focus:ring-[color:var(--accent-orange)] transition-all cursor-pointer" ' . (!$canManagePenalties ? 'disabled' : '') . '></div>',
                 tr('Employee'),
                 tr('Dept/Job'),
                 tr('Date'),

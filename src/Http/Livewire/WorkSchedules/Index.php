@@ -304,8 +304,8 @@ class Index extends Component
             }
         }
 
-        $locations = [];
-        foreach (['locations', 'work_locations', 'branches'] as $tbl) {
+        $locations = collect();
+        foreach (['branches', 'locations', 'work_locations'] as $tbl) {
             if (Schema::hasTable($tbl)) {
             $qLoc = DB::table($tbl)->where('saas_company_id', $companyId)->orderBy('id');
 
