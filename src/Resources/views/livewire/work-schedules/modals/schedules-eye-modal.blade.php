@@ -1,6 +1,6 @@
-{{-- app/Modules/Attendance/Resources/views/livewire/work-schedules/modals/schedules-eye-modal.blade.php --}}
+﻿{{-- app/Modules/Attendance/Resources/views/livewire/work-schedules/modals/schedules-eye-modal.blade.php --}}
 
-<x-ui.modal wire:model="showScheduleEyeModal" max-width="xl">
+<x-ui.modal wire:model="showScheduleEyeModal" max-width="4xl">
     <x-slot name="title">
         <div class="flex items-center gap-3">
             <div class="w-10 h-10 bg-[color:var(--accent-orange)]/10 text-[color:var(--accent-orange)] rounded-xl flex items-center justify-center text-lg border border-[color:var(--accent-orange)]/20 shadow-sm">
@@ -27,7 +27,7 @@
                 </div>
             @else
                 <x-ui.table
-                    :headers="[tr('Schedule'), tr('Start'), tr('End'), app()->isLocale('ar') ? 'نوع التعيين' : 'Assignment Type', tr('Status'), tr('Action')]"
+                    :headers="[tr('Schedule'), tr('Start'), tr('End'), tr('Assignment Type'), tr('Status'), tr('Action')]"
                     :enablePagination="false"
                     :headerAlign="['start','start','start','start','start','end']"
                 >
@@ -42,7 +42,7 @@
                         @endphp
 
                         <tr class="hover:bg-gray-50/50 border-b border-gray-50 last:border-0 transition-colors">
-                            <td class="py-3 px-6 text-sm">
+                            <td class="py-2.5 px-3 text-sm">
                                 <div class="flex flex-col gap-0.5">
                                     @if(!empty($r['rotation_info']))
                                         <div class="flex flex-col gap-2">
@@ -84,14 +84,14 @@
                                 </div>
                             </td>
 
-                            <td class="py-3 px-6 font-mono text-gray-700 text-sm">
+                            <td class="py-2.5 px-3 font-mono text-gray-700 text-sm">
                                 {{ $row['start_date'] ?? $r['start_date'] ?? '-' }}
                             </td>
 
-                            <td class="py-3 px-6 font-mono text-gray-700 text-sm">
+                            <td class="py-2.5 px-3 font-mono text-gray-700 text-sm">
                                 {{ !empty($r['end_date']) ? $r['end_date'] : tr('Permanent') }}
                             </td>
-                            <td class="py-3 px-6">
+                            <td class="py-2.5 px-3">
                                 @php
                                     $isPerm = empty($r['end_date']) || $r['end_date'] === '-';
                                 @endphp
@@ -99,7 +99,7 @@
                                     {{ $isPerm ? tr('Permanent') : tr('Temporary') }}
                                 </x-ui.badge>
                             </td>
-                            <td class="py-3 px-6">
+                            <td class="py-2.5 px-3">
                                 <x-ui.badge :type="$badgeType" size="xs">
                                     {{ $status === 'active' ? tr('Active') :
                                        ($status === 'future' ? tr('Future') :
@@ -108,7 +108,7 @@
                                 </x-ui.badge>
                             </td>
 
-                            <td class="py-3 px-6 text-right">
+                            <td class="py-2.5 px-3 text-right">
                                 <div class="flex items-center justify-end gap-2">
                                     @can('attendance.manage')
                                         @if(!empty($r['can_edit']))

@@ -50,7 +50,9 @@ trait WithAttendanceFilters
             $this->date_from = now()->startOfMonth()->toDateString();
             $this->date_to = now()->toDateString();
         }
-        $this->generateMissingLogs(true);
+        if ($this->view_mode === 'daily') {
+            $this->generateMissingLogs(true);
+        }
         $this->loadStats();
     }
 
@@ -60,14 +62,18 @@ trait WithAttendanceFilters
         if ($this->view_mode === 'daily') {
             $this->date_to = $value;
         }
-        $this->generateMissingLogs(true);
+        if ($this->view_mode === 'daily') {
+            $this->generateMissingLogs(true);
+        }
         $this->loadStats();
     }
 
     public function updatedDateTo($value)
     {
         $this->resetPage();
-        $this->generateMissingLogs(true);
+        if ($this->view_mode === 'daily') {
+            $this->generateMissingLogs(true);
+        }
         $this->loadStats();
     }
 
@@ -183,7 +189,7 @@ trait WithAttendanceFilters
                 ->with('branch')
                 ->when($this->status !== 'all', fn($q) => $q->where('status', (string)$this->status));
 
-            // âœ… Data scoping
+            // Data scoping.
             $employeeQuery = $this->applyDataScoping($employeeQuery, 'attendance.daily.view', 'attendance.daily.view-subordinates', '');
 
             $allowed = $this->allowedBranchIds();
@@ -211,7 +217,7 @@ trait WithAttendanceFilters
                 $employeeQuery->where('job_title_id', $this->job_title_id);
             }
 
-            // ✅ If filtering by Attendance Log criteria, use a subquery to only show employees who have such logs
+            // If filtering by attendance-log criteria, show only employees with matching logs.
             if ($this->attendance_status_filter !== 'all' || $this->work_schedule_id !== 'all' || $this->approval_status_filter !== 'all') {
                 $employeeQuery->whereIn('id', function($q) {
                     $q->select('employee_id')
@@ -228,44 +234,76 @@ trait WithAttendanceFilters
             // Paginate Employees
             $employees = $employeeQuery->paginate(15);
 
-            // Eager Load Attendance Data for current page only
+            // Aggregate attendance data for the current page in one query.
             $startDate = $this->date_from ?: now()->startOfMonth()->toDateString();
             $endDate = $this->date_to ?: now()->endOfMonth()->toDateString();
 
-            foreach ($employees as $employee) {
-                // Fetch relevant logs for stats
+            $employeeIds = $employees->getCollection()->pluck('id')->filter()->values()->all();
+            $summaryByEmployee = collect();
+            $scheduleNames = collect();
+
+            if (!empty($employeeIds)) {
                 $logs = AttendanceDailyLog::forCompany($companyId)
-                    ->where('employee_id', $employee->id)
+                    ->whereIn('employee_id', $employeeIds)
                     ->whereBetween('attendance_date', [$startDate, $endDate]);
 
-                // Apply Log Filters (Status, Schedule, etc.)
-                // Note: Applying attendance status filter here filters the STATS, not the employees themselves.
-                // If we want to filter employees who HAVE a certain status, we'd need a whereHas on the employeeQuery.
-                // For simplified UX, we will show all selected employees but their stats will reflect the period.
-                
                 if ($this->attendance_status_filter !== 'all') {
                     $logs->where('attendance_status', $this->attendance_status_filter);
                 }
-                
+
                 if ($this->work_schedule_id !== 'all') {
                     $logs->where('work_schedule_id', $this->work_schedule_id);
                 }
 
-                $logsData = $logs->get();
+                $summaryByEmployee = $logs
+                    ->select(
+                        'employee_id',
+                        DB::raw('COUNT(*) as total_days'),
+                        DB::raw("SUM(CASE WHEN attendance_status = 'present' THEN 1 ELSE 0 END) as present_days"),
+                        DB::raw("SUM(CASE WHEN attendance_status = 'late' THEN 1 ELSE 0 END) as late_days"),
+                        DB::raw("SUM(CASE WHEN attendance_status = 'absent' THEN 1 ELSE 0 END) as absent_days"),
+                        DB::raw("SUM(CASE WHEN attendance_status = 'early_departure' THEN 1 ELSE 0 END) as early_departure_days"),
+                        DB::raw("SUM(CASE WHEN attendance_status = 'on_leave' THEN 1 ELSE 0 END) as on_leave_days"),
+                        DB::raw("SUM(CASE WHEN attendance_status = 'auto_checkout' THEN 1 ELSE 0 END) as auto_checkout_days"),
+                        DB::raw('COALESCE(SUM(scheduled_hours), 0) as total_scheduled_hours'),
+                        DB::raw('COALESCE(SUM(actual_hours), 0) as total_actual_hours'),
+                        DB::raw('COALESCE(AVG(CASE WHEN scheduled_hours > 0 THEN compliance_percentage END), 0) as avg_compliance'),
+                        DB::raw('MAX(work_schedule_id) as schedule_id')
+                    )
+                    ->groupBy('employee_id')
+                    ->get()
+                    ->keyBy('employee_id');
+
+                $scheduleIds = $summaryByEmployee
+                    ->pluck('schedule_id')
+                    ->filter()
+                    ->unique()
+                    ->values()
+                    ->all();
+
+                if (!empty($scheduleIds)) {
+                    $scheduleNames = WorkSchedule::where('saas_company_id', $companyId)
+                        ->whereIn('id', $scheduleIds)
+                        ->pluck('name', 'id');
+                }
+            }
+
+            foreach ($employees as $employee) {
+                $summary = $summaryByEmployee->get($employee->id);
+                $scheduleId = $summary->schedule_id ?? null;
 
                 $employee->summary = (object)[
-                    'total_days' => $logsData->count(),
-                    'present_days' => $logsData->where('attendance_status', 'present')->count(),
-                    'late_days' => $logsData->where('attendance_status', 'late')->count(),
-                    'absent_days' => $logsData->where('attendance_status', 'absent')->count(),
-                    'early_departure_days' => $logsData->where('attendance_status', 'early_departure')->count(),
-                    'on_leave_days' => $logsData->where('attendance_status', 'on_leave')->count(),
-                    'auto_checkout_days' => $logsData->where('attendance_status', 'auto_checkout')->count(),
-                    'total_scheduled_hours' => $logsData->sum('scheduled_hours'),
-                    'total_actual_hours' => $logsData->sum('actual_hours'),
-                    'avg_compliance' => $logsData->where('scheduled_hours', '>', 0)->avg('compliance_percentage') ?? 0,
-                    // Use arbitrary log for schedule name if needed, or fetch separately
-                    'schedule_name' => $logsData->first()->workSchedule->name ?? '-',
+                    'total_days' => (int) ($summary->total_days ?? 0),
+                    'present_days' => (int) ($summary->present_days ?? 0),
+                    'late_days' => (int) ($summary->late_days ?? 0),
+                    'absent_days' => (int) ($summary->absent_days ?? 0),
+                    'early_departure_days' => (int) ($summary->early_departure_days ?? 0),
+                    'on_leave_days' => (int) ($summary->on_leave_days ?? 0),
+                    'auto_checkout_days' => (int) ($summary->auto_checkout_days ?? 0),
+                    'total_scheduled_hours' => (float) ($summary->total_scheduled_hours ?? 0),
+                    'total_actual_hours' => (float) ($summary->total_actual_hours ?? 0),
+                    'avg_compliance' => (float) ($summary->avg_compliance ?? 0),
+                    'schedule_name' => $scheduleId ? ($scheduleNames[$scheduleId] ?? '-') : '-',
                 ];
             }
 
@@ -288,7 +326,7 @@ trait WithAttendanceFilters
                 'auditLogs as edits_count' => fn ($q) => $q->where('action', 'attendance.edited'),
             ]);
 
-        // âœ… Data scoping
+        // Data scoping.
         $query = $this->applyDataScoping($query, 'attendance.daily.view', 'attendance.daily.view-subordinates');
 
         $allowed = $this->allowedBranchIds();
@@ -398,7 +436,7 @@ trait WithAttendanceFilters
             ->where('saas_company_id', auth()->user()->saas_company_id)
             ->when($this->status !== 'all', fn ($query) => $query->where('status', (string) $this->status));
 
-        // âœ… Data scoping for employee list
+        // Data scoping for employee list.
         $q = $this->applyDataScoping($q, 'attendance.daily.view', 'attendance.daily.view-subordinates', '');
 
         $allowed = $this->allowedBranchIds();
@@ -437,21 +475,21 @@ trait WithAttendanceFilters
 
         $scope = $user->access_scope ?? 'all_branches';
 
-        // âœ… all_branches => Ø¨Ø¯ÙˆÙ† ØªÙ‚ÙŠÙŠØ¯ (Ù†Ø±Ø¬Ù‘Ø¹ [] Ø­ØªÙ‰ Ù…Ø§ Ù†Ø¹Ù…Ù„ whereIn)
+        // all_branches means no branch restriction.
         if ($scope === 'all_branches') {
             return [];
         }
 
         $ids = [];
 
-        // âœ… Ø§Ù„Ù…ØµØ¯Ø± Ø§Ù„Ø±Ø³Ù…ÙŠ Ø¹Ù†Ø¯Ùƒ
+        // Prefer the official user branch access source when available.
         if (method_exists($user, 'accessibleBranchIds')) {
             $ids = (array) $user->accessibleBranchIds();
         } elseif (method_exists($user, 'allowedBranches')) {
             $ids = $user->allowedBranches()->pluck('branches.id')->all();
         }
 
-        // âœ… fallback: pivot branch_user_access
+        // Fallback to branch_user_access pivot.
         if (empty($ids) && Schema::hasTable('branch_user_access')) {
             $cols = Schema::getColumnListing('branch_user_access');
 
@@ -470,7 +508,7 @@ trait WithAttendanceFilters
 
         $ids = array_values(array_unique(array_filter(array_map('intval', $ids), fn ($v) => $v > 0)));
 
-        // âœ… Ù…Ø³ØªØ®Ø¯Ù… Ù…Ø­Ø¯ÙˆØ¯ Ù„ÙƒÙ† Ø¨Ø¯ÙˆÙ† ÙØ±ÙˆØ¹: Ø§Ù…Ù†Ø¹Ù‡ ÙŠØ´ÙˆÙ Ø£ÙŠ Ø´ÙŠØ¡ Ø¨Ø¯Ù„ Ù…Ø§ ÙŠØ´ÙˆÙ Ø§Ù„ÙƒÙ„
+        // If the user is branch-restricted but has no branches, return an impossible branch id.
         return !empty($ids) ? $ids : [0];
     }
 }

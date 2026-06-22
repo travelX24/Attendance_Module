@@ -1739,7 +1739,7 @@
                         <thead class="bg-gray-50 text-gray-600">
                         <tr>
                             <th class="text-start p-3">{{ tr('When') }}</th>
-                            <th class="text-start p-3">{{ tr('Approved By') }}</th>
+                            <th class="text-start p-3">{{ tr('Approved By') == 'Approved By' ? 'Ø§Ù„Ù…Ø¹ØªÙ…Ø¯' : tr('Approved By') }}</th>
                             <th class="text-start p-3">{{ tr('Employee') }}</th>
                             <th class="text-start p-3">{{ tr('Employee Status') }}</th>
                             <th class="text-start p-3">{{ tr('Type') }}</th>
@@ -1779,15 +1779,8 @@
 
                                 <td class="p-3 text-gray-700">
                                     @php
-                                        $type = strtolower((string) $h->subject_type);
-                                        $typeMap = [
-                                            'leave' => tr('Leave'),
-                                            'permission' => tr('Permission'),
-                                            'mission' => tr('Mission'),
-                                            'leave_cut' => tr('Leave Cut'),
-                                            'cut_leave' => tr('Leave Cut'),
-                                            'replacement' => tr('Replacement'),
-                                        ];
+                                        $type = strtolower($h->subject_type);
+                                        $typeMap = ['leave' => 'Ø¥Ø¬Ø§Ø²Ø©', 'permission' => 'Ø¥Ø°Ù†', 'mission' => 'Ù…Ù‡Ù…Ø©'];
                                     @endphp
                                     {{ $typeMap[$type] ?? tr($h->subject_type) }}
                                 </td>
