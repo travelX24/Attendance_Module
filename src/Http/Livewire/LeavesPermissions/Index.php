@@ -291,7 +291,7 @@ class Index extends Component
             $employees = $employeeQuery
                 ->orderBy('employee_no')
                 ->orderBy('id')
-                ->paginate($this->perPage, ['*'], 'balancePage');
+                ->paginate($this->balancePerPage, ['*'], 'balancePage');
 
             $employeeIds = $employees->getCollection()->pluck('id')->map(fn ($id) => (int) $id)->all();
 
@@ -335,12 +335,12 @@ class Index extends Component
                     $key = (int) $employee->id . ':' . (int) $policy->id;
                     $stored = $storedBalances->get($key);
                     $taken = (float) ($approvedTaken->get($key)->total_taken ?? $stored->taken_days ?? 0);
-                    $isAnnual = ($policy->leave_type ?? '') === 'annual';
+                    $isDefaultAnnual = data_get($policy->settings, 'meta.system_key') === 'annual_default';
                     $excluded = (array) ($policy->excluded_contract_types ?? []);
 
                     if (in_array($employee->contract_type, $excluded, true)) {
                         $entitled = 0.0;
-                    } elseif ($isAnnual) {
+                    } elseif ($isDefaultAnnual) {
                         if ($employee->is_transferred_employee) {
                             $entitled = (float) (($employee->opening_leave_balance ?? 0) + ($employee->leave_balance_adjustments ?? 0));
                         } else {
@@ -394,7 +394,7 @@ class Index extends Component
             $this->applyEmployeeFilters($q);
             if ($this->status !== 'all') $q->whereHas('employee', fn($qq) => $qq->withoutGlobalScope('active_only')->where('status', (string)$this->status));
 
-            return $q->orderByDesc('remaining_days')->paginate($this->perPage, ['*'], 'balancePage');
+            return $q->orderByDesc('remaining_days')->paginate($this->balancePerPage, ['*'], 'balancePage');
         });
     }
 

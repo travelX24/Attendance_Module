@@ -12,6 +12,7 @@ trait WithLeavePermissionsFilters
 {
     public string $tab = 'pending';
     public int $perPage = 10;
+    public int $balancePerPage = 10;
 
     public string $search = '';
     public ?int $selectedYearId = null;

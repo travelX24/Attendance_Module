@@ -143,7 +143,7 @@ class LeaveApprovalImpactService
             return 0.0;
         }
 
-        if (($policy->leave_type ?? '') === 'annual') {
+        if (data_get($policy->settings, 'meta.system_key') === 'annual_default') {
             if ($employee->is_transferred_employee) {
                 return (float) (($employee->opening_leave_balance ?? 0) + ($employee->leave_balance_adjustments ?? 0));
             }

@@ -1,4 +1,4 @@
-﻿{{-- app/Modules/Attendance/Resources/views/livewire/leaves-permissions/index.blade.php --}}
+{{-- app/Modules/Attendance/Resources/views/livewire/leaves-permissions/index.blade.php --}}
 
 @php
     $locale = app()->getLocale();
@@ -955,7 +955,7 @@
             </div>
 
             <div class="overflow-x-auto">
-                <x-ui.table class="min-w-full text-sm">
+                <x-ui.table class="min-w-full text-sm" :enable-pagination="false">
                     <thead class="bg-gray-50 text-gray-600">
                     <tr>
                         <th class="text-start p-3 w-12"></th>
@@ -1096,7 +1096,7 @@
             </div>
 
             <div class="overflow-x-auto">
-                <x-ui.table class="min-w-full text-sm">
+                <x-ui.table class="min-w-full text-sm" :enable-pagination="false">
                     <thead class="bg-gray-50 text-gray-600">
                     <tr>
                         <th class="text-start p-3">{{ tr('Employee') }}</th>
