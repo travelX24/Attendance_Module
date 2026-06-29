@@ -3,6 +3,10 @@
     $locale = app()->getLocale();
     $isRtl  = in_array(substr($locale, 0, 2), ['ar','fa','ur','he']);
     $dir    = $isRtl ? 'rtl' : 'ltr';
+    $attendanceUser = auth()->user();
+    $canManageDaily = $attendanceUser?->can('attendance.daily.manage');
+    $canManualDaily = $canManageDaily;
+    $canExportDaily = $canManageDaily;
 @endphp
 
 @section('topbar-left-content')
@@ -113,7 +117,7 @@
                         <x-ui.search-box
                             model="search"
                             :placeholder="tr('Search by name or employee ID...')"
-                            :disabled="!auth()->user()->can('attendance.manage')"
+                            :disabled="!$canManageDaily"
                         />
                     </div>
 
@@ -124,7 +128,7 @@
                             <x-ui.company-date-picker
                                 model="date_from"
                                 :label="tr('Select Date')"
-                                :disabled="!auth()->user()->can('attendance.manage')"
+                                :disabled="!$canManageDaily"
                             />
                         </div>
                     @else
@@ -133,14 +137,14 @@
                             <x-ui.company-date-picker
                                 model="date_from"
                                 :label="tr('From Date')"
-                                :disabled="!auth()->user()->can('attendance.manage')"
+                                :disabled="!$canManageDaily"
                             />
                         </div>
                         <div class="w-40">
                             <x-ui.company-date-picker
                                 model="date_to"
                                 :label="tr('To Date')"
-                                :disabled="!auth()->user()->can('attendance.manage')"
+                                :disabled="!$canManageDaily"
                             />
                         </div>
                     @endif
@@ -162,7 +166,7 @@
                             width="full"
                             :defer="false"
                             :applyOnChange="true"
-                            :disabled="!auth()->user()->can('attendance.manage')"
+                            :disabled="!$canManageDaily"
                         />
                     </div>
 
@@ -180,7 +184,7 @@
                             width="full"
                             :defer="false"
                             :applyOnChange="true"
-                            :disabled="!auth()->user()->can('attendance.manage')"
+                            :disabled="!$canManageDaily"
                         />
                     </div>
 
@@ -194,7 +198,7 @@
                             width="full"
                             :defer="false"
                             :applyOnChange="true"
-                            :disabled="!auth()->user()->can('attendance.manage')"
+                            :disabled="!$canManageDaily"
                         />
                     </div>
                     {{-- Work Schedule --}}
@@ -207,7 +211,7 @@
                             width="full"
                             :defer="false"
                             :applyOnChange="true"
-                            :disabled="!auth()->user()->can('attendance.manage')"
+                            :disabled="!$canManageDaily"
                         />
                     </div>
 
@@ -221,7 +225,7 @@
                             width="full"
                             :defer="false"
                             :applyOnChange="true"
-                            :disabled="!auth()->user()->can('attendance.manage')"
+                            :disabled="!$canManageDaily"
                         />
                     </div>
 
@@ -236,7 +240,7 @@
                             wire:model.live="compliance_from"
                             class="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[color:var(--accent-orange)] focus:border-transparent"
                             placeholder="0"
-                            @disabled(!auth()->user()->can('attendance.manage'))
+                            @disabled(!$canManageDaily)
                         >
                     </div>
 
@@ -250,7 +254,7 @@
                             wire:model.live="compliance_to"
                             class="w-full px-2 py-1.5 border border-gray-200 rounded-lg text-sm focus:ring-2 focus:ring-[color:var(--accent-orange)] focus:border-transparent"
                             placeholder="100"
-                            @disabled(!auth()->user()->can('attendance.manage'))
+                            @disabled(!$canManageDaily)
                         >
                     </div>
 
@@ -265,7 +269,7 @@
                                 width="full"
                                 :defer="false"
                                 :applyOnChange="true"
-                                :disabled="!auth()->user()->can('attendance.manage')"
+                                :disabled="!$canManageDaily"
                             />
                         </div>
 
@@ -279,7 +283,7 @@
                                 width="full"
                                 :defer="false"
                                 :applyOnChange="true"
-                                :disabled="!auth()->user()->can('attendance.manage')"
+                                :disabled="!$canManageDaily"
                             />
                         </div>
 
@@ -345,7 +349,7 @@
                             <span class="text-xs">{{ tr('Refresh') }}</span>
                         </x-ui.secondary-button>
 
-                        @can('attendance.manage')
+                        @if($canManageDaily)
                         {{-- Export Excel --}}
                         <x-ui.secondary-button wire:click="exportExcel" size="sm" class="flex-1 sm:flex-none justify-center gap-1.5 group" title="{{ tr('Export to Excel') }}">
                             <i class="fas fa-file-excel text-xs text-gray-400 group-hover:text-[color:var(--success)]"></i>
@@ -357,7 +361,7 @@
                             <i class="fas fa-file-pdf text-xs text-gray-400 group-hover:text-[color:var(--error)]"></i>
                             <span class="text-xs">{{ tr('PDF') }}</span>
                         </x-ui.secondary-button>
-                        @endcan
+                        @endif
                     </div>
                 </div>
             </div>
@@ -390,7 +394,7 @@
                             type="checkbox" 
                             wire:model.live="selectAll" 
                             class="w-4 h-4 text-[color:var(--accent-orange)] border-gray-300 rounded focus:ring-[color:var(--accent-orange)]"
-                            @disabled(!auth()->user()->can('attendance.manage'))
+                            @disabled(!$canManageDaily)
                         >
                     </td>
                     <td colspan="10" class="px-6 py-3">
@@ -399,12 +403,12 @@
                                 <span class="text-sm font-semibold text-gray-700">
                                     {{ tr('Selected') }}: {{ count($selectedLogs) }}
                                 </span>
-                                @can('attendance.manage')
+                                @if($canManageDaily)
                                 <x-ui.primary-button wire:click="openBulkApprovalModal" class="gap-2" size="sm">
                                     <i class="fas fa-check-double"></i>
                                     <span>{{ tr('Approve Selected') }}</span>
                                 </x-ui.primary-button>
-                                @endcan
+                                @endif
                             </div>
                         @else
                             <span class="text-xs text-gray-500">{{ tr('Select attendance records to approve') }}</span>
@@ -479,7 +483,7 @@
                                 wire:model.live="selectedLogs" 
                                 value="{{ $log->id }}" 
                                 class="w-4 h-4 text-[color:var(--accent-orange)] border-gray-300 rounded focus:ring-[color:var(--accent-orange)]"
-                                @disabled(!auth()->user()->can('attendance.manage'))
+                                @disabled(!$canManageDaily)
                             >
                         </td>
     
@@ -495,28 +499,28 @@
                                             {{ $employee ? ($employee->name_ar ?: $employee->name_en) : '-' }}
                                         </p>
     
-                                        {{-- 🔴 No attendance for 3 consecutive days --}}
+                                        {{-- ðŸ”´ No attendance for 3 consecutive days --}}
                                         @if(in_array($log->employee_id, $warningNoAttendanceEmployeeIds ?? [], true))
                                             <span class="text-[color:var(--error)]" title="{{ tr('No attendance for 3 consecutive days') }}">
                                                 <i class="fas fa-exclamation-circle"></i>
                                             </span>
                                         @endif
     
-                                        {{-- 🟠 Many edits on approved record --}}
+                                        {{-- ðŸŸ  Many edits on approved record --}}
                                         @if($log->approval_status === 'approved' && (int)($log->edits_count ?? 0) >= 2)
                                             <span class="text-[color:var(--accent-orange)]" title="{{ tr('High edits count on approved record') }}">
                                                 <i class="fas fa-history"></i>
                                             </span>
                                         @endif
 
-                                        {{-- ⭐ Exceptional Day Badge --}}
+                                        {{-- â­ Exceptional Day Badge --}}
                                         @if($log->scheduleException && $log->scheduleException->exception_date->format('Y-m-d') === $log->attendance_date->format('Y-m-d'))
                                             <span class="text-[color:var(--warning)] bg-[color:var(--warning)]/10 px-1.5 py-0.5 rounded-md border border-[color:var(--warning)]/25 cursor-help" title="{{ tr('Exceptional Day') }}: {{ $log->scheduleException->exception_type }}">
                                                 <i class="fas fa-star text-[10px]"></i>
                                             </span>
                                         @endif
     
-                                        {{-- 🟡 Late > 60 min (today row check) --}}
+                                        {{-- ðŸŸ¡ Late > 60 min (today row check) --}}
                                         @php
                                             $lateToday = 0;
                                             if(!empty($log->scheduled_check_in) && !empty($log->check_in_time)) {
@@ -645,7 +649,7 @@
     
                         {{-- Actions --}}
                         <td class="px-6 py-4 text-center">
-                            @can('attendance.manage')
+                            @if($canManageDaily)
                             <x-ui.actions-menu wire:key="actions-{{ $log->id }}">
                                 <x-ui.dropdown-item wire:click="openEditModal({{ $log->id }})">
                                     <i class="fas fa-pen me-2"></i>
@@ -679,7 +683,7 @@
                             </x-ui.actions-menu>
                             @else
                                 <span class="text-gray-400"><i class="fas fa-lock text-[10px]"></i></span>
-                            @endcan
+                            @endif
                         </td>
                     </tr>
                 @empty
@@ -853,13 +857,13 @@
 
                         {{-- Actions --}}
                         <td class="px-6 py-4 text-center">
-                            @can('attendance.manage')
+                            @if($canManageDaily)
                             <x-ui.secondary-button wire:click="openMonthlyEditModal({{ $employee->id }})" size="xs">
                                 <i class="fas fa-edit me-1"></i> {{ tr('Edit Sheet') }}
                             </x-ui.secondary-button>
                             @else
                                 <span class="text-gray-400"><i class="fas fa-lock text-[10px]"></i></span>
-                            @endcan
+                            @endif
                         </td>
                      </tr>
                 @empty

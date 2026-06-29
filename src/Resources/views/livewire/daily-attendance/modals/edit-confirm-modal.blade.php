@@ -15,11 +15,11 @@
                     wire:model="approvedEditConfirmText"
                     :label="tr('Type CONFIRM to proceed')"
                     error="approvedEditConfirmText"
-                    :disabled="!auth()->user()->can('attendance.manage')"
+                    :disabled="!$canManageDaily"
                 />
 
                 <label class="flex items-center gap-2 text-xs text-gray-700">
-                    <input type="checkbox" wire:model="approvedEditConfirmUnderstood" class="text-[color:var(--accent-orange)] rounded border-gray-300 focus:ring-[color:var(--accent-orange)]" @cannot('attendance.manage') disabled @endcannot>
+                    <input type="checkbox" wire:model="approvedEditConfirmUnderstood" class="text-[color:var(--accent-orange)] rounded border-gray-300 focus:ring-[color:var(--accent-orange)]" @if(!$canManageDaily) disabled @endif>
                     <span>{{ tr('I understand this will reopen the record for re-approval') }}</span>
                 </label>
                 @error('approvedEditConfirmUnderstood') <div class="text-xs text-[color:var(--error)]">{{ $message }}</div> @enderror
@@ -32,12 +32,12 @@
                     {{ tr('Cancel') }}
                 </x-ui.secondary-button>
 
-                @can('attendance.manage')
+                @if($canManageDaily)
                 <x-ui.primary-button wire:click="confirmEditApproved" class="gap-2">
                     <i class="fas fa-check"></i>
                     <span>{{ tr('Confirm') }}</span>
                 </x-ui.primary-button>
-                @endcan
+                @endif
             </div>
         </x-slot>
     </x-ui.modal>

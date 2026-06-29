@@ -17,7 +17,7 @@
 
             <div>
                 <label class="block text-sm font-semibold text-gray-700 mb-1.5">{{ tr('Schedule') }}</label>
-                <x-ui.select wire:model="editScheduleForm.work_schedule_id" class="w-full" align="down" :disabled="!auth()->user()->can('attendance.manage')">
+                <x-ui.select wire:model="editScheduleForm.work_schedule_id" class="w-full" align="down" :disabled="!$canManageSchedules">
                     <option value="">{{ tr('Select a schedule...') }}</option>
                     @foreach(($workSchedulesAll ?? []) as $sch)
                         <option value="{{ $sch->id }}">
@@ -41,7 +41,7 @@
                     <x-ui.company-date-picker 
                         model="editScheduleForm.start_date" 
                         :label="tr('Start Date')" 
-                        :disabled="!auth()->user()->can('attendance.manage')" 
+                        :disabled="!$canManageSchedules" 
                     />
                 </div>
                 
@@ -49,7 +49,7 @@
                     <x-ui.company-date-picker 
                         model="editScheduleForm.end_date" 
                         :label="tr('End Date')" 
-                        :disabled="!auth()->user()->can('attendance.manage')" 
+                        :disabled="!$canManageSchedules" 
                     />
                 @endif
             </div>
@@ -66,13 +66,13 @@
                 {{ tr('Cancel') }}
             </x-ui.secondary-button>
 
-            @can('attendance.manage')
+            @if($canManageSchedules)
             <x-ui.primary-button wire:click="saveScheduleEdit" wire:loading.attr="disabled" class="gap-2">
                 <i class="fas fa-save" wire:loading.remove></i>
                 <i class="fas fa-spinner fa-spin" wire:loading></i>
                 <span>{{ tr('Save') }}</span>
             </x-ui.primary-button>
-            @endcan
+            @endif
         </div>
     </x-slot>
 </x-ui.modal>

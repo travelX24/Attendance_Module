@@ -1,4 +1,4 @@
-﻿{{-- app/Modules/Attendance/Resources/views/livewire/work-schedules/modals/schedules-eye-modal.blade.php --}}
+{{-- app/Modules/Attendance/Resources/views/livewire/work-schedules/modals/schedules-eye-modal.blade.php --}}
 
 <x-ui.modal wire:model="showScheduleEyeModal" max-width="4xl">
     <x-slot name="title">
@@ -110,7 +110,7 @@
 
                             <td class="py-2.5 px-3 text-right">
                                 <div class="flex items-center justify-end gap-2">
-                                    @can('attendance.manage')
+                                    @if($canManageSchedules)
                                         @if(!empty($r['can_edit']))
                                             <button
                                                 type="button"
@@ -148,7 +148,7 @@
                                             <i class="fas fa-eye text-[10px] me-1"></i>
                                             {{ tr('View only') }}
                                         </span>
-                                    @endcan
+                                    @endif
                                 </div>
                             </td>
                         </tr>

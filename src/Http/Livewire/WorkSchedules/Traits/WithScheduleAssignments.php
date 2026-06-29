@@ -73,6 +73,7 @@ trait WithScheduleAssignments
 
     public function openBulkModal()
     {
+        $this->requireAttendanceAny('attendance.schedules.manage');
         $this->resetModalFlags();
         $this->resetBulkFormData();
 
@@ -93,6 +94,7 @@ trait WithScheduleAssignments
 
     public function openBulkModalForSingleEmployee($employeeId)
     {
+        $this->requireAttendanceAny('attendance.schedules.manage');
         $this->resetModalFlags();
         $this->resetBulkFormData();
 
@@ -114,6 +116,7 @@ trait WithScheduleAssignments
 
     public function applyBulkAssignment()
     {
+        $this->requireAttendanceAny('attendance.schedules.manage');
         $companyId = $this->getCompanyId();
         if (!empty($this->selectedExpiredContractEmployeeIds($this->selectedEmployees, $companyId))) {
             $this->notifyExpiredContractAssignmentBlocked();
@@ -145,13 +148,13 @@ trait WithScheduleAssignments
 
         $messages = [
             'bulkFormData.end_date.after_or_equal' => app()->getLocale() === 'ar' 
-                ? 'لا يمكن أن يكون تاريخ النهاية قبل تاريخ البداية' 
+                ? 'Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø£Ù† ÙŠÙƒÙˆÙ† ØªØ§Ø±ÙŠØ® Ø§Ù„Ù†Ù‡Ø§ÙŠØ© Ù‚Ø¨Ù„ ØªØ§Ø±ÙŠØ® Ø§Ù„Ø¨Ø¯Ø§ÙŠØ©' 
                 : 'The end date cannot be before the start date.',
             'bulkFormData.work_schedule_id.required' => app()->getLocale() === 'ar'
-                ? 'يرجى اختيار الجدول الزمني'
+                ? 'ÙŠØ±Ø¬Ù‰ Ø§Ø®ØªÙŠØ§Ø± Ø§Ù„Ø¬Ø¯ÙˆÙ„ Ø§Ù„Ø²Ù…Ù†ÙŠ'
                 : 'Please select a work schedule.',
             'bulkFormData.rotation_work_schedule_id.required' => app()->getLocale() === 'ar'
-                ? 'يرجى اختيار الجدول الزمني البديل'
+                ? 'ÙŠØ±Ø¬Ù‰ Ø§Ø®ØªÙŠØ§Ø± Ø§Ù„Ø¬Ø¯ÙˆÙ„ Ø§Ù„Ø²Ù…Ù†ÙŠ Ø§Ù„Ø¨Ø¯ÙŠÙ„'
                 : 'Please select an alternate work schedule.',
         ];
 
@@ -396,6 +399,7 @@ trait WithScheduleAssignments
 
     public function openCriteriaModal()
     {
+        $this->requireAttendanceAny('attendance.schedules.manage');
         $this->resetModalFlags();
         $this->criteriaForm = [
             'department_id' => 'all',
@@ -500,6 +504,7 @@ trait WithScheduleAssignments
 
     public function openRotationModal()
     {
+        $this->requireAttendanceAny('attendance.schedules.manage');
         $this->resetModalFlags();
         $this->resetBulkFormData();
 
@@ -519,6 +524,7 @@ trait WithScheduleAssignments
 
     public function openRotationModalForSingleEmployee($employeeId)
     {
+        $this->requireAttendanceAny('attendance.schedules.manage');
         $this->resetModalFlags();
         $this->resetBulkFormData();
 
@@ -799,6 +805,7 @@ trait WithScheduleAssignments
 
     public function openSchedulePreviewModal(int $employeeId): void
 {
+        $this->requireAttendanceAny(['attendance.schedules.view', 'attendance.schedules.view-subordinates']);
     $this->resetErrorBag();
 
     $this->previewEmployeeId = (int) $employeeId;
@@ -1264,5 +1271,6 @@ private function buildSchedulePreview($employeeOrId, int $companyId, Carbon $fro
         }
     }
 }
+
 
 

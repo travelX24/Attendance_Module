@@ -27,6 +27,7 @@ trait WithAttendanceEdits
 
     public function openEditModal($logId)
     {
+        $this->requireAttendanceAny('attendance.daily.manage');
         $this->resetModalFlags();
         $companyId = auth()->user()->saas_company_id;
         $log = AttendanceDailyLog::forCompany($companyId)->findOrFail($logId);
@@ -72,7 +73,7 @@ trait WithAttendanceEdits
         $holidays = $service->getHolidays($companyId, $dateStr, $dateStr);
         $metrics = $service->getMetricsForDate($dateStr, $ws, $holidays, $log->employee);
 
-        // ✅ Check for Employee Specific Exception (Highest Priority)
+        // âœ… Check for Employee Specific Exception (Highest Priority)
         $empExt = \Athka\Attendance\Models\EmployeeWorkScheduleException::where('employee_id', $log->employee_id)
             ->whereDate('exception_date', $dateStr)
             ->first();
@@ -182,6 +183,7 @@ trait WithAttendanceEdits
 
     public function confirmEditApproved()
     {
+        $this->requireAttendanceAny('attendance.daily.manage');
         $this->validate([
              'approvedEditConfirmText' => 'required|string|in:CONFIRM',
              'approvedEditConfirmUnderstood' => 'accepted'
@@ -203,17 +205,20 @@ trait WithAttendanceEdits
 
     public function addPeriodRow()
     {
+        $this->requireAttendanceAny('attendance.daily.manage');
         $this->editForm['periods'][] = ['check_in_time' => '', 'check_out_time' => ''];
     }
 
     public function removePeriodRow($index)
     {
+        $this->requireAttendanceAny('attendance.daily.manage');
         unset($this->editForm['periods'][$index]);
         $this->editForm['periods'] = array_values($this->editForm['periods']);
     }
 
     public function saveEdit()
     {
+        $this->requireAttendanceAny('attendance.daily.manage');
         $this->validate([
             'editForm.periods.*.check_in_time' => 'nullable|date_format:H:i',
             'editForm.periods.*.check_out_time' => 'nullable|date_format:H:i|after:editForm.periods.*.check_in_time',
@@ -263,7 +268,7 @@ trait WithAttendanceEdits
         $log->calculateCompliance();
         $log->save();
 
-        // âœ… Sync with AttendanceDailyDetail table for consistency (Mobile App uses this)
+        // Ã¢Å“â€¦ Sync with AttendanceDailyDetail table for consistency (Mobile App uses this)
         $log->details()->delete();
         foreach ($validPeriods as $p) {
             $log->details()->create([
@@ -310,6 +315,7 @@ trait WithAttendanceEdits
 
     public function openMonthlyEditModal($employeeId)
     {
+         $this->requireAttendanceAny('attendance.daily.manage');
          $this->resetModalFlags();
          $companyId = auth()->user()->saas_company_id;
             $empQ = \Athka\Employees\Models\Employee::forCompany($companyId);
@@ -336,7 +342,7 @@ trait WithAttendanceEdits
 
          // Fetch existing logs
          $existingLogs = AttendanceDailyLog::forCompany($companyId)
-             ->with('details') // ✅ Load details for multi-period support
+             ->with('details') // âœ… Load details for multi-period support
              ->where('employee_id', $employeeId)
              ->whereBetween('attendance_date', [$start->toDateString(), $end->toDateString()])
              ->get()
@@ -492,6 +498,7 @@ trait WithAttendanceEdits
 
     public function saveMonthlyEdit()
     {
+        $this->requireAttendanceAny('attendance.daily.manage');
         $this->validate([
             'monthlyEditReason' => 'required|string|min:3',
             'monthlyEditForm.*.periods.*.check_in' => 'nullable|date_format:H:i',
@@ -566,11 +573,13 @@ trait WithAttendanceEdits
 
     public function addMonthlyPeriod($dayIndex)
     {
+        $this->requireAttendanceAny('attendance.daily.manage');
         $this->monthlyEditForm[$dayIndex]['periods'][] = ['id' => null, 'check_in' => '', 'check_out' => ''];
     }
 
     public function removeMonthlyPeriod($dayIndex, $periodIndex)
     {
+        $this->requireAttendanceAny('attendance.daily.manage');
         if (count($this->monthlyEditForm[$dayIndex]['periods']) > 1) {
             unset($this->monthlyEditForm[$dayIndex]['periods'][$periodIndex]);
             $this->monthlyEditForm[$dayIndex]['periods'] = array_values($this->monthlyEditForm[$dayIndex]['periods']);

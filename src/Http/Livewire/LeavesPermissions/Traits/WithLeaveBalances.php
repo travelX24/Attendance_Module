@@ -90,11 +90,9 @@ trait WithLeaveBalances
             if (in_array($employee->contract_type, $excluded, true)) {
                 $entitled = 0.0;
             } elseif (data_get($policy->settings, 'meta.system_key') === 'annual_default') {
-                if ($employee->is_transferred_employee) {
-                    $entitled = (float) (($employee->opening_leave_balance ?? 0) + ($employee->leave_balance_adjustments ?? 0));
-                } else {
-                    $entitled = (float) (($employee->annual_leave_days ?? $policy->days_per_year ?? 0) + ($employee->leave_balance_adjustments ?? 0));
-                }
+                $entitled = method_exists($employee, 'calculateLeaveEntitlementForPolicy')
+                    ? $employee->calculateLeaveEntitlementForPolicy($policy)
+                    : (float) (($employee->annual_leave_days ?? $policy->days_per_year ?? 0) + ($employee->leave_balance_adjustments ?? 0));
             }
         }
 

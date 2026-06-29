@@ -20,6 +20,7 @@ trait WithManualAttendance
 
     public function openCreateModal()
     {
+        $this->requireAttendanceAny('attendance.daily.manual-entry');
         $this->resetModalFlags();
         $this->createForm = [
             'employee_id' => '',
@@ -85,6 +86,7 @@ trait WithManualAttendance
 
     public function saveManualAttendance()
     {
+        $this->requireAttendanceAny('attendance.daily.manual-entry');
         $this->validate([
             'createForm.employee_id' => 'required|exists:employees,id',
             'createForm.attendance_date' => 'required|date',

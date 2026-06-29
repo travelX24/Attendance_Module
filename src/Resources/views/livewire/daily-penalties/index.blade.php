@@ -2,7 +2,10 @@
     $locale = app()->getLocale();
     $isRtl  = in_array(substr($locale, 0, 2), ['ar','fa','ur','he']);
     $dir    = $isRtl ? 'rtl' : 'ltr';
-    $canManagePenalties = auth()->user()->can('attendance.penalties.manage') || auth()->user()->can('attendance.manage');
+    $attendanceUser = auth()->user();
+    $canManagePenalties = $attendanceUser?->can('attendance.penalties.manage');
+    $canWaivePenalties = $canManagePenalties;
+    $canExportPenalties = $canManagePenalties;
 @endphp
 
 @section('topbar-left-content')

@@ -56,7 +56,7 @@
                         <x-ui.company-date-picker
                             model="exceptionForm.exception_date"
                             :label="tr('Date')"
-                            :disabled="!auth()->user()->can('attendance.manage')"
+                            :disabled="!$canManageSchedules"
                         />
 
                         <x-ui.select
@@ -65,7 +65,7 @@
                             error="exceptionForm.exception_type"
                             openUpward="true"
                             required
-                            :disabled="!auth()->user()->can('attendance.manage')"
+                            :disabled="!$canManageSchedules"
                         >
                             <option value="time_override">{{ tr('Time Override') }}</option>
                             <option value="day_off">{{ tr('Exceptional Day Off') }}</option>
@@ -78,7 +78,7 @@
                                 :label="tr('Start Time')"
                                 error="exceptionForm.start_time"
                                 required
-                                :disabled="!auth()->user()->can('attendance.manage')"
+                                :disabled="!$canManageSchedules"
                             />
 
                             <x-ui.input
@@ -87,7 +87,7 @@
                                 :label="tr('End Time')"
                                 error="exceptionForm.end_time"
                                 required
-                                :disabled="!auth()->user()->can('attendance.manage')"
+                                :disabled="!$canManageSchedules"
                             />
 
                             {{-- ✅ Breaks removed --}}
@@ -110,13 +110,13 @@
                                 :label="tr('Notes')"
                                 error="exceptionForm.notes"
                                 :hint="tr('Optional: add a short reason or note for audit purposes')"
-                                :disabled="!auth()->user()->can('attendance.manage')"
+                                :disabled="!$canManageSchedules"
                             />
                         </div>
                     </div>
 
                     <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-3 mt-5">
-                        @can('attendance.manage')
+                        @if($canManageSchedules)
                         @if($exceptionEditId)
                             <x-ui.secondary-button wire:click="resetExceptionForm">
                                 <i class="fas fa-times me-1"></i>
@@ -143,7 +143,7 @@
                                 <span>{{ tr('Save') }}</span>
                             </x-ui.primary-button>
                         @endif
-                        @endcan
+                        @endif
                     </div>
                 </div>
             </x-ui.card>
@@ -212,7 +212,7 @@
                                 <td class="py-3 px-6">
                                     <div class="flex justify-end">
                                         <x-ui.actions-menu>
-                                            @can('attendance.manage')
+                                            @if($canManageSchedules)
                                             <x-ui.dropdown-item wire:click="editException({{ $ex['id'] }})">
                                                 <i class="fas fa-pen me-2 text-gray-500"></i>
                                                 <span>{{ tr('Edit') }}</span>
@@ -227,7 +227,7 @@
                                             </x-ui.dropdown-item>
                                             @else
                                                 <span class="text-xs text-gray-400 italic">{{ tr('No Access') }}</span>
-                                            @endcan
+                                            @endif
                                         </x-ui.actions-menu>
                                     </div>
                                 </td>

@@ -144,11 +144,9 @@ class LeaveApprovalImpactService
         }
 
         if (data_get($policy->settings, 'meta.system_key') === 'annual_default') {
-            if ($employee->is_transferred_employee) {
-                return (float) (($employee->opening_leave_balance ?? 0) + ($employee->leave_balance_adjustments ?? 0));
-            }
-
-            return (float) (($employee->annual_leave_days ?? $policy->days_per_year ?? 0) + ($employee->leave_balance_adjustments ?? 0));
+            return method_exists($employee, 'calculateLeaveEntitlementForPolicy')
+                ? $employee->calculateLeaveEntitlementForPolicy($policy)
+                : (float) (($employee->annual_leave_days ?? $policy->days_per_year ?? 0) + ($employee->leave_balance_adjustments ?? 0));
         }
 
         return $entitled;

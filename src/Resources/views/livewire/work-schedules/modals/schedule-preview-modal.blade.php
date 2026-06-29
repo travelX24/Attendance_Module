@@ -54,7 +54,7 @@
                         <x-ui.company-date-picker
                             model="previewForm.from"
                             :label="tr('From')"
-                            :disabled="!auth()->user()->can('attendance.manage')"
+                            :disabled="!$canManageSchedules"
                         />
                         @error('previewForm.from')
                             <p class="text-xs text-[color:var(--error)] mt-1">{{ $message }}</p>
@@ -65,14 +65,14 @@
                         <x-ui.company-date-picker
                             model="previewForm.to"
                             :label="tr('To')"
-                            :disabled="!auth()->user()->can('attendance.manage')"
+                            :disabled="!$canManageSchedules"
                         />
                         @error('previewForm.to')
                             <p class="text-xs text-[color:var(--error)] mt-1">{{ $message }}</p>
                         @enderror
                     </div>
 
-                    @can('attendance.manage')
+                    @if($canManageSchedules)
                     <div class="sm:col-span-2 flex justify-end">
                         <x-ui.primary-button
                             type="button"
@@ -84,7 +84,7 @@
                             <span>{{ tr('Update Preview') }}</span>
                         </x-ui.primary-button>
                     </div>
-                    @endcan
+                    @endif
                 </div>
             </x-ui.card>
 

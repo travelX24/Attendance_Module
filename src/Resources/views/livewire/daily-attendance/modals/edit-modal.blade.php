@@ -34,11 +34,11 @@
                 <div class="bg-gray-50/50 rounded-xl border border-gray-100 p-4 space-y-4">
                     <div class="flex items-center justify-between">
                         <label class="text-sm font-bold text-gray-700">{{ tr('Attendance Periods') }}</label>
-                        @can('attendance.manage')
+                        @if($canManageDaily)
                         <button type="button" wire:click="addPeriodRow" class="text-xs text-[color:var(--accent-orange)] hover:underline font-semibold flex items-center gap-1">
                             <i class="fas fa-plus-circle"></i> {{ tr('Add Period') }}
                         </button>
-                        @endcan
+                        @endif
                     </div>
 
                     @foreach($editForm['periods'] as $index => $period)
@@ -46,13 +46,13 @@
                             
                             {{-- Remove Button (absolute) --}}
                             @if(count($editForm['periods']) > 1)
-                                @can('attendance.manage')
+                                @if($canManageDaily)
                                 <button type="button" wire:click="removePeriodRow({{ $index }})" 
                                     class="absolute -top-2 -right-2 w-6 h-6 bg-[color:var(--error)]/10 text-[color:var(--error)] rounded-full border border-[color:var(--error)]/20 flex items-center justify-center hover:bg-[color:var(--error)] hover:text-white transition-colors shadow-sm z-10"
                                     title="{{ tr('Remove Period') }}">
                                     <i class="fas fa-times text-xs"></i>
                                 </button>
-                                @endcan
+                                @endif
                             @endif
 
                             <div class="space-y-1.5">
@@ -68,7 +68,7 @@
                                         type="time" 
                                         wire:model="editForm.periods.{{ $index }}.check_in_time"
                                         class="flex-1 w-full border-0 focus:ring-0 text-sm px-3 text-gray-900 placeholder-gray-400 h-full bg-transparent"
-                                        @cannot('attendance.manage') disabled @endcannot
+                                        @if(!$canManageDaily) disabled @endif
                                     >
                                 </div>
                                 @error("editForm.periods.$index.check_in_time") 
@@ -89,7 +89,7 @@
                                         type="time" 
                                         wire:model="editForm.periods.{{ $index }}.check_out_time"
                                         class="flex-1 w-full border-0 focus:ring-0 text-sm px-3 text-gray-900 placeholder-gray-400 h-full bg-transparent"
-                                        @cannot('attendance.manage') disabled @endcannot
+                                        @if(!$canManageDaily) disabled @endif
                                     >
                                 </div>
                                 @error("editForm.periods.$index.check_out_time") 
@@ -107,7 +107,7 @@
                     rows="3"
                     error="editForm.reason"
                     required
-                    :disabled="!auth()->user()->can('attendance.manage')"
+                    :disabled="!$canManageDaily"
                 />
 
                 {{-- Attachment --}}
@@ -120,7 +120,7 @@
                         file:bg-[color:var(--accent-orange)]/10 file:text-[color:var(--accent-orange)]
                         hover:file:bg-[color:var(--accent-orange)]/15
                         disabled:opacity-50
-                     " @cannot('attendance.manage') disabled @endcannot />
+                     " @if(!$canManageDaily) disabled @endif />
                      @error('editAttachment') <span class="text-xs text-[color:var(--error)]">{{ $message }}</span> @enderror
                      <div wire:loading wire:target="editAttachment" class="text-xs text-gray-500 mt-1">
                          <i class="fas fa-spinner fa-spin"></i> {{ tr('Uploading...') }}
@@ -165,13 +165,13 @@
                 <x-ui.secondary-button wire:click="closeEditModal">
                     {{ tr('Cancel') }}
                 </x-ui.secondary-button>
-                @can('attendance.manage')
+                @if($canManageDaily)
                 <x-ui.primary-button wire:click="saveEdit" wire:loading.attr="disabled" class="gap-2">
                     <i class="fas fa-save" wire:loading.remove></i>
                     <i class="fas fa-spinner fa-spin" wire:loading></i>
                     <span>{{ tr('Save Changes') }}</span>
                 </x-ui.primary-button>
-                @endcan
+                @endif
             </div>
         </x-slot>
     </x-ui.modal>

@@ -55,12 +55,12 @@
                     {{ tr('Cancel') }}
                 </x-ui.secondary-button>
 
-                @can('attendance.manage')
+                @if($canManageDaily)
                 <x-ui.primary-button wire:click="confirmBulkApprove" class="gap-2">
                     <i class="fas fa-check-double"></i>
                     <span>{{ tr('Confirm Approval') }}</span>
                 </x-ui.primary-button>
-                @endcan
+                @endif
             </div>
         </x-slot>
     </x-ui.modal>

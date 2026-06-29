@@ -69,6 +69,8 @@ class Index extends Component
 
     public function mount()
     {
+        $this->requireAttendanceAny(['attendance.daily.view', 'attendance.daily.view-subordinates', 'attendance.daily.manage', 'attendance.daily.manual-entry']);
+
         $this->date_from = now()->toDateString();
         $this->date_to = now()->toDateString();
 
@@ -81,7 +83,9 @@ class Index extends Component
             $this->branch_id = $userBranchId ?: 'all';
         }
 
-        $this->generateMissingLogs(true);
+        if ($this->canAttendanceAny('attendance.daily.manage')) {
+            $this->generateMissingLogs(true);
+        }
 
         $this->loadStats();
         $this->loadWarnings();
@@ -112,16 +116,16 @@ class Index extends Component
         $companyId = auth()->user()->saas_company_id;
         $query = AttendanceDailyLog::forCompany($companyId);
 
-        // âœ… Data scoping (Admin vs Subordinates)
+        // Ã¢Å“â€¦ Data scoping (Admin vs Subordinates)
         $query = $this->applyDataScoping($query, 'attendance.daily.view', 'attendance.daily.view-subordinates');
 
-        // âœ… Allowed branches scope
+        // Ã¢Å“â€¦ Allowed branches scope
         $allowed = $this->allowedBranchIds();
         if (!empty($allowed)) {
             $query->whereHas('employee', fn ($q) => $q->whereIn('branch_id', $allowed));
         }
 
-        // âœ… Selected branch filter (if user picked a specific branch)
+        // Ã¢Å“â€¦ Selected branch filter (if user picked a specific branch)
         if ($this->branch_id !== 'all') {
             $query->whereHas('employee', fn ($q) => $q->where('branch_id', (int) $this->branch_id));
         }
@@ -172,7 +176,7 @@ class Index extends Component
 
         $this->stats['total'] = $data->sum('count');
         
-        // الحاضرون هم فقط من سجل دخول في موعده (حاضر)
+        // Ø§Ù„Ø­Ø§Ø¶Ø±ÙˆÙ† Ù‡Ù… ÙÙ‚Ø· Ù…Ù† Ø³Ø¬Ù„ Ø¯Ø®ÙˆÙ„ ÙÙŠ Ù…ÙˆØ¹Ø¯Ù‡ (Ø­Ø§Ø¶Ø±)
         $this->stats['present'] = $data->where('attendance_status', 'present')->sum('count');
         
         $this->stats['late'] = $data->where('attendance_status', 'late')->first()->count ?? 0;
@@ -187,7 +191,7 @@ class Index extends Component
             ->where('approval_status', 'pending')
             ->whereBetween('attendance_date', [$this->date_from ?: '1900-01-01', $this->date_to ?: '2100-01-01']);
 
-        // âœ… Data scoping
+        // Ã¢Å“â€¦ Data scoping
         $pendingQ = $this->applyDataScoping($pendingQ, 'attendance.daily.view', 'attendance.daily.view-subordinates');
 
         if (!empty($allowed)) {
@@ -222,16 +226,16 @@ class Index extends Component
         $empQ = Employee::withoutGlobalScope('active_only')->forCompany($companyId)
             ->when($this->status !== 'all', fn($q) => $q->where('status', (string)$this->status));
 
-        // âœ… Data scoping
+        // Ã¢Å“â€¦ Data scoping
         $empQ = $this->applyDataScoping($empQ, 'attendance.daily.view', 'attendance.daily.view-subordinates', '');
 
-        // âœ… Allowed branches scope
+        // Ã¢Å“â€¦ Allowed branches scope
         $allowed = $this->allowedBranchIds();
         if (!empty($allowed)) {
             $empQ->whereIn('branch_id', $allowed);
         }
 
-        // âœ… Selected branch filter
+        // Ã¢Å“â€¦ Selected branch filter
         if ($this->branch_id !== 'all') {
             $empQ->where('branch_id', (int) $this->branch_id);
         }
@@ -241,7 +245,7 @@ class Index extends Component
                 $q->select(DB::raw(1))
                 ->from('attendance_daily_logs')
                 ->whereColumn('attendance_daily_logs.employee_id', 'employees.id')
-                // âœ… Ù…Ù‡Ù…: Ø§Ù…Ù†Ø¹ Ø£ÙŠ ØªØ¯Ø§Ø®Ù„ multi-tenant
+                // Ã¢Å“â€¦ Ã™â€¦Ã™â€¡Ã™â€¦: Ã˜Â§Ã™â€¦Ã™â€ Ã˜Â¹ Ã˜Â£Ã™Å  Ã˜ÂªÃ˜Â¯Ã˜Â§Ã˜Â®Ã™â€ž multi-tenant
                 ->where('attendance_daily_logs.saas_company_id', $companyId)
                 ->where('attendance_date', '>=', $threeDaysAgo);
             })

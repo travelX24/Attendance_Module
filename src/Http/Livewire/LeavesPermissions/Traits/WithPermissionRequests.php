@@ -10,10 +10,10 @@ use Illuminate\Support\Facades\Schema;
 
 trait WithPermissionRequests
 {
-    // âœ… Create Permission Modal
+    // Ã¢Å“â€¦ Create Permission Modal
     public bool $createPermissionOpen = false;
 
-    // âœ… Fix: Ø­ØªÙ‰ Ù„Ùˆ ÙƒØ§Ù† render ÙŠØ³ØªØ®Ø¯Ù…Ù‡ ÙˆÙ…Ø§ Ù‡Ùˆ Ù…Ø¹Ø±Ù Ø¹Ù†Ø¯Ùƒ
+    // Ã¢Å“â€¦ Fix: Ã˜Â­Ã˜ÂªÃ™â€° Ã™â€žÃ™Ë† Ã™Æ’Ã˜Â§Ã™â€  render Ã™Å Ã˜Â³Ã˜ÂªÃ˜Â®Ã˜Â¯Ã™â€¦Ã™â€¡ Ã™Ë†Ã™â€¦Ã˜Â§ Ã™â€¡Ã™Ë† Ã™â€¦Ã˜Â¹Ã˜Â±Ã™Â Ã˜Â¹Ã™â€ Ã˜Â¯Ã™Æ’
     public bool $createGroupPermissionOpen = false;
 
     // Form fields (must match blade)
@@ -24,7 +24,7 @@ trait WithPermissionRequests
     public int $minutes = 0;
     public string $permission_reason = '';
 
-    // âœ… NEW: Group Permission fields
+    // Ã¢Å“â€¦ NEW: Group Permission fields
     public array $groupPermissionEmployeeIds = [];
     public string $group_permission_date = '';
     public string $group_from_time = '';
@@ -34,6 +34,7 @@ trait WithPermissionRequests
 
     public function openCreatePermission(): void
     {
+        $this->requireAttendanceAny('requests.permissions.manage');
         $this->resetValidation();
 
         $this->permission_employee_id = null;
@@ -51,9 +52,10 @@ trait WithPermissionRequests
         $this->createPermissionOpen = false;
     }
 
-    // âœ… NEW: Group Permission Open/Close
+    // Ã¢Å“â€¦ NEW: Group Permission Open/Close
     public function openCreateGroupPermission(): void
     {
+        $this->requireAttendanceAny('requests.permissions.manage');
         $this->resetValidation();
 
         $this->groupPermissionEmployeeIds = [];
@@ -81,7 +83,7 @@ trait WithPermissionRequests
         $this->syncPermissionMinutes();
     }
 
-    // âœ… NEW: Group time change -> compute minutes
+    // Ã¢Å“â€¦ NEW: Group time change -> compute minutes
     public function updatedGroupFromTime($value): void
     {
         $this->syncGroupPermissionMinutes();
@@ -94,7 +96,7 @@ trait WithPermissionRequests
 
     protected function syncPermissionMinutes(): void
     {
-        // ÙŠØ¹ØªÙ…Ø¯ Ø¹Ù„Ù‰ computeMinutesSafe + parseTimeSafe Ø§Ù„Ù…ÙˆØ¬ÙˆØ¯Ø© Ø¹Ù†Ø¯Ùƒ ÙÙŠ WithLeaveRequests
+        // Ã™Å Ã˜Â¹Ã˜ÂªÃ™â€¦Ã˜Â¯ Ã˜Â¹Ã™â€žÃ™â€° computeMinutesSafe + parseTimeSafe Ã˜Â§Ã™â€žÃ™â€¦Ã™Ë†Ã˜Â¬Ã™Ë†Ã˜Â¯Ã˜Â© Ã˜Â¹Ã™â€ Ã˜Â¯Ã™Æ’ Ã™ÂÃ™Å  WithLeaveRequests
         if (method_exists($this, 'computeMinutesSafe')) {
             $mins = (int) $this->computeMinutesSafe((string) $this->from_time, (string) $this->to_time);
             $this->minutes = max(0, $mins);
@@ -111,6 +113,7 @@ trait WithPermissionRequests
 
     public function savePermission(): void
     {
+        $this->requireAttendanceAny('requests.permissions.manage');
         $this->ensureCanManage();
 
         $policy = $this->permissionPolicyRow();
@@ -180,7 +183,7 @@ trait WithPermissionRequests
 
         $data = $this->validate($rules, $messages, $attributes);
 
-        // âœ… Employee (same company)
+        // Ã¢Å“â€¦ Employee (same company)
      $allowed = method_exists($this, 'lpAllowedBranchIdsSafe')
             ? (array) $this->lpAllowedBranchIdsSafe()
             : [];
@@ -200,7 +203,7 @@ trait WithPermissionRequests
         $from = (string) $data['from_time'];
         $to   = (string) $data['to_time'];
 
-        // âœ… Compute minutes from times (source of truth)
+        // Ã¢Å“â€¦ Compute minutes from times (source of truth)
         if (!method_exists($this, 'computeMinutesSafe')) {
             $this->addError('from_time', 'computeMinutesSafe() is missing.');
             return;
@@ -212,14 +215,14 @@ trait WithPermissionRequests
             return;
         }
 
-        // ✅ validate within working hours (بنفس منطق الشفت عندك)
+        // âœ… validate within working hours (Ø¨Ù†ÙØ³ Ù…Ù†Ø·Ù‚ Ø§Ù„Ø´ÙØª Ø¹Ù†Ø¯Ùƒ)
         if (!$this->validatePermissionWithinWorkWindow($date, $from, $to)) {
             return;
         }
 
         $this->minutes = $mins;
 
-        // ✅ Exceptional Day Check
+        // âœ… Exceptional Day Check
         if (class_exists(\Athka\SystemSettings\Services\WorkScheduleService::class)) {
             $wsService = app(\Athka\SystemSettings\Services\WorkScheduleService::class);
             $exDay = $wsService->getExceptionalDay($this->companyId, $date->toDateString(), $employee);
@@ -236,7 +239,7 @@ trait WithPermissionRequests
 
         $approvalRequired = $this->isPermissionApprovalRequired();
 
-        // ✅ Check Workflow existence (only if approval is required)
+        // âœ… Check Workflow existence (only if approval is required)
         if ($approvalRequired && class_exists(\Athka\SystemSettings\Services\Approvals\ApprovalService::class)) {
             $approvalService = app(\Athka\SystemSettings\Services\Approvals\ApprovalService::class);
             $workflowReason = null;
@@ -262,7 +265,7 @@ trait WithPermissionRequests
             }
         }
 
-        // ✅ NEW: hard limits (per request / per day / per month)
+        // âœ… NEW: hard limits (per request / per day / per month)
         if (!$this->validatePermissionLimits((int) $employee->id, $date, $mins)) {
             return;
         }
@@ -280,18 +283,18 @@ trait WithPermissionRequests
             'status' => $approvalRequired ? 'pending' : 'approved',
         ];
 
-        // ✅ company column (company_id vs saas_company_id)
+        // âœ… company column (company_id vs saas_company_id)
         if ($companyCol && Schema::hasColumn($permTable, $companyCol)) {
             $payload[$companyCol] = (int) $this->companyId;
         }
 
-        // ✅ optional columns (safe)
+        // âœ… optional columns (safe)
         if (Schema::hasColumn($permTable, 'requested_by')) $payload['requested_by'] = auth()->id();
         if (Schema::hasColumn($permTable, 'requested_at')) $payload['requested_at'] = now();
 
         $row = AttendancePermissionRequest::create($payload);
 
-        // ✅ Integrate with Approval Workflow (only if approval is required)
+        // âœ… Integrate with Approval Workflow (only if approval is required)
         if ($approvalRequired) {
             try {
                 $approvalService = app(\Athka\SystemSettings\Services\Approvals\ApprovalService::class);
@@ -320,7 +323,7 @@ trait WithPermissionRequests
             } catch (\Exception $e) {}
         }
 
-        // ✅ activity log (لو عندك logAction)
+        // âœ… activity log (Ù„Ùˆ Ø¹Ù†Ø¯Ùƒ logAction)
         if (method_exists($this, 'logAction')) {
             $this->logAction('permission', 0, 'created', ['minutes' => $mins], (int) $employee->id);
         }
@@ -338,9 +341,10 @@ trait WithPermissionRequests
         $this->resetPage('permPage');
     }
 
-    // ✅ NEW: Group Permission Save
+    // âœ… NEW: Group Permission Save
     public function saveGroupPermission(): void
     {
+        $this->requireAttendanceAny('requests.permissions.manage');
         $this->ensureCanManage();
 
         $policy = $this->permissionPolicyRow();
@@ -433,7 +437,7 @@ trait WithPermissionRequests
         }
         $this->group_minutes = $mins;
 
-        // ✅ Exceptional Day Check (for groups)
+        // âœ… Exceptional Day Check (for groups)
         if (class_exists(\Athka\SystemSettings\Services\WorkScheduleService::class)) {
             $wsService = app(\Athka\SystemSettings\Services\WorkScheduleService::class);
             // We check the date once; if it's company-wide holiday, it affects all.
@@ -449,19 +453,19 @@ trait WithPermissionRequests
             }
         }
 
-        // âœ… Validate within work window (Ù…Ø±Ø© ÙˆØ§Ø­Ø¯Ø©)
+        // Ã¢Å“â€¦ Validate within work window (Ã™â€¦Ã˜Â±Ã˜Â© Ã™Ë†Ã˜Â§Ã˜Â­Ã˜Â¯Ã˜Â©)
         if (!$this->validateGroupPermissionWithinWorkWindow($date, $from, $to)) {
             return;
         }
 
-        // âœ… Max per request (Ù…Ø±Ø© ÙˆØ§Ø­Ø¯Ø©)
+        // Ã¢Å“â€¦ Max per request (Ã™â€¦Ã˜Â±Ã˜Â© Ã™Ë†Ã˜Â§Ã˜Â­Ã˜Â¯Ã˜Â©)
         $maxPerRequest = $this->getPermissionMaxMinutesPerRequest($date);
         if ($maxPerRequest > 0 && $mins > $maxPerRequest) {
             $this->addError('group_to_time', tr('Permission duration exceeds the allowed limit') . ' (' . $this->fmtMinutes($maxPerRequest) . ').');
             return;
         }
 
-        // âœ… Load employees in one query
+        // Ã¢Å“â€¦ Load employees in one query
         $allowed = method_exists($this, 'lpAllowedBranchIdsSafe')
             ? (array) $this->lpAllowedBranchIdsSafe()
             : [];
@@ -479,14 +483,14 @@ trait WithPermissionRequests
 
         $employeesById = $employees->keyBy('id');
 
-        // âœ… If any missing
+        // Ã¢Å“â€¦ If any missing
         $missing = array_values(array_diff($ids, $employeesById->keys()->all()));
         if (!empty($missing)) {
             $this->addError('groupPermissionEmployeeIds', tr('Some selected employees are not valid.'));
             return;
         }
 
-        // âœ… Build sums maps (daily + monthly) once
+        // Ã¢Å“â€¦ Build sums maps (daily + monthly) once
         $permTable = (new AttendancePermissionRequest())->getTable();
         $permCoCol = method_exists($this, 'detectCompanyColumn') ? $this->detectCompanyColumn($permTable) : null;
 
@@ -512,7 +516,7 @@ trait WithPermissionRequests
             ->pluck('total', 'employee_id')
             ->toArray();
 
-        // âœ… Check daily/monthly limits per employee
+        // Ã¢Å“â€¦ Check daily/monthly limits per employee
         $dailyExceeded = [];
         $monthlyExceeded = [];
 
@@ -564,7 +568,7 @@ trait WithPermissionRequests
 
         $approvalRequired = $this->isPermissionApprovalRequired();
 
-        // âœ… Create all rows in a transaction (all-or-nothing)
+        // Ã¢Å“â€¦ Create all rows in a transaction (all-or-nothing)
         DB::transaction(function () use ($ids, $date, $from, $to, $mins, $approvalRequired, $permTable, $permCoCol, $data) {
 
             foreach ($ids as $empId) {
@@ -587,7 +591,7 @@ trait WithPermissionRequests
 
                 $row = AttendancePermissionRequest::create($payload);
 
-                // ✅ No approval workflow for individual rows in group request if $approvalRequired is false
+                // âœ… No approval workflow for individual rows in group request if $approvalRequired is false
                 // But usually we handle it row by row if needed.
                 // Added check to ensure row is auto-approved if needed.
                 
@@ -631,7 +635,7 @@ trait WithPermissionRequests
         $this->resetPage('permPage');
     }
 
-    // âœ… Group Work Window validation (same logic but fields for group)
+    // Ã¢Å“â€¦ Group Work Window validation (same logic but fields for group)
     protected function validateGroupPermissionWithinWorkWindow(Carbon $date, string $from, string $to): bool
     {
         if (!method_exists($this, 'companyWorkingDays') || !method_exists($this, 'parseTimeSafe')) {
@@ -713,7 +717,7 @@ trait WithPermissionRequests
     }
 
     // =========================================================
-    // âœ… Permission hard limits (existing)
+    // Ã¢Å“â€¦ Permission hard limits (existing)
     // =========================================================
     protected function validatePermissionLimits(int $employeeId, Carbon $date, int $mins): bool
     {
@@ -947,5 +951,6 @@ trait WithPermissionRequests
     }
 
 }
+
 
 

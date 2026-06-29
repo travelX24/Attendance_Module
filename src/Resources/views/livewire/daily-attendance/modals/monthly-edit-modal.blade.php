@@ -74,7 +74,7 @@
                                                    ($day['status'] == 'absent' ? 'text-[color:var(--error)] bg-[color:var(--error)]/10 border-[color:var(--error)]/25' : 
                                                    ($day['status'] == 'late' ? 'text-[color:var(--warning)] bg-[color:var(--warning)]/10 border-[color:var(--warning)]/25' : 
                                                    ($day['status'] == 'weekend' ? 'text-gray-400 bg-gray-50' : 'text-gray-700 bg-white'))) }}"
-                                                 @cannot('attendance.manage') disabled @endcannot>
+                                                 @if(!$canManageDaily) disabled @endif>
                                                 <option value="present">{{ tr('Present') }}</option>
                                                 <option value="late">{{ tr('Late') }}</option>
                                                 <option value="early_departure">{{ tr('Early Leave') }}</option>
@@ -119,7 +119,7 @@
                                                          <input type="time" wire:model.defer="monthlyEditForm.{{ $index }}.periods.{{ $pIndex }}.check_in" 
                                                               class="bg-white border text-gray-900 text-[10px] rounded-lg focus:ring-[color:var(--accent-orange)] focus:border-[color:var(--accent-orange)] block w-full py-1 px-1 font-mono text-center shadow-sm border-gray-200"
                                                               placeholder="--:--"
-                                                              @cannot('attendance.manage') disabled @endcannot
+                                                              @if(!$canManageDaily) disabled @endif
                                                           >
                                                      </div>
                                                      {{-- divider --}}
@@ -129,28 +129,28 @@
                                                          <input type="time" wire:model.defer="monthlyEditForm.{{ $index }}.periods.{{ $pIndex }}.check_out" 
                                                               class="bg-white border text-gray-900 text-[10px] rounded-lg focus:ring-[color:var(--accent-orange)] focus:border-[color:var(--accent-orange)] block w-full py-1 px-1 font-mono text-center shadow-sm border-gray-200"
                                                               placeholder="--:--"
-                                                              @cannot('attendance.manage') disabled @endcannot
+                                                              @if(!$canManageDaily) disabled @endif
                                                           >
                                                      </div>
                                                      {{-- Remove Button --}}
                                                      @if(count($day['periods']) > 1)
-                                                         @can('attendance.manage')
+                                                         @if($canManageDaily)
                                                          <button type="button" wire:click="removeMonthlyPeriod({{ $index }}, {{ $pIndex }})" 
                                                              class="text-[color:var(--error)]/70 hover:text-[color:var(--error)] transition-colors p-0.5" title="{{ tr('Remove') }}">
                                                              <i class="fas fa-times-circle text-[10px]"></i>
                                                          </button>
-                                                         @endcan
+                                                         @endif
                                                      @endif
                                                  </div>
                                              @endforeach
                                              {{-- Add Period Button --}}
                                              <div class="p-1 flex justify-center">
-                                                 @can('attendance.manage')
+                                                 @if($canManageDaily)
                                                  <button type="button" wire:click="addMonthlyPeriod({{ $index }})" 
                                                      class="text-[9px] font-bold text-[color:var(--accent-orange)] hover:brightness-90 flex items-center gap-1 transition-colors px-2 py-0.5 rounded-full hover:bg-white border border-transparent hover:border-[color:var(--accent-orange)]/20">
                                                      <i class="fas fa-plus-circle"></i> {{ tr('Add') }}
                                                  </button>
-                                                 @endcan
+                                                 @endif
                                              </div>
                                          </div>
                                      </td>
@@ -170,7 +170,7 @@
                                             wire:model.defer="monthlyEditForm.{{ $index }}.notes" 
                                             placeholder="{{ tr('Add note...') }}" 
                                             class="bg-transparent border border-transparent text-gray-700 text-[11px] rounded transition-all focus:bg-white focus:border-[color:var(--accent-orange)] focus:ring-1 focus:ring-[color:var(--accent-orange)] block w-full py-1 px-2 hover:bg-gray-50 placeholder-gray-300"
-                                            @cannot('attendance.manage') disabled @endcannot
+                                            @if(!$canManageDaily) disabled @endif
                                         >
                                     </td>
                                 </tr>
@@ -192,7 +192,7 @@
                     rows="2" 
                     class="block p-3 w-full text-sm text-gray-900 bg-white rounded-lg border border-gray-200 focus:ring-[color:var(--accent-orange)] focus:border-[color:var(--accent-orange)] shadow-sm placeholder-gray-400 transition-shadow" 
                     placeholder="{{ tr('Please describe the reason for these changes...') }}"
-                    @cannot('attendance.manage') disabled @endcannot
+                    @if(!$canManageDaily) disabled @endif
                 ></textarea>
                 @error('monthlyEditReason') <span class="text-[color:var(--error)] text-xs mt-1 block font-bold">{{ $message }}</span> @enderror
             </div>
@@ -206,11 +206,11 @@
             </div>
             <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
                 <x-ui.secondary-button wire:click="$set('showMonthlyEditModal', false)" class="w-full sm:w-auto justify-center">{{ tr('Cancel') }}</x-ui.secondary-button>
-                @can('attendance.manage')
+                @if($canManageDaily)
                 <x-ui.brand-button wire:click="saveMonthlyEdit" class="w-full sm:w-auto justify-center shadow-lg shadow-[color:var(--accent-orange)]/20">
                     <i class="fas fa-save me-2"></i> {{ tr('Save All Changes') }}
                 </x-ui.brand-button>
-                @endcan
+                @endif
             </div>
         </div>
     </x-slot:footer>

@@ -138,7 +138,7 @@
                     <x-ui.company-date-picker
                         model="bulkFormData.start_date"
                         :label="tr('Start Date')"
-                        :disabled="!auth()->user()->can('attendance.manage')"
+                        :disabled="!$canManageSchedules"
                     />
 
                     @if($isRotationMode)
@@ -150,12 +150,12 @@
                             :label="tr('Rotation Days')"
                             error="bulkFormData.rotation_days"
                             required
-                            :disabled="!auth()->user()->can('attendance.manage')"
+                            :disabled="!$canManageSchedules"
                         />
                     @elseif($overrideContractDates)
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-1.5">{{ tr('Duration') }}</label>
-                            <x-ui.select wire:model.live="bulkFormData.is_permanent" class="w-full" align="up" :disabled="!auth()->user()->can('attendance.manage')">
+                            <x-ui.select wire:model.live="bulkFormData.is_permanent" class="w-full" align="up" :disabled="!$canManageSchedules">
                                 <option value="1">{{ tr('Permanent') }}</option>
                                 <option value="0">{{ tr('Temporary') }}</option>
                             </x-ui.select>
@@ -167,7 +167,7 @@
                     <div class="grid grid-cols-2 gap-4">
                         <div>
                             <label class="block text-sm font-semibold text-gray-700 mb-1.5">{{ tr('Duration') }}</label>
-                            <x-ui.select wire:model.live="bulkFormData.is_permanent" class="w-full" align="up" :disabled="!auth()->user()->can('attendance.manage')">
+                            <x-ui.select wire:model.live="bulkFormData.is_permanent" class="w-full" align="up" :disabled="!$canManageSchedules">
                                 <option value="1">{{ tr('Permanent') }}</option>
                                 <option value="0">{{ tr('Temporary') }}</option>
                             </x-ui.select>
@@ -180,7 +180,7 @@
                 {{-- End Date --}}
                 @if($overrideContractDates && (empty($bulkFormData['is_permanent']) || $bulkFormData['is_permanent'] === '0'))
                     <div class="grid grid-cols-2 gap-4">
-                        <x-ui.company-date-picker model="bulkFormData.end_date" :label="tr('End Date')" :disabled="!auth()->user()->can('attendance.manage')" />
+                        <x-ui.company-date-picker model="bulkFormData.end_date" :label="tr('End Date')" :disabled="!$canManageSchedules" />
                         <div class="hidden md:block"></div>
                     </div>
                 @endif
@@ -191,7 +191,7 @@
                     </label>
 
                     {{-- Ù…Ù‡Ù…: live Ø¹Ø´Ø§Ù† Ø¨Ù…Ø¬Ø±Ø¯ Ø§Ø®ØªÙŠØ§Ø± Ø§Ù„Ø¬Ø¯ÙˆÙ„ ØªØ¸Ù‡Ø± Ø§Ù„ÙØªØ±Ø§Øª ÙÙˆØ±Ø§Ù‹ --}}
-                    <x-ui.select wire:model.live="bulkFormData.work_schedule_id" class="w-full" align="down" :disabled="!auth()->user()->can('attendance.manage')">
+                    <x-ui.select wire:model.live="bulkFormData.work_schedule_id" class="w-full" align="down" :disabled="!$canManageSchedules">
                         <option value="">{{ tr('Select a schedule...') }}</option>
                         @foreach($workSchedules as $sch)
                             @php $optSummary = $getScheduleSummary($sch->id); @endphp
@@ -225,7 +225,7 @@
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-1.5">{{ tr('Second Schedule (B)') }}</label>
 
-                        <x-ui.select wire:model.live="bulkFormData.rotation_work_schedule_id" class="w-full" align="down" :disabled="!auth()->user()->can('attendance.manage')">
+                        <x-ui.select wire:model.live="bulkFormData.rotation_work_schedule_id" class="w-full" align="down" :disabled="!$canManageSchedules">
                             <option value="">{{ tr('Select schedule B...') }}</option>
                             @foreach($workSchedules as $sch)
                                 @php $optSummary = $getScheduleSummary($sch->id); @endphp
@@ -265,13 +265,13 @@
                 {{ tr('Cancel') }}
             </x-ui.secondary-button>
 
-            @can('attendance.manage')
+            @if($canManageSchedules)
             <x-ui.primary-button wire:click="applyBulkAssignment" wire:loading.attr="disabled" class="gap-2">
                 <i class="fas fa-check" wire:loading.remove></i>
                 <i class="fas fa-spinner fa-spin" wire:loading></i>
                 <span>{{ tr('Confirm Application') }}</span>
             </x-ui.primary-button>
-            @endcan
+            @endif
         </div>
     </x-slot>
 </x-ui.modal>

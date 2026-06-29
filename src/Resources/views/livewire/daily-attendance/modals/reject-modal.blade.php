@@ -10,17 +10,17 @@
                     </p>
                 </div>
 
-                <x-ui.textarea wire:model="rejectNotes" :label="tr('Rejection Reason')" rows="4" :disabled="!auth()->user()->can('attendance.manage')" />
+                <x-ui.textarea wire:model="rejectNotes" :label="tr('Rejection Reason')" rows="4" :disabled="!$canManageDaily" />
                 @error('rejectNotes') <div class="text-xs text-[color:var(--error)]">{{ $message }}</div> @enderror
 
                 <div class="flex items-center justify-end gap-3 w-full pt-4 border-t border-gray-100 mt-4">
                     <x-ui.secondary-button wire:click="$set('showRejectModal', false)">{{ tr('Cancel') }}</x-ui.secondary-button>
-                    @can('attendance.manage')
+                    @if($canManageDaily)
                     <x-ui.primary-button wire:click="rejectSingle" class="gap-2">
                         <i class="fas fa-times"></i>
                         <span>{{ tr('Reject') }}</span>
                     </x-ui.primary-button>
-                    @endcan
+                    @endif
                 </div>
             </div>
         </x-slot>

@@ -84,6 +84,7 @@ class Index extends Component
 
     public function mount()
     {
+        $this->requireAttendanceAny(['attendance.penalties.view', 'attendance.penalties.view-subordinates', 'attendance.penalties.manage', 'attendance.penalties.waive']);
         $this->calculation_mode = $this->calculation_mode ?: 'single_day';
         $this->date_from = now()->format('Y-m-d');
         $this->date_to = now()->format('Y-m-d');
@@ -314,13 +315,7 @@ class Index extends Component
 
     public function runCalculation(PenaltyService $service)
     {
-        if (! auth()->user()->can('attendance.penalties.manage') && ! auth()->user()->can('attendance.manage')) {
-            $this->dispatch('toast', [
-                'type' => 'error',
-                'message' => tr('You do not have permission to run daily penalties calculation.')
-            ]);
-            return;
-        }
+        $this->requireAttendanceAny('attendance.penalties.manage');
 
         $companyId = auth()->user()->saas_company_id;
         [$dateFrom, $dateTo] = $this->getEffectiveDateRange();
@@ -403,6 +398,7 @@ class Index extends Component
 
     public function openExemptionModal($id)
     {
+        $this->requireAttendanceAny('attendance.penalties.waive');
         $penalty = $this->findPenaltyOrFail((int) $id);
 
         /*
@@ -424,6 +420,7 @@ class Index extends Component
 
     public function saveExemption()
     {
+        $this->requireAttendanceAny('attendance.penalties.waive');
         $penalty = $this->findPenaltyOrFail((int) $this->selectedPenaltyId);
 
         $exemptAmount = ($this->exemptionForm['type'] === 'full')
@@ -464,12 +461,14 @@ class Index extends Component
 
     public function openConfirmModal($id)
     {
+        $this->requireAttendanceAny('attendance.penalties.manage');
         $this->confirmPenaltyId = $id;
         $this->showConfirmModal = true;
     }
 
     public function confirmPenalty()
     {
+        $this->requireAttendanceAny('attendance.penalties.manage');
         $penalty = $this->findPenaltyOrFail((int) $this->confirmPenaltyId);
         $penalty->update([
             'status' => 'confirmed',
@@ -488,6 +487,7 @@ class Index extends Component
 
     public function deletePenalty($id)
     {
+        $this->requireAttendanceAny('attendance.penalties.manage');
         $penalty = $this->findPenaltyOrFail((int) $id);
 
         /*
@@ -518,6 +518,7 @@ class Index extends Component
 
     public function bulkConfirm()
     {
+        $this->requireAttendanceAny('attendance.penalties.manage');
         if (empty($this->selectedPenalties)) return;
 
         $companyId = auth()->user()->saas_company_id;
@@ -542,6 +543,7 @@ class Index extends Component
 
     public function bulkDelete()
     {
+        $this->requireAttendanceAny('attendance.penalties.manage');
         if (empty($this->selectedPenalties)) return;
 
         $sevenDaysAgo = now()->subDays(7)->toDateString();
@@ -583,6 +585,7 @@ class Index extends Component
 
     public function exportExcel(ExcelExportService $exporter)
     {
+        $this->requireAttendanceAny('attendance.penalties.export');
         $penalties = $this->getPenaltiesQuery()->get();
         $filename = "daily_penalties_" . now()->format('YmdHis');
 
@@ -606,6 +609,7 @@ class Index extends Component
 
     public function exportPdf()
     {
+        $this->requireAttendanceAny('attendance.penalties.export');
         $penalties = $this->getPenaltiesQuery()->get();
         $stats = $this->stats;
         [$dateFrom, $dateTo] = $this->getEffectiveDateRange();
@@ -724,3 +728,5 @@ class Index extends Component
         return $value === 'all' || blank($value);
     }
 }
+
+

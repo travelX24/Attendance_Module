@@ -36,6 +36,7 @@ trait WithScheduleExceptions
 
     public function openExceptionsModal($employeeId): void
     {
+        $this->requireAttendanceAny(['attendance.schedules.view', 'attendance.schedules.view-subordinates', 'attendance.schedules.manage']);
         $this->resetModalFlags();
         $companyId = $this->getCompanyId();
 
@@ -102,6 +103,7 @@ trait WithScheduleExceptions
 
     public function saveException(): void
     {
+        $this->requireAttendanceAny('attendance.schedules.manage');
         $companyId = $this->getCompanyId();
         $rules = [
             'exceptionForm.exception_date' => 'required|date',
@@ -153,6 +155,7 @@ trait WithScheduleExceptions
 
     public function editException($exceptionId): void
     {
+        $this->requireAttendanceAny('attendance.schedules.manage');
         $ex = EmployeeWorkScheduleException::findOrFail($exceptionId);
         $this->exceptionEditId = (int)$ex->id;
         $this->exceptionForm = [
@@ -166,6 +169,7 @@ trait WithScheduleExceptions
 
     public function deleteException($exceptionId): void
     {
+        $this->requireAttendanceAny('attendance.schedules.manage');
         $ex = EmployeeWorkScheduleException::findOrFail($exceptionId);
         $before = $ex->toArray();
         $ex->delete();
@@ -176,6 +180,7 @@ trait WithScheduleExceptions
 
     public function openHistoryModal($employeeId): void
     {
+        $this->requireAttendanceAny(['attendance.schedules.view', 'attendance.schedules.view-subordinates']);
         $this->resetModalFlags();
         $companyId = $this->getCompanyId();
         $emp = Employee::forCompany($companyId)->findOrFail($employeeId);
@@ -188,5 +193,6 @@ trait WithScheduleExceptions
         $this->showHistoryModal = true;
     }
 }
+
 
 

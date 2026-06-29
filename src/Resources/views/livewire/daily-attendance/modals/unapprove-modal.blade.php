@@ -10,23 +10,23 @@
                     </p>
                 </div>
 
-                <x-ui.textarea wire:model="unapproveReason" :label="tr('Reason')" rows="4" :disabled="!auth()->user()->can('attendance.manage')" />
+                <x-ui.textarea wire:model="unapproveReason" :label="tr('Reason')" rows="4" :disabled="!$canManageDaily" />
                 @error('unapproveReason') <div class="text-xs text-[color:var(--error)]">{{ $message }}</div> @enderror
 
                 <label class="flex items-center gap-2 text-xs text-gray-700">
-                    <input type="checkbox" wire:model="unapproveUnderstood" class="text-[color:var(--accent-orange)] rounded border-gray-300 focus:ring-[color:var(--accent-orange)]" @cannot('attendance.manage') disabled @endcannot>
+                    <input type="checkbox" wire:model="unapproveUnderstood" class="text-[color:var(--accent-orange)] rounded border-gray-300 focus:ring-[color:var(--accent-orange)]" @if(!$canManageDaily) disabled @endif>
                     <span>{{ tr('I understand this will require re-approval for payroll') }}</span>
                 </label>
                 @error('unapproveUnderstood') <div class="text-xs text-[color:var(--error)]">{{ $message }}</div> @enderror
 
                 <div class="flex items-center justify-end gap-3 w-full pt-4 border-t border-gray-100 mt-4">
                     <x-ui.secondary-button wire:click="$set('showUnapproveModal', false)">{{ tr('Cancel') }}</x-ui.secondary-button>
-                    @can('attendance.manage')
+                    @if($canManageDaily)
                     <x-ui.primary-button wire:click="unapproveSingle" class="gap-2">
                         <i class="fas fa-undo"></i>
                         <span>{{ tr('Reopen') }}</span>
                     </x-ui.primary-button>
-                    @endcan
+                    @endif
                 </div>
             </div>
         </x-slot>

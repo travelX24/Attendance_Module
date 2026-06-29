@@ -79,6 +79,7 @@ class Index extends Component
 
    public function mount()
     {
+        $this->requireAttendanceAny(['attendance.schedules.view', 'attendance.schedules.view-subordinates', 'attendance.schedules.manage']);
         $companyId = $this->getCompanyId();
 
         $this->allowedLocationIds = $this->resolveCurrentUserAllowedLocationIds($companyId);
@@ -155,7 +156,7 @@ class Index extends Component
             ->when($this->contract_type !== 'all', fn($q) => $q->where('contract_type', (string)$this->contract_type))
             ->with(['department', 'jobTitle']);
 
-        // âœ… Data scoping
+        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Data scoping
         $query = $this->applyDataScoping($query, 'attendance.schedules.view', 'attendance.schedules.view-subordinates', '');
 
         if ($this->search) {
@@ -389,12 +390,13 @@ class Index extends Component
     }
     public function openScheduleEyeModal(int $employeeId): void
     {
+        $this->requireAttendanceAny(['attendance.schedules.view', 'attendance.schedules.view-subordinates']);
         $this->resetModalFlags();
         $companyId = $this->getCompanyId();
 
         $empQ = Employee::withoutGlobalScope('active_only')->forCompany($companyId)->whereKey($employeeId);
 
-        // âœ… Data scoping
+        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Data scoping
         $empQ = $this->applyDataScoping($empQ, 'attendance.schedules.view', 'attendance.schedules.view-subordinates', '');
 
         $emp = $empQ->firstOrFail(['id', 'name_ar', 'name_en', 'contract_type']);
@@ -511,6 +513,7 @@ class Index extends Component
 
     public function openScheduleEditModal(int $assignmentId): void
     {
+        $this->requireAttendanceAny('attendance.schedules.manage');
         $companyId = $this->getCompanyId();
 
         $row = EmployeeWorkSchedule::where('saas_company_id', $companyId)
@@ -554,6 +557,7 @@ class Index extends Component
 
     public function saveScheduleEdit(): void
     {
+        $this->requireAttendanceAny('attendance.schedules.manage');
         $companyId = $this->getCompanyId();
 
         $this->validate([
@@ -676,12 +680,14 @@ class Index extends Component
 
     public function confirmDeleteAssignment(int $id): void
     {
+        $this->requireAttendanceAny('attendance.schedules.manage');
         $this->deleteAssignmentId = $id;
         $this->dispatch('open-confirm-assignment-delete');
     }
 
     public function deleteAssignment(): void
     {
+        $this->requireAttendanceAny('attendance.schedules.manage');
         if (!$this->deleteAssignmentId) return;
 
         $companyId = $this->getCompanyId();
@@ -748,5 +754,7 @@ class Index extends Component
     }
 
 }
+
+
 
 

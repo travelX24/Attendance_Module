@@ -20,7 +20,7 @@ trait WithRequestApprovals
     public string $rejectReason = '';
 
     /**
-     * âœ… Robust detection for company column.
+     * Ã¢Å“â€¦ Robust detection for company column.
      * Prefers existing detectCompanyColumn() if exists on component.
      */
     protected function lpDetectCompanyColumn(string $table): ?string
@@ -45,6 +45,7 @@ trait WithRequestApprovals
 
     public function approveLeave(int $id): void
     {
+        $this->requireAttendanceAny('requests.leaves.approve');
         $this->ensureCanManage();
 
         $reqTable = (new AttendanceLeaveRequest())->getTable();
@@ -58,7 +59,7 @@ trait WithRequestApprovals
         $row = $q->findOrFail($id);
         if ($row->status !== 'pending') return;
 
-        // âœ… NEW: Integrate with ApprovalInbox sequence
+        // Ã¢Å“â€¦ NEW: Integrate with ApprovalInbox sequence
         try {
             $controller = app(\Athka\SystemSettings\Http\Controllers\Api\Employee\ApprovalInboxController::class);
             $resp = $controller->approve(new \Illuminate\Http\Request(), 'leaves', $id);
@@ -84,7 +85,7 @@ trait WithRequestApprovals
                 'requested_days' => $row->requested_days
             ], (int) $row->employee_id);
 
-            // âœ… Ø¥Ø¹Ø§Ø¯Ø© Ø­Ø³Ø§Ø¨ Ø§Ù„Ø±ØµÙŠØ¯
+            // Ã¢Å“â€¦ Ã˜Â¥Ã˜Â¹Ã˜Â§Ã˜Â¯Ã˜Â© Ã˜Â­Ã˜Â³Ã˜Â§Ã˜Â¨ Ã˜Â§Ã™â€žÃ˜Â±Ã˜ÂµÃ™Å Ã˜Â¯
             if (!empty($row->leave_policy_id) && !empty($row->policy_year_id)) {
                 $this->recalculateBalance(
                     $this->companyId,
@@ -101,6 +102,7 @@ trait WithRequestApprovals
 
     public function approvePermission(int $id): void
     {
+        $this->requireAttendanceAny('requests.permissions.manage');
         $this->ensureCanManage();
 
         $permTable = (new AttendancePermissionRequest())->getTable();
@@ -114,7 +116,7 @@ trait WithRequestApprovals
         $row = $q->findOrFail($id);
         if ($row->status !== 'pending') return;
 
-        // âœ… NEW: Integrate with ApprovalInbox sequence
+        // Ã¢Å“â€¦ NEW: Integrate with ApprovalInbox sequence
         try {
             $controller = app(\Athka\SystemSettings\Http\Controllers\Api\Employee\ApprovalInboxController::class);
             $resp = $controller->approve(new \Illuminate\Http\Request(), 'permissions', $id);
@@ -133,7 +135,7 @@ trait WithRequestApprovals
         $row->refresh();
 
         if ($row->status === 'approved') {
-            // âœ… recalculates monthly excess minutes correctly after final approval
+            // Ã¢Å“â€¦ recalculates monthly excess minutes correctly after final approval
             if (method_exists($this, 'recalculatePermissionMonthExcess')) {
                 $this->recalculatePermissionMonthExcess(
                     (int) $row->employee_id,
@@ -152,6 +154,7 @@ trait WithRequestApprovals
 
     public function cancelPermission(int $id): void
     {
+        $this->requireAttendanceAny('requests.permissions.manage');
         $this->ensureCanManage();
 
         $permTable = (new AttendancePermissionRequest())->getTable();
@@ -171,7 +174,7 @@ trait WithRequestApprovals
 
         $row->update(['status' => 'cancelled']);
 
-        // âœ… if it was approved, recompute the month distribution
+        // Ã¢Å“â€¦ if it was approved, recompute the month distribution
         if ($wasApproved && method_exists($this, 'recalculatePermissionMonthExcess')) {
             $this->recalculatePermissionMonthExcess((int) $row->employee_id, $permDate);
         }
@@ -186,6 +189,7 @@ trait WithRequestApprovals
 
     public function cancelLeave(int $id): void
     {
+        $this->requireAttendanceAny('requests.leaves.approve');
         $this->ensureCanManage();
 
         $reqTable = (new AttendanceLeaveRequest())->getTable();
@@ -211,7 +215,7 @@ trait WithRequestApprovals
             'previous_status' => $wasApproved ? 'approved' : 'pending'
         ], (int) $row->employee_id);
 
-        // âœ… Ù„Ø§ Ù†Ø¹ÙŠØ¯ Ø­Ø³Ø§Ø¨ Ø§Ù„Ø±ØµÙŠØ¯ Ø¥Ù„Ø§ Ù„Ùˆ ÙƒØ§Ù†Øª Ù„Ù‡Ø§ policy + policy_year
+        // Ã¢Å“â€¦ Ã™â€žÃ˜Â§ Ã™â€ Ã˜Â¹Ã™Å Ã˜Â¯ Ã˜Â­Ã˜Â³Ã˜Â§Ã˜Â¨ Ã˜Â§Ã™â€žÃ˜Â±Ã˜ÂµÃ™Å Ã˜Â¯ Ã˜Â¥Ã™â€žÃ˜Â§ Ã™â€žÃ™Ë† Ã™Æ’Ã˜Â§Ã™â€ Ã˜Âª Ã™â€žÃ™â€¡Ã˜Â§ policy + policy_year
         if ($wasApproved && !empty($row->leave_policy_id) && !empty($row->policy_year_id)) {
             $this->recalculateBalance(
                 $this->companyId,
@@ -227,6 +231,7 @@ trait WithRequestApprovals
 
     public function openReject(string $type, int $id): void
     {
+        $this->requireRequestDecisionPermission($type);
         $this->rejectType = in_array($type, ['leave', 'permission', 'cut_leave', 'replacement'], true) ? $type : 'leave';
         
         // Only allow non-managers if it's a replacement rejection for themselves
@@ -246,6 +251,7 @@ trait WithRequestApprovals
 
     public function confirmReject(): void
     {
+        $this->requireRequestDecisionPermission($this->rejectType);
         $this->validate(
             ['rejectReason' => ['required', 'string', 'min:2', 'max:2000']],
             ['rejectReason.required' => tr('Note is mandatory when rejecting')]
@@ -274,7 +280,7 @@ trait WithRequestApprovals
             }
         } elseif ($row->status === 'pending') {
             $this->ensureCanManage();
-            // âœ… NEW: Integrate with ApprovalInbox sequence
+            // Ã¢Å“â€¦ NEW: Integrate with ApprovalInbox sequence
             try {
                 $controller = app(\Athka\SystemSettings\Http\Controllers\Api\Employee\ApprovalInboxController::class);
                 $type = $this->rejectType === 'cut_leave' ? 'leaves' : $this->rejectType . 's';
@@ -315,6 +321,7 @@ trait WithRequestApprovals
 
     public function approveMission(int $id): void
     {
+        $this->requireAttendanceAny('attendance.missions.manage');
         $this->ensureCanManage();
 
         $table = (new \Athka\Attendance\Models\AttendanceMissionRequest())->getTable();
@@ -328,7 +335,7 @@ trait WithRequestApprovals
         $row = $q->findOrFail($id);
         if ($row->status !== 'pending') return;
 
-        // âœ… NEW: Integrate with ApprovalInbox sequence
+        // Ã¢Å“â€¦ NEW: Integrate with ApprovalInbox sequence
         try {
             $controller = app(\Athka\SystemSettings\Http\Controllers\Api\Employee\ApprovalInboxController::class);
             $resp = $controller->approve(new \Illuminate\Http\Request(), 'missions', $id);
@@ -356,6 +363,7 @@ trait WithRequestApprovals
 
     public function approveCutLeave(int $id): void
     {
+        $this->requireAttendanceAny('requests.leaves.approve');
         $this->ensureCanManage();
 
         $cutTable = (new AttendanceLeaveCutRequest())->getTable();
@@ -369,7 +377,7 @@ trait WithRequestApprovals
         $cut = $cutQ->findOrFail($id);
         if ($cut->status !== 'pending') return;
 
-        // âœ… NEW: Integrate with ApprovalInbox sequence
+        // Ã¢Å“â€¦ NEW: Integrate with ApprovalInbox sequence
         try {
             $controller = app(\Athka\SystemSettings\Http\Controllers\Api\Employee\ApprovalInboxController::class);
             $resp = $controller->approve(new \Illuminate\Http\Request(), 'leaves', $id);
@@ -474,21 +482,21 @@ trait WithRequestApprovals
 
     protected function lpApplyAllowedBranchesOnRequest($q, string $requestTable, string $employeeIdColumn = 'employee_id'): void
     {
-        // Ù„Ùˆ Ù…Ø§ Ø¹Ù†Ø¯Ùƒ Ù†Ø¸Ø§Ù… ØµÙ„Ø§Ø­ÙŠØ§Øª ÙØ±ÙˆØ¹ØŒ Ù„Ø§ ØªÙ‚ÙŠÙ‘Ø¯
+        // Ã™â€žÃ™Ë† Ã™â€¦Ã˜Â§ Ã˜Â¹Ã™â€ Ã˜Â¯Ã™Æ’ Ã™â€ Ã˜Â¸Ã˜Â§Ã™â€¦ Ã˜ÂµÃ™â€žÃ˜Â§Ã˜Â­Ã™Å Ã˜Â§Ã˜Âª Ã™ÂÃ˜Â±Ã™Ë†Ã˜Â¹Ã˜Å’ Ã™â€žÃ˜Â§ Ã˜ÂªÃ™â€šÃ™Å Ã™â€˜Ã˜Â¯
         if (!method_exists($this, 'lpAllowedBranchIdsSafe')) return;
 
-        // Ù…Ù‡Ù…: Ù„Ùˆ Ø±Ø¬Ù‘Ø¹Øª null => Ù…Ø¹Ù†Ø§Ù‡Ø§ ÙˆØµÙˆÙ„ ÙƒØ§Ù…Ù„ (Ø¨Ø¯ÙˆÙ† ØªÙ‚ÙŠÙŠØ¯)
+        // Ã™â€¦Ã™â€¡Ã™â€¦: Ã™â€žÃ™Ë† Ã˜Â±Ã˜Â¬Ã™â€˜Ã˜Â¹Ã˜Âª null => Ã™â€¦Ã˜Â¹Ã™â€ Ã˜Â§Ã™â€¡Ã˜Â§ Ã™Ë†Ã˜ÂµÃ™Ë†Ã™â€ž Ã™Æ’Ã˜Â§Ã™â€¦Ã™â€ž (Ã˜Â¨Ã˜Â¯Ã™Ë†Ã™â€  Ã˜ÂªÃ™â€šÃ™Å Ã™Å Ã˜Â¯)
         $allowed = $this->lpAllowedBranchIdsSafe();
         if ($allowed === null) return;
 
         $allowed = array_values(array_filter(array_map('intval', (array) $allowed)));
 
-        // âœ… Ù„Ùˆ ÙØ§Ø¶ÙŠ: Ø£Ø­ÙŠØ§Ù†Ø§Ù‹ all_branches ÙŠØ±Ø¬Ø¹ [] Ø¨Ø§Ù„ØºÙ„Ø· => Ù„Ø§ ØªÙ‚ÙŠÙ‘Ø¯
+        // Ã¢Å“â€¦ Ã™â€žÃ™Ë† Ã™ÂÃ˜Â§Ã˜Â¶Ã™Å : Ã˜Â£Ã˜Â­Ã™Å Ã˜Â§Ã™â€ Ã˜Â§Ã™â€¹ all_branches Ã™Å Ã˜Â±Ã˜Â¬Ã˜Â¹ [] Ã˜Â¨Ã˜Â§Ã™â€žÃ˜ÂºÃ™â€žÃ˜Â· => Ã™â€žÃ˜Â§ Ã˜ÂªÃ™â€šÃ™Å Ã™â€˜Ã˜Â¯
         if (empty($allowed)) {
             $scope = auth()->user()?->access_scope ?? 'all_branches';
             if ($scope === 'all_branches') return;
 
-            // ØºÙŠØ± ÙƒØ°Ø§: Ù…Ø§ ÙŠØ´ÙˆÙ Ø´ÙŠØ¡ (Ø£Ù…Ø§Ù†)
+            // Ã˜ÂºÃ™Å Ã˜Â± Ã™Æ’Ã˜Â°Ã˜Â§: Ã™â€¦Ã˜Â§ Ã™Å Ã˜Â´Ã™Ë†Ã™Â Ã˜Â´Ã™Å Ã˜Â¡ (Ã˜Â£Ã™â€¦Ã˜Â§Ã™â€ )
             $q->whereRaw('1=0');
             return;
         }
@@ -499,7 +507,7 @@ trait WithRequestApprovals
             ?? 'branch_id';
 
         if (!$branchCol || !Schema::hasColumn($empTable, $branchCol)) {
-            // Ù„Ùˆ Ù…Ø§ Ù†Ù‚Ø¯Ø± Ù†Ø­Ø¯Ø¯ Ø¹Ù…ÙˆØ¯ Ø§Ù„ÙØ±Ø¹ Ø¨Ø«Ù‚Ø©ØŒ Ù…Ø§ Ù†Ø·Ø¨Ù‘Ù‚ ØªÙ‚ÙŠÙŠØ¯ Ø­ØªÙ‰ Ù„Ø§ Ù†ÙƒØ³Ø± Ø§Ù„Ù†Ø¸Ø§Ù…
+            // Ã™â€žÃ™Ë† Ã™â€¦Ã˜Â§ Ã™â€ Ã™â€šÃ˜Â¯Ã˜Â± Ã™â€ Ã˜Â­Ã˜Â¯Ã˜Â¯ Ã˜Â¹Ã™â€¦Ã™Ë†Ã˜Â¯ Ã˜Â§Ã™â€žÃ™ÂÃ˜Â±Ã˜Â¹ Ã˜Â¨Ã˜Â«Ã™â€šÃ˜Â©Ã˜Å’ Ã™â€¦Ã˜Â§ Ã™â€ Ã˜Â·Ã˜Â¨Ã™â€˜Ã™â€š Ã˜ÂªÃ™â€šÃ™Å Ã™Å Ã˜Â¯ Ã˜Â­Ã˜ÂªÃ™â€° Ã™â€žÃ˜Â§ Ã™â€ Ã™Æ’Ã˜Â³Ã˜Â± Ã˜Â§Ã™â€žÃ™â€ Ã˜Â¸Ã˜Â§Ã™â€¦
             return;
         }
 
@@ -510,5 +518,12 @@ trait WithRequestApprovals
                 ->whereIn('lp_emp.' . $branchCol, $allowed);
         });
     }
+    protected function requireRequestDecisionPermission(?string $type): void
+    {
+        match ($type) {
+            'permission' => $this->requireAttendanceAny('requests.permissions.manage'),
+            'mission' => $this->requireAttendanceAny('attendance.missions.manage'),
+            default => $this->requireAttendanceAny('requests.leaves.approve'),
+        };
+    }
 }
-

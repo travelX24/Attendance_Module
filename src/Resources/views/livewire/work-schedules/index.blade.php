@@ -2,6 +2,9 @@
     $locale = app()->getLocale();
     $isRtl  = in_array(substr($locale, 0, 2), ['ar','fa','ur','he']);
     $dir    = $isRtl ? 'rtl' : 'ltr';
+    $attendanceUser = auth()->user();
+    $canManageSchedules = $attendanceUser?->can('attendance.schedules.manage');
+
 @endphp
 
 @section('topbar-left-content')
@@ -144,7 +147,7 @@
         </div>
 
         {{-- Bulk Actions Toolbar (Appears only on selection) --}}
-        @can('attendance.manage')
+        @if($canManageSchedules)
         <div 
             x-show="selectionCount > 0"
             x-transition:enter="transition ease-out duration-300"
@@ -188,7 +191,7 @@
                 </button>
             </div>
         </div>
-        @endcan
+        @endif
     </div>
 
     {{-- Filters & Content --}}
@@ -205,7 +208,7 @@
                         wire:model.live.debounce.300ms="search"
                         :placeholder="tr('Search by name or employee ID...')"
                         class="w-full"
-                        :disabled="!auth()->user()->can('attendance.manage')"
+                        :disabled="!$canManageSchedules"
                     />
                 </div>
 
@@ -220,7 +223,7 @@
                         :defer="false"
                         :applyOnChange="true"
                         class="w-full"
-                        :disabled="!auth()->user()->can('attendance.manage')"
+                        :disabled="!$canManageSchedules"
                     />
                 </div>
 
@@ -235,7 +238,7 @@
                         :defer="false"
                         :applyOnChange="true"
                         class="w-full"
-                        :disabled="!auth()->user()->can('attendance.manage') || !empty($forcedLocationId)"
+                        :disabled="!$canManageSchedules || !empty($forcedLocationId)"
                     />
                 </div>
 
@@ -253,7 +256,7 @@
                         :defer="false"
                         :applyOnChange="true"
                         class="w-full"
-                        :disabled="!auth()->user()->can('attendance.manage')"
+                        :disabled="!$canManageSchedules"
                     />
                 </div>
 
@@ -268,7 +271,7 @@
                         :defer="false"
                         :applyOnChange="true"
                         class="w-full"
-                        :disabled="!auth()->user()->can('attendance.manage')"
+                        :disabled="!$canManageSchedules"
                     />
                 </div>
 
@@ -283,7 +286,7 @@
                         :defer="false"
                         :applyOnChange="true"
                         class="w-full"
-                        :disabled="!auth()->user()->can('attendance.manage')"
+                        :disabled="!$canManageSchedules"
                     />
                 </div>
 
@@ -298,7 +301,7 @@
                         :defer="false"
                         :applyOnChange="true"
                         class="w-full"
-                        :disabled="!auth()->user()->can('attendance.manage')"
+                        :disabled="!$canManageSchedules"
                     />
                 </div>
 
@@ -312,7 +315,7 @@
                             ['value' => 'all', 'label' => tr('All')],
                             ['value' => 'no_schedule', 'label' => tr('No Schedule')],
                             ['value' => 'ending_soon', 'label' => tr('Ending Soon')],
-                            ['value' => 'contract_conflict', 'label' => app()->isLocale('ar') ? 'منتهي العقد' : 'Expired Contract'],
+                            ['value' => 'contract_conflict', 'label' => app()->isLocale('ar') ? 'Ù…Ù†ØªÙ‡ÙŠ Ø§Ù„Ø¹Ù‚Ø¯' : 'Expired Contract'],
                             ['value' => 'changed_too_much', 'label' => tr('Too many changes')],
                             ['value' => 'inactive_schedule', 'label' => tr('Inactive Schedule')],
                         ]"
@@ -320,7 +323,7 @@
                         :defer="false"
                         :applyOnChange="true"
                         class="w-full"
-                        :disabled="!auth()->user()->can('attendance.manage')"
+                        :disabled="!$canManageSchedules"
                     />
                 </div>
             </div>
@@ -433,14 +436,14 @@
                 @php
                     $isContractExpired = $this->isEmployeeContractExpired($employee);
                     $contractEndLabel = $isContractExpired ? $this->employeeContractEndDateLabel($employee) : '';
-                    $expiredContractLabel = app()->isLocale('ar') ? 'منتهي العقد' : 'Expired Contract';
+                    $expiredContractLabel = app()->isLocale('ar') ? 'Ù…Ù†ØªÙ‡ÙŠ Ø§Ù„Ø¹Ù‚Ø¯' : 'Expired Contract';
                     $expiredContractMessage = app()->isLocale('ar')
-                        ? 'لا يمكن إضافة جدول عمل لموظف منتهي العقد'
+                        ? 'Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø¥Ø¶Ø§ÙØ© Ø¬Ø¯ÙˆÙ„ Ø¹Ù…Ù„ Ù„Ù…ÙˆØ¸Ù Ù…Ù†ØªÙ‡ÙŠ Ø§Ù„Ø¹Ù‚Ø¯'
                         : 'Cannot add a work schedule for an employee with an expired contract.';
                 @endphp
                 <tr class="hover:bg-gray-50/50 transition-colors">
                     <td class="px-6 py-4">
-                        <input type="checkbox" wire:model.live="selectedEmployees" value="{{ $employee->id }}" class="w-4 h-4 text-[color:var(--accent-orange)] border-gray-300 rounded focus:ring-[color:var(--accent-orange)]" @cannot('attendance.manage') disabled @endcannot>
+                        <input type="checkbox" wire:model.live="selectedEmployees" value="{{ $employee->id }}" class="w-4 h-4 text-[color:var(--accent-orange)] border-gray-300 rounded focus:ring-[color:var(--accent-orange)]" @if(!$canManageSchedules) disabled @endif>
                     </td>
 
                     <td class="px-6 py-4">
@@ -623,7 +626,7 @@
 
                     <td class="px-6 py-4 text-center">
                         <div class="flex items-center justify-center gap-2">
-                           @can('attendance.manage')
+                           @if($canManageSchedules)
                            <button type="button" 
                                wire:click="openBulkModalForSingleEmployee({{ $employee->id }})" 
                                wire:loading.attr="disabled" 
@@ -645,7 +648,7 @@
                             </button>
                             @else
                                 <span class="text-gray-400"><i class="fas fa-lock text-[10px]"></i></span>
-                            @endcan
+                            @endif
 
                            <x-ui.actions-menu wire:key="actions-{{ $employee->id }}">
 
@@ -654,7 +657,7 @@
                                 <span>{{ tr('Schedule Preview') }}</span>
                             </x-ui.dropdown-item>
 
-                            <x-ui.dropdown-item wire:click="openExceptionsModal({{ $employee->id }})" :disabled="!$employee->current_schedule_name || !auth()->user()->can('attendance.manage')">
+                            <x-ui.dropdown-item wire:click="openExceptionsModal({{ $employee->id }})" :disabled="!$employee->current_schedule_name">
                                 <i class="fas fa-calendar-times me-2"></i>
                                 <span>{{ tr('Exceptions') }}</span>
                             </x-ui.dropdown-item>

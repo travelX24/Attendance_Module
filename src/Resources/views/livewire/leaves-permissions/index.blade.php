@@ -4,6 +4,8 @@
     $locale = app()->getLocale();
     $isRtl  = in_array(substr($locale, 0, 2), ['ar','fa','ur','he']);
     $dir    = $isRtl ? 'rtl' : 'ltr';
+    $attendanceUser = auth()->user();
+    $canManageLeaveRequests = $attendanceUser?->can('attendance.leaves.manage');
 
     $smartNumber = function (float $n, int $dec = 2): string {
         $r = round($n, $dec);
@@ -15,7 +17,7 @@
 
         if ($unit === 'hours') {
             $mins = (int) ($r->minutes ?? 0);
-            if ($mins <= 0) return 'â€”';
+            if ($mins <= 0) return 'Ã¢â‚¬â€';
             $hours = $mins / 60;
             return $smartNumber((float)$hours, 2) . ' ' . tr('Hours');
         }
@@ -43,7 +45,7 @@
 
     $formatMissionDuration = function ($r) use ($smartNumber): string {
         if ($r->type === 'partial') {
-            return ($r->from_time ?? '--') . ' â†’ ' . ($r->to_time ?? '--');
+            return ($r->from_time ?? '--') . ' Ã¢â€ â€™ ' . ($r->to_time ?? '--');
         }
         $start = \Carbon\Carbon::parse($r->start_date);
         $end = \Carbon\Carbon::parse($r->end_date ?: $r->start_date);
@@ -100,17 +102,32 @@
         </div>
 
         {{-- Action Button --}}
-        @can('attendance.manage')
-        <div class="shrink-0">
-            <x-ui.dropdown-menu>
-                <x-slot name="trigger">
-                    <div class="flex items-center gap-2 px-5 py-2.5 bg-[color:var(--accent-orange)] text-white rounded-xl font-bold shadow-lg hover:bg-[color:var(--accent-orange-hover)] transition-all cursor-pointer group text-xs">
-                        <i class="fas fa-plus"></i>
-                        <span>{{ tr('New Request') }}</span>
-                        <i class="fas fa-chevron-down text-[8px] opacity-70 group-hover:translate-y-0.5 transition-transform"></i>
-                    </div>
-                </x-slot>
+        @if($canManageLeaveRequests)
+        <div class="shrink-0 relative" x-data="{ open: false }" @keydown.escape.window="open = false" @click.outside="open = false">
+            <button
+                type="button"
+                @click="open = !open"
+                class="flex items-center gap-2 px-5 py-2.5 bg-[color:var(--accent-orange)] text-white rounded-xl font-bold shadow-lg hover:bg-[color:var(--accent-orange-hover)] transition-all cursor-pointer group text-xs"
+                aria-haspopup="true"
+                :aria-expanded="open.toString()"
+            >
+                <i class="fas fa-plus"></i>
+                <span>{{ tr('New Request') }}</span>
+                <i class="fas fa-chevron-down text-[8px] opacity-70 transition-transform" :class="{ 'rotate-180': open, 'group-hover:translate-y-0.5': !open }"></i>
+            </button>
 
+            <div
+                x-cloak
+                x-show="open"
+                x-transition:enter="transition ease-out duration-100"
+                x-transition:enter-start="opacity-0 scale-95 translate-y-1"
+                x-transition:enter-end="opacity-100 scale-100 translate-y-0"
+                x-transition:leave="transition ease-in duration-75"
+                x-transition:leave-start="opacity-100 scale-100 translate-y-0"
+                x-transition:leave-end="opacity-0 scale-95 translate-y-1"
+                @click="open = false"
+                class="absolute end-0 top-full z-[10000] mt-2 w-56 max-w-[calc(100vw-2rem)] origin-top-end overflow-hidden rounded-xl border border-gray-200 bg-white py-1 shadow-lg"
+            >
                 <x-ui.dropdown-item wire:click="openCreateLeave">
                     <i class="fas fa-calendar-plus me-2 text-[color:var(--accent-orange)]"></i> {{ tr('New Leave Request') }}
                 </x-ui.dropdown-item>
@@ -138,9 +155,9 @@
                 <x-ui.dropdown-item wire:click="openCutLeave">
                     <i class="fas fa-cut me-2 text-[color:var(--error)]"></i> {{ tr('Cut Leave') }}
                 </x-ui.dropdown-item>
-            </x-ui.dropdown-menu>
+            </div>
         </div>
-        @endcan
+        @endif
     </div>
 
     {{-- Filters --}}
@@ -156,7 +173,7 @@
                         wire:model.live="search"
                         :placeholder="tr('Search employee...')"
                         class="w-full"
-                        :disabled="!auth()->user()->can('attendance.manage')"
+                        :disabled="!$canManageLeaveRequests"
                     />
                 </div>
 
@@ -171,7 +188,7 @@
 
                 <div>
                     <div class="text-[11px] text-gray-500 mb-1 font-bold uppercase tracking-wider">{{ tr('Branch') }}</div>
-                    <x-ui.select wire:model.live="branchId" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
+                    <x-ui.select wire:model.live="branchId" class="w-full" :disabled="!$canManageLeaveRequests">
                         <option value="">{{ tr('All Branches') }}</option>
                         @foreach(($branches ?? []) as $br)
                             <option value="{{ $br->id }}">
@@ -183,7 +200,7 @@
 
                 <div>
                     <div class="text-[11px] text-gray-500 mb-1 font-bold uppercase tracking-wider">{{ tr('Department') }}</div>
-                    <x-ui.select wire:model.live="departmentId" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
+                    <x-ui.select wire:model.live="departmentId" class="w-full" :disabled="!$canManageLeaveRequests">
                         <option value="">{{ tr('All Departments') }}</option>
                         @foreach(($departments ?? []) as $d)
                             <option value="{{ $d->id }}">{{ $d->label ?? $d->name ?? ('#'.$d->id) }}</option>
@@ -193,7 +210,7 @@
 
                 <div>
                     <div class="text-[11px] text-gray-500 mb-1 font-bold uppercase tracking-wider">{{ tr('Job Title') }}</div>
-                    <x-ui.select wire:model.live="jobTitleId" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
+                    <x-ui.select wire:model.live="jobTitleId" class="w-full" :disabled="!$canManageLeaveRequests">
                         <option value="">{{ tr('All Job Titles') }}</option>
                         @foreach(($jobTitles ?? []) as $jt)
                             <option value="{{ $jt->id }}">{{ $jt->name ?? $jt->label ?? ('#'.$jt->id) }}</option>
@@ -203,7 +220,7 @@
 
                 <div>
                     <div class="text-[11px] text-gray-500 mb-1 font-bold uppercase tracking-wider">{{ tr('Employee Status') }}</div>
-                    <x-ui.select wire:model.live="status" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
+                    <x-ui.select wire:model.live="status" class="w-full" :disabled="!$canManageLeaveRequests">
                         @foreach(\Athka\Employees\Support\EmployeeStatus::filterOptions(true) as $option)
                             <option value="{{ $option['value'] }}">{{ $option['label'] }}</option>
                         @endforeach
@@ -212,7 +229,7 @@
 
                 <div>
                     <div class="text-[11px] text-gray-500 mb-1 font-bold uppercase tracking-wider">{{ tr('Leave Type') }}</div>
-                    <x-ui.select wire:model.live="filterLeavePolicyId" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
+                    <x-ui.select wire:model.live="filterLeavePolicyId" class="w-full" :disabled="!$canManageLeaveRequests">
                         <option value="">{{ tr('All Leave Types') }}</option>
                         @foreach(($policies ?? []) as $p)
                             <option value="{{ $p->id }}">{{ $p->name ?? $p->label ?? ('#'.$p->id) }}</option>
@@ -223,18 +240,18 @@
                 @if($tab !== 'balances')
                     <div>
                         <div class="text-[11px] text-gray-500 mb-1 font-bold uppercase tracking-wider">{{ tr('From Date') }}</div>
-                        <x-ui.company-date-picker model="fromDate" :disabled="!auth()->user()->can('attendance.manage')" />
+                        <x-ui.company-date-picker model="fromDate" :disabled="!$canManageLeaveRequests" />
                     </div>
                     <div>
                         <div class="text-[11px] text-gray-500 mb-1 font-bold uppercase tracking-wider">{{ tr('To Date') }}</div>
-                        <x-ui.company-date-picker model="toDate" :disabled="!auth()->user()->can('attendance.manage')" />
+                        <x-ui.company-date-picker model="toDate" :disabled="!$canManageLeaveRequests" />
                     </div>
                 @endif
 
                 @if($tab === 'history')
                     <div>
                         <div class="text-[11px] text-gray-500 mb-1 font-bold uppercase tracking-wider">{{ tr('Status') }}</div>
-                        <x-ui.select wire:model.live="historyStatus" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
+                        <x-ui.select wire:model.live="historyStatus" class="w-full" :disabled="!$canManageLeaveRequests">
                             <option value="">{{ tr('All Statuses') }}</option>
                             <option value="approved">{{ tr('Approved') }}</option>
                             <option value="rejected">{{ tr('Rejected') }}</option>
@@ -420,7 +437,7 @@
 
                                 <td class="p-3">
                                     <div class="text-xs text-gray-600">
-                                        {{ company_date($r->start_date) }} â†’ {{ company_date($r->end_date) }}
+                                        {{ company_date($r->start_date) }} Ã¢â€ â€™ {{ company_date($r->end_date) }}
                                     </div>
                                     <div class="mt-1 font-bold text-gray-900">
                                         {{ $formatLeaveDuration($r) }}
@@ -435,7 +452,7 @@
                                             : ($r->reason ?? null);
                                     @endphp
                                     <div class="max-w-[150px] truncate" title="{{ $reason }}">
-                                        {{ $reason ?: 'â€”' }}
+                                        {{ $reason ?: 'Ã¢â‚¬â€' }}
                                     </div>
                                 </td>
 
@@ -581,7 +598,7 @@
                                         {{ company_date($r->permission_date) }}
                                     </div>
                                     <div class="mt-1 font-mono text-xs text-gray-800 font-bold">
-                                        {{ $r->from_time ?? '--:--' }} â†’ {{ $r->to_time ?? '--:--' }}
+                                        {{ $r->from_time ?? '--:--' }} Ã¢â€ â€™ {{ $r->to_time ?? '--:--' }}
                                     </div>
                                 </td>
 
@@ -591,7 +608,7 @@
 
                                 <td class="p-3 text-gray-700">
                                     <div class="max-w-[150px] truncate" title="{{ $r->reason }}">
-                                        {{ $r->reason ?: 'â€”' }}
+                                        {{ $r->reason ?: 'Ã¢â‚¬â€' }}
                                     </div>
                                 </td>
 
@@ -717,7 +734,7 @@
 
                                 <td class="p-3 text-gray-700">
                                     <div class="font-mono text-xs">
-                                        {{ company_date($row->original_start_date) }} â†’ {{ company_date($row->original_end_date) }}
+                                        {{ company_date($row->original_start_date) }} Ã¢â€ â€™ {{ company_date($row->original_end_date) }}
                                     </div>
                                 </td>
 
@@ -848,7 +865,7 @@
                                 </td>
 
                                 <td class="p-3 text-gray-700 font-mono text-xs">
-                                    {{ company_date($r->start_date) }} {{ $r->end_date && $r->end_date !== $r->start_date ? 'â†’ '.company_date($r->end_date) : '' }}
+                                    {{ company_date($r->start_date) }} {{ $r->end_date && $r->end_date !== $r->start_date ? 'Ã¢â€ â€™ '.company_date($r->end_date) : '' }}
                                 </td>
 
                                 <td class="p-3 font-bold text-gray-900">
@@ -856,11 +873,11 @@
                                 </td>
 
                                 <td class="p-3 text-gray-700">
-                                    {{ $r->destination ?: 'â€”' }}
+                                    {{ $r->destination ?: 'Ã¢â‚¬â€' }}
                                 </td>
 
                                 <td class="p-3 text-gray-700">
-                                    {{ $r->reason ?: 'â€”' }}
+                                    {{ $r->reason ?: 'Ã¢â‚¬â€' }}
                                 </td>
 
                                 <td class="p-3">
@@ -1144,7 +1161,7 @@
                                     $taken = (float) $b->taken_days;
                                     $usage = $entitled > 0 ? ($taken / $entitled) * 100 : null;
                                 @endphp
-                                {{ $usage === null ? 'â€”' : number_format($usage, 2) . '%' }}
+                                {{ $usage === null ? 'Ã¢â‚¬â€' : number_format($usage, 2) . '%' }}
                             </td>
 
                              <td class="p-3">
@@ -1293,7 +1310,7 @@
 
                                 <td class="p-3 text-gray-700">
                                     <div class="font-mono text-[10px] whitespace-nowrap">
-                                        {{ company_date($r->start_date) }}<br/>â†’ {{ company_date($r->end_date) }}
+                                        {{ company_date($r->start_date) }}<br/>Ã¢â€ â€™ {{ company_date($r->end_date) }}
                                     </div>
                                 </td>
 
@@ -1309,7 +1326,7 @@
                                             : ($r->reason ?? null);
                                     @endphp
                                     <div class="max-w-[150px] truncate" title="{{ $reason }}">
-                                        {{ $reason ?: 'â€”' }}
+                                        {{ $reason ?: 'Ã¢â‚¬â€' }}
                                     </div>
                                 </td>
 
@@ -1350,7 +1367,7 @@
                                         @endif
 
                                         @if(in_array($r->status, ['approved','pending'], true))
-                                            @can('attendance.manage')
+                                            @if($canManageLeaveRequests)
                                             <x-ui.secondary-button
                                                 type="button"
                                                 @click.prevent="$dispatch('open-confirm-cancel-leave-dialog', { id: {{ $r->id }} })"
@@ -1360,9 +1377,9 @@
                                             </x-ui.secondary-button>
                                             @else
                                                 <span class="text-xs text-gray-400 italic">{{ tr('Locked') }}</span>
-                                            @endcan
+                                            @endif
                                         @else
-                                            <span class="text-xs text-gray-400">â€”</span>
+                                            <span class="text-xs text-gray-400">Ã¢â‚¬â€</span>
                                         @endif
                                     </div>
                                 </td>
@@ -1435,7 +1452,7 @@
                                         {{ company_date($r->permission_date) }}
                                     </div>
                                     <div class="mt-1 font-mono text-xs text-gray-800 font-bold">
-                                        {{ $r->from_time ?? '--:--' }} â†’ {{ $r->to_time ?? '--:--' }}
+                                        {{ $r->from_time ?? '--:--' }} Ã¢â€ â€™ {{ $r->to_time ?? '--:--' }}
                                     </div>
                                     <div class="mt-1 text-[10px] font-bold text-gray-400">
                                         {{ (int) $r->minutes }} {{ tr('min') }}
@@ -1444,7 +1461,7 @@
 
                                 <td class="p-3 text-gray-700">
                                     <div class="max-w-[150px] truncate" title="{{ $r->reason }}">
-                                        {{ $r->reason ?: 'â€”' }}
+                                        {{ $r->reason ?: 'Ã¢â‚¬â€' }}
                                     </div>
                                 </td>
 
@@ -1483,7 +1500,7 @@
                                                 <i class="fas fa-paperclip"></i>
                                             </a>
                                         @endif
-                                        <span class="text-xs text-gray-400">â€”</span>
+                                        <span class="text-xs text-gray-400">Ã¢â‚¬â€</span>
                                     </div>
                                 </td>
                             </tr>
@@ -1550,7 +1567,7 @@
 
                                 <td class="p-3 text-gray-700">
                                     <div class="font-mono text-xs">
-                                        {{ company_date($row->original_start_date) }} â†’ {{ company_date($row->original_end_date) }}
+                                        {{ company_date($row->original_start_date) }} Ã¢â€ â€™ {{ company_date($row->original_end_date) }}
                                     </div>
                                 </td>
 
@@ -1656,7 +1673,7 @@
                                 </td>
 
                                 <td class="p-3 text-gray-700 font-mono text-xs">
-                                    {{ company_date($r->start_date) }} {{ $r->end_date && $r->end_date !== $r->start_date ? 'â†’ '.company_date($r->end_date) : '' }}
+                                    {{ company_date($r->start_date) }} {{ $r->end_date && $r->end_date !== $r->start_date ? 'Ã¢â€ â€™ '.company_date($r->end_date) : '' }}
                                 </td>
 
                                 <td class="p-3 font-bold text-gray-900">
@@ -1665,7 +1682,7 @@
 
                                 <td class="p-3 text-gray-700">
                                     <div class="max-w-[150px] truncate" title="{{ $r->reason }}">
-                                        {{ $r->reason ?: 'â€”' }}
+                                        {{ $r->reason ?: 'Ã¢â‚¬â€' }}
                                     </div>
                                 </td>
 
@@ -1704,7 +1721,7 @@
                                                 <i class="fas fa-paperclip"></i>
                                             </a>
                                         @else
-                                            <span class="text-xs text-gray-400">â€”</span>
+                                            <span class="text-xs text-gray-400">Ã¢â‚¬â€</span>
                                         @endif
                                     </div>
                                 </td>
@@ -1773,7 +1790,7 @@
                                             <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ \Athka\Employees\Support\EmployeeStatus::label($empStatus) }}</span>
                                         </div>
                                     @else
-                                        <span class="text-xs text-gray-400">â€”</span>
+                                        <span class="text-xs text-gray-400">Ã¢â‚¬â€</span>
                                     @endif
                                 </td>
 
@@ -1836,7 +1853,7 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div wire:key="create-leave-emp-select">
                         <div class="text-xs text-gray-500 mb-1">{{ tr('Employee') }}</div>
-                        <x-ui.select wire:model.live="employee_id" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
+                        <x-ui.select wire:model.live="employee_id" class="w-full" :disabled="!$canManageLeaveRequests">
                             <option value="0">--</option>
                             @foreach($employeesForSelect as $e)
                                 <option value="{{ $e->id }}">
@@ -1851,7 +1868,7 @@
                     <div>
                         <div class="text-xs text-gray-500 mb-1">{{ tr('Policy') }}</div>
                       <div wire:key="leave-policy-select-{{ (int) $employee_id }}">
-                            <x-ui.select wire:model.live="leave_policy_id" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
+                            <x-ui.select wire:model.live="leave_policy_id" class="w-full" :disabled="!$canManageLeaveRequests">
                                 <option value="0">--</option>
                                 @foreach($createLeavePolicies as $p)
                                     <option value="{{ $p->id }}">{{ $p->name ?? $p->label ?? ('#'.$p->id) }}</option>
@@ -1870,7 +1887,7 @@
                     </div>
                 </div>
 
-                {{-- âœ… Duration (from policy settings) --}}
+                {{-- Ã¢Å“â€¦ Duration (from policy settings) --}}
                 @if($leave_policy_id > 0)
                     <div class="bg-gray-50 border border-gray-100 rounded-xl p-3">
                         <div class="text-[11px] text-gray-500 font-bold mb-1">{{ tr('Duration') }}</div>
@@ -1893,18 +1910,18 @@
                     </div>
                 @endif
 
-                {{-- âœ… Date/Time fields based on duration unit --}}
+                {{-- Ã¢Å“â€¦ Date/Time fields based on duration unit --}}
                 @if($create_leave_duration_unit === 'full_day')
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
                             <div class="text-xs text-gray-500 mb-1">{{ tr('Start Date') }}</div>
-                            <x-ui.company-date-picker model="start_date" :disabled="!auth()->user()->can('attendance.manage')" />
+                            <x-ui.company-date-picker model="start_date" :disabled="!$canManageLeaveRequests" />
                             @error('start_date') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
                         </div>
 
                         <div>
                             <div class="text-xs text-gray-500 mb-1">{{ tr('End Date') }}</div>
-                            <x-ui.company-date-picker model="end_date" :disabled="!auth()->user()->can('attendance.manage')" />
+                            <x-ui.company-date-picker model="end_date" :disabled="!$canManageLeaveRequests" />
                             @error('end_date') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
                         </div>
                     </div>
@@ -1919,7 +1936,7 @@
 
                         <div>
                             <div class="text-xs text-gray-500 mb-1">{{ tr('Half day') }}</div>
-                            <x-ui.select wire:model="leave_half_day_part" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
+                            <x-ui.select wire:model="leave_half_day_part" class="w-full" :disabled="!$canManageLeaveRequests">
                                 <option value="first_half">{{ tr('First half') }}</option>
                                 <option value="second_half">{{ tr('Second half') }}</option>
                             </x-ui.select>
@@ -1935,7 +1952,7 @@
                             @error('start_date') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
                         </div>
                         @php
-                        // Ø³Ù†Ù…Ø±Ø±Ù‡Ø§ Ù…Ù† Ø§Ù„Ø³ÙŠØ±ÙØ± Ø¨Ø¹Ø¯ Ù…Ø§ Ù†Ø¹Ø±Ù Ø§Ù„Ø£Ø¹Ù…Ø¯Ø©
+                        // Ã˜Â³Ã™â€ Ã™â€¦Ã˜Â±Ã˜Â±Ã™â€¡Ã˜Â§ Ã™â€¦Ã™â€  Ã˜Â§Ã™â€žÃ˜Â³Ã™Å Ã˜Â±Ã™ÂÃ˜Â± Ã˜Â¨Ã˜Â¹Ã˜Â¯ Ã™â€¦Ã˜Â§ Ã™â€ Ã˜Â¹Ã˜Â±Ã™Â Ã˜Â§Ã™â€žÃ˜Â£Ã˜Â¹Ã™â€¦Ã˜Â¯Ã˜Â©
                         $workStart = $workStart ?? '08:00';
                         $workEnd   = $workEnd   ?? '16:00';
                         @endphp
@@ -1952,13 +1969,13 @@
                         <div>
                             <div class="text-xs text-gray-500 mb-1">{{ tr('To') }}</div>
                             <x-ui.input type="time" wire:model.blur="leave_to_time" class="w-full"
-                                min="{{ $workStart }}" max="{{ $workEnd }}" step="60" :disabled="!auth()->user()->can('attendance.manage')" />
+                                min="{{ $workStart }}" max="{{ $workEnd }}" step="60" :disabled="!$canManageLeaveRequests" />
                             @error('leave_to_time') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
                         </div>
                     </div>
                 @endif
 
-                {{-- âœ… Policy Note --}}
+                {{-- Ã¢Å“â€¦ Policy Note --}}
                 @if(trim($create_leave_note_text) !== '')
                     <div class="bg-[color:var(--warning)]/10 border border-[color:var(--warning)]/20 rounded-xl p-3">
                         <div class="text-[11px] text-[color:var(--warning)] font-bold mb-1">
@@ -1970,7 +1987,7 @@
 
                         @if($create_leave_note_ack_required)
                             <label class="flex items-center gap-2 mt-3 text-sm text-gray-800">
-                                <input type="checkbox" wire:model="leave_note_ack" class="rounded border-[color:var(--warning)]/30 text-[color:var(--accent-orange)] focus:ring-[color:var(--accent-orange)]" @cannot('attendance.manage') disabled @endcannot />
+                                <input type="checkbox" wire:model="leave_note_ack" class="rounded border-[color:var(--warning)]/30 text-[color:var(--accent-orange)] focus:ring-[color:var(--accent-orange)]" @if(!$canManageLeaveRequests) disabled @endif />
                                 <span class="font-semibold">{{ tr('I acknowledge this note') }}</span>
                             </label>
                             @error('leave_note_ack') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
@@ -1978,7 +1995,7 @@
                     </div>
                 @endif
 
-                {{-- âœ… Attachment (required by policy OR note exists) --}}
+                {{-- Ã¢Å“â€¦ Attachment (required by policy OR note exists) --}}
                 @if($create_leave_attachment_required)
                     <div class="bg-gray-50 border border-gray-100 rounded-xl p-3">
                         <div class="text-[11px] text-gray-500 font-bold mb-1">{{ tr('Attachment') }}</div>
@@ -1992,12 +2009,12 @@
                                 file:bg-white file:text-gray-700
                                 hover:file:bg-gray-50"
                             accept="{{ collect($create_leave_attachment_types)->map(fn($t)=>'.'.$t)->implode(',') }}"
-                            @disabled(!auth()->user()->can('attendance.manage'))
+                            @disabled(!$canManageLeaveRequests)
                         />
 
                         <div class="text-[11px] text-gray-500 mt-2">
                             {{ tr('Allowed') }}: {{ implode(', ', $create_leave_attachment_types) }}
-                            â€¢ {{ tr('Max') }}: {{ (int) $create_leave_attachment_max_mb }}MB
+                            Ã¢â‚¬Â¢ {{ tr('Max') }}: {{ (int) $create_leave_attachment_max_mb }}MB
                         </div>
 
                         <div wire:loading wire:target="leave_attachment" class="text-[11px] text-[color:var(--accent-orange)] mt-2">
@@ -2010,7 +2027,7 @@
 
                 <div wire:key="create-leave-rep-select-{{ (int) $employee_id }}">
                     <div class="text-xs text-gray-500 mb-1">{{ tr('Replacement Employee') }} ({{ tr('Optional') }})</div>
-                    <x-ui.select wire:model.live="replacement_employee_id" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
+                    <x-ui.select wire:model.live="replacement_employee_id" class="w-full" :disabled="!$canManageLeaveRequests">
                         <option value="0">--</option>
                         @foreach($replacementEmployees as $e)
                             <option value="{{ $e->id }}">
@@ -2023,7 +2040,7 @@
 
                 <div>
                     <div class="text-xs text-gray-500 mb-1">{{ tr('Reason') }}</div>
-                    <x-ui.textarea wire:model="reason" class="w-full" :disabled="!auth()->user()->can('attendance.manage')" />
+                    <x-ui.textarea wire:model="reason" class="w-full" :disabled="!$canManageLeaveRequests" />
                     @error('reason') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
                 </div>
             </div>
@@ -2040,7 +2057,7 @@
                     {{ tr('Cancel') }}
                 </x-ui.secondary-button>
 
-                @can('attendance.manage')
+                @if($canManageLeaveRequests)
                 <x-ui.primary-button 
                     type="button" 
                     wire:click="saveLeave" 
@@ -2051,7 +2068,7 @@
                 >
                     {{ tr('Save') }}
                 </x-ui.primary-button>
-                @endcan
+                @endif
             </div>
         </x-slot>
     </x-ui.modal>
@@ -2074,7 +2091,7 @@
             <div class="space-y-4">
                 <div>
                     <div class="text-xs text-gray-500 mb-1">{{ tr('Employee') }}</div>
-                    <x-ui.select wire:model="permission_employee_id" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
+                    <x-ui.select wire:model="permission_employee_id" class="w-full" :disabled="!$canManageLeaveRequests">
                         <option value="0">--</option>
                         @foreach($employeesForSelect as $e)
                             <option value="{{ $e->id }}">
@@ -2089,19 +2106,19 @@
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div>
                         <div class="text-xs text-gray-500 mb-1">{{ tr('Date') }}</div>
-                        <x-ui.company-date-picker model="permission_date" :disabled="!auth()->user()->can('attendance.manage')" />
+                        <x-ui.company-date-picker model="permission_date" :disabled="!$canManageLeaveRequests" />
                         @error('permission_date') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
                     </div>
 
                     <div>
                         <div class="text-xs text-gray-500 mb-1">{{ tr('From') }}</div>
-                        <x-ui.input type="time" wire:model="from_time" class="w-full" :disabled="!auth()->user()->can('attendance.manage')" />
+                        <x-ui.input type="time" wire:model="from_time" class="w-full" :disabled="!$canManageLeaveRequests" />
                         @error('from_time') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
                     </div>
 
                     <div>
                         <div class="text-xs text-gray-500 mb-1">{{ tr('To') }}</div>
-                        <x-ui.input type="time" wire:model="to_time" class="w-full" :disabled="!auth()->user()->can('attendance.manage')" />
+                        <x-ui.input type="time" wire:model="to_time" class="w-full" :disabled="!$canManageLeaveRequests" />
                         @error('to_time') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
                     </div>
                 </div>
@@ -2124,7 +2141,7 @@
 
                     <div>
                         <div class="text-xs text-gray-500 mb-1">{{ tr('Reason') }}</div>
-                        <x-ui.input type="text" wire:model="permission_reason" class="w-full" :disabled="!auth()->user()->can('attendance.manage')" />
+                        <x-ui.input type="text" wire:model="permission_reason" class="w-full" :disabled="!$canManageLeaveRequests" />
                         @error('permission_reason') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
                     </div>
                 </div>
@@ -2142,7 +2159,7 @@
                     {{ tr('Cancel') }}
                 </x-ui.secondary-button>
 
-                @can('attendance.manage')
+                @if($canManageLeaveRequests)
                 <x-ui.primary-button 
                     type="button" 
                     wire:click="savePermission" 
@@ -2153,7 +2170,7 @@
                 >
                     {{ tr('Save') }}
                 </x-ui.primary-button>
-                @endcan
+                @endif
             </div>
         </x-slot>
     </x-ui.modal>
@@ -2216,7 +2233,7 @@
                 rows="3"
                 class="w-full"
                 placeholder="{{ tr('Type the reason for the leave...') }}"
-                :disabled="!auth()->user()->can('attendance.manage')"
+                :disabled="!$canManageLeaveRequests"
             />
 
                 <label class="flex items-center gap-2 text-sm text-gray-700">
@@ -2224,7 +2241,7 @@
                         type="checkbox"
                         wire:model.live="group_leave_deduct_from_balance"
                         class="rounded border-gray-300 text-[color:var(--accent-orange)] focus:ring-[color:var(--accent-orange)]"
-                        @cannot('attendance.manage') disabled @endcannot
+                        @if(!$canManageLeaveRequests) disabled @endif
                     />
                     <span class="font-semibold">{{ tr('Deduct from leave balance') }}</span>
                 </label>
@@ -2266,7 +2283,7 @@
                     </div>
                 @endif
 
-                {{-- âœ… Date/Time fields based on duration unit --}}
+                {{-- Ã¢Å“â€¦ Date/Time fields based on duration unit --}}
                 @if($group_leave_duration_unit === 'full_day')
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
@@ -2331,12 +2348,12 @@
                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3 mb-3">
     <div>
         <div class="text-xs text-gray-500 mb-1">{{ tr('Search') }}</div>
-        <x-ui.input type="text" wire:model.live="groupEmployeeSearch" class="w-full" :disabled="!auth()->user()->can('attendance.manage')" />
+        <x-ui.input type="text" wire:model.live="groupEmployeeSearch" class="w-full" :disabled="!$canManageLeaveRequests" />
     </div>
 
     <div>
         <div class="text-xs text-gray-500 mb-1">{{ tr('Branch') }}</div>
-        <x-ui.select wire:model.live="groupBranchId" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
+        <x-ui.select wire:model.live="groupBranchId" class="w-full" :disabled="!$canManageLeaveRequests">
             <option value="">{{ tr('All Branches') }}</option>
             @foreach(($branches ?? []) as $br)
                 <option value="{{ $br->id }}">
@@ -2348,7 +2365,7 @@
 
     <div>
         <div class="text-xs text-gray-500 mb-1">{{ tr('Department') }}</div>
-        <x-ui.select wire:model.live="groupDepartmentId" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
+        <x-ui.select wire:model.live="groupDepartmentId" class="w-full" :disabled="!$canManageLeaveRequests">
             <option value="">{{ tr('All Departments') }}</option>
             @foreach(($departments ?? []) as $d)
                 <option value="{{ $d->id }}">{{ $d->label ?? $d->name ?? ('#'.$d->id) }}</option>
@@ -2358,7 +2375,7 @@
 
     <div>
         <div class="text-xs text-gray-500 mb-1">{{ tr('Job Title') }}</div>
-        <x-ui.select wire:model.live="groupJobTitleId" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
+        <x-ui.select wire:model.live="groupJobTitleId" class="w-full" :disabled="!$canManageLeaveRequests">
             <option value="">{{ tr('All Job Titles') }}</option>
             @foreach(($jobTitles ?? []) as $jt)
                 <option value="{{ $jt->id }}">{{ $jt->label ?? $jt->name ?? ('#'.$jt->id) }}</option>
@@ -2368,7 +2385,7 @@
 
  <div>
     <div class="text-xs text-gray-500 mb-1">{{ tr('Contract Type') }}</div>
-    <x-ui.select wire:model.live="groupContractType" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
+    <x-ui.select wire:model.live="groupContractType" class="w-full" :disabled="!$canManageLeaveRequests">
         <option value="">{{ tr('All Contract Types') }}</option>
         <option value="permanent">{{ tr('Permanent') }}</option>
         <option value="temporary">{{ tr('Temporary') }}</option>
@@ -2384,7 +2401,7 @@
                                 <label class="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 border border-transparent hover:border-gray-100 transition-all cursor-pointer group">
                                     <input type="checkbox" value="{{ $e->id }}" wire:model="groupEmployeeIds" 
                                         class="w-4 h-4 rounded border-gray-300 text-[color:var(--accent-orange)] focus:ring-[color:var(--accent-orange)]"
-                                        @cannot('attendance.manage') disabled @endcannot />
+                                        @if(!$canManageLeaveRequests) disabled @endif />
                                     <div class="flex flex-col">
                                         <span class="text-xs font-bold text-gray-800 group-hover:text-[color:var(--accent-orange)] transition-colors">
                                             {{ $e->name_ar ?? $e->name_en ?? $e->name ?? $e->full_name ?? ('#'.$e->id) }}
@@ -2402,9 +2419,9 @@
                 <x-slot name="footer">
                     <div class="flex items-center justify-end gap-3">
                         <x-ui.secondary-button type="button" wire:click="closeCreateGroupLeave">{{ tr('Cancel') }}</x-ui.secondary-button>
-                        @can('attendance.manage')
+                        @if($canManageLeaveRequests)
                         <x-ui.primary-button type="button" wire:click="saveGroupLeave" class="!px-8">{{ tr('Save') }}</x-ui.primary-button>
-                        @endcan
+                        @endif
                     </div>
                 </x-slot>
             </div>
@@ -2431,13 +2448,13 @@
 
             <div>
                 <div class="text-xs text-gray-500 mb-1">{{ tr('Approved Leave') }}</div>
-                <x-ui.select wire:model="cut_leave_request_id" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
+                <x-ui.select wire:model="cut_leave_request_id" class="w-full" :disabled="!$canManageLeaveRequests">
                     <option value="0">--</option>
                     @foreach($approvedLeavesForCut as $l)
                         <option value="{{ $l->id }}">
                             #{{ $l->id }} -
                             {{ $l->employee->name_ar ?? $l->employee->name_en ?? ('#'.$l->employee_id) }}
-                            ({{ optional($l->start_date)->toDateString() }} â†’ {{ optional($l->end_date)->toDateString() }})
+                            ({{ optional($l->start_date)->toDateString() }} Ã¢â€ â€™ {{ optional($l->end_date)->toDateString() }})
                         </option>
                     @endforeach
                 </x-ui.select>
@@ -2446,22 +2463,22 @@
 
             <div>
                 <div class="text-xs text-gray-500 mb-1">{{ tr('Cut End Date') }}</div>
-                <x-ui.company-date-picker model="cut_new_end_date" :disabled="!auth()->user()->can('attendance.manage')" />
+                <x-ui.company-date-picker model="cut_new_end_date" :disabled="!$canManageLeaveRequests" />
                 @error('cut_new_end_date') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
             </div>
 
             <div>
                 <div class="text-xs text-gray-500 mb-1">{{ tr('Reason') }}</div>
-                <x-ui.textarea rows="3" wire:model="cut_reason" class="w-full" :disabled="!auth()->user()->can('attendance.manage')" />
+                <x-ui.textarea rows="3" wire:model="cut_reason" class="w-full" :disabled="!$canManageLeaveRequests" />
                 @error('cut_reason') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
             </div>
 
             <x-slot name="footer">
                 <div class="flex items-center justify-end gap-3">
                     <x-ui.secondary-button type="button" wire:click="closeCutLeave">{{ tr('Cancel') }}</x-ui.secondary-button>
-                    @can('attendance.manage')
+                    @if($canManageLeaveRequests)
                     <x-ui.primary-button type="button" wire:click="saveCutLeaveRequest" class="!px-8">{{ tr('Save') }}</x-ui.primary-button>
-                    @endcan
+                    @endif
                 </div>
             </x-slot>
         </div>
@@ -2541,10 +2558,10 @@
                                                 -{{ number_format($log->requested_days, 2) }}
                                             </td>
                                             <td class="p-3 text-gray-600 truncate max-w-[150px]" title="{{ $log->reason }}">
-                                                {{ $log->reason ?: 'â€”' }}
+                                                {{ $log->reason ?: 'Ã¢â‚¬â€' }}
                                             </td>
                                             <td class="p-3 text-center text-gray-400">
-                                                {{ $log->approved_at ? $log->approved_at->format('Y-m-d') : 'â€”' }}
+                                                {{ $log->approved_at ? $log->approved_at->format('Y-m-d') : 'Ã¢â‚¬â€' }}
                                             </td>
                                         </tr>
                                     @empty
@@ -2599,19 +2616,19 @@
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div>
                         <div class="text-xs text-gray-500 mb-1">{{ tr('Date') }}</div>
-                        <x-ui.company-date-picker model="group_permission_date" :disabled="!auth()->user()->can('attendance.manage')" />
+                        <x-ui.company-date-picker model="group_permission_date" :disabled="!$canManageLeaveRequests" />
                         @error('group_permission_date') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
                     </div>
 
                     <div>
                         <div class="text-xs text-gray-500 mb-1">{{ tr('From') }}</div>
-                        <x-ui.input type="time" wire:model="group_from_time" class="w-full" :disabled="!auth()->user()->can('attendance.manage')" />
+                        <x-ui.input type="time" wire:model="group_from_time" class="w-full" :disabled="!$canManageLeaveRequests" />
                         @error('group_from_time') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
                     </div>
 
                     <div>
                         <div class="text-xs text-gray-500 mb-1">{{ tr('To') }}</div>
-                        <x-ui.input type="time" wire:model="group_to_time" class="w-full" :disabled="!auth()->user()->can('attendance.manage')" />
+                        <x-ui.input type="time" wire:model="group_to_time" class="w-full" :disabled="!$canManageLeaveRequests" />
                         @error('group_to_time') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
                     </div>
                 </div>
@@ -2625,7 +2642,7 @@
 
                     <div>
                         <div class="text-xs text-gray-500 mb-1">{{ tr('Reason') }}</div>
-                        <x-ui.input type="text" wire:model="group_permission_reason" class="w-full" :disabled="!auth()->user()->can('attendance.manage')" />
+                        <x-ui.input type="text" wire:model="group_permission_reason" class="w-full" :disabled="!$canManageLeaveRequests" />
                         @error('group_permission_reason') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
                     </div>
                 </div>
@@ -2642,12 +2659,12 @@
                 <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3 mb-3">
     <div>
         <div class="text-xs text-gray-500 mb-1">{{ tr('Search') }}</div>
-        <x-ui.input type="text" wire:model.live="groupEmployeeSearch" class="w-full" :disabled="!auth()->user()->can('attendance.manage')" />
+        <x-ui.input type="text" wire:model.live="groupEmployeeSearch" class="w-full" :disabled="!$canManageLeaveRequests" />
     </div>
 
     <div>
         <div class="text-xs text-gray-500 mb-1">{{ tr('Branch') }}</div>
-        <x-ui.select wire:model.live="groupBranchId" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
+        <x-ui.select wire:model.live="groupBranchId" class="w-full" :disabled="!$canManageLeaveRequests">
             <option value="">{{ tr('All Branches') }}</option>
             @foreach(($branches ?? []) as $br)
                 <option value="{{ $br->id }}">
@@ -2659,7 +2676,7 @@
 
     <div>
         <div class="text-xs text-gray-500 mb-1">{{ tr('Department') }}</div>
-        <x-ui.select wire:model.live="groupDepartmentId" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
+        <x-ui.select wire:model.live="groupDepartmentId" class="w-full" :disabled="!$canManageLeaveRequests">
             <option value="">{{ tr('All Departments') }}</option>
             @foreach(($departments ?? []) as $d)
                 <option value="{{ $d->id }}">{{ $d->label ?? $d->name ?? ('#'.$d->id) }}</option>
@@ -2669,7 +2686,7 @@
 
     <div>
         <div class="text-xs text-gray-500 mb-1">{{ tr('Job Title') }}</div>
-        <x-ui.select wire:model.live="groupJobTitleId" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
+        <x-ui.select wire:model.live="groupJobTitleId" class="w-full" :disabled="!$canManageLeaveRequests">
             <option value="">{{ tr('All Job Titles') }}</option>
             @foreach(($jobTitles ?? []) as $jt)
                 <option value="{{ $jt->id }}">{{ $jt->label ?? $jt->name ?? ('#'.$jt->id) }}</option>
@@ -2679,7 +2696,7 @@
 
     <div>
         <div class="text-xs text-gray-500 mb-1">{{ tr('Contract Type') }}</div>
-        <x-ui.select wire:model.live="groupContractType" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
+        <x-ui.select wire:model.live="groupContractType" class="w-full" :disabled="!$canManageLeaveRequests">
             <option value="">{{ tr('All Contract Types') }}</option>
             <option value="permanent">{{ tr('Permanent') }}</option>
             <option value="temporary">{{ tr('Temporary') }}</option>
@@ -2695,7 +2712,7 @@
                                 <label class="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 border border-transparent hover:border-gray-100 transition-all cursor-pointer group">
                                     <input type="checkbox" value="{{ $e->id }}" wire:model="groupPermissionEmployeeIds" 
                                         class="w-4 h-4 rounded border-gray-300 text-[color:var(--accent-orange)] focus:ring-[color:var(--accent-orange)]"
-                                        @cannot('attendance.manage') disabled @endcannot />
+                                        @if(!$canManageLeaveRequests) disabled @endif />
                                     <div class="flex flex-col">
                                         <span class="text-xs font-bold text-gray-800 group-hover:text-[color:var(--accent-orange)] transition-colors">
                                             {{ $e->name_ar ?? $e->name_en ?? $e->name ?? $e->full_name ?? ('#'.$e->id) }}
@@ -2713,9 +2730,9 @@
                 <x-slot name="footer">
                     <div class="flex items-center justify-end gap-3">
                         <x-ui.secondary-button type="button" wire:click="closeCreateGroupPermission">{{ tr('Cancel') }}</x-ui.secondary-button>
-                        @can('attendance.manage')
+                        @if($canManageLeaveRequests)
                         <x-ui.primary-button type="button" wire:click="saveGroupPermission" class="!px-8">{{ tr('Save') }}</x-ui.primary-button>
-                        @endcan
+                        @endif
                     </div>
                 </x-slot>
             </div>
@@ -2849,7 +2866,7 @@
             <div class="space-y-4">
                 <div>
                     <div class="text-xs text-gray-500 mb-1">{{ tr('Employee') }}</div>
-                    <x-ui.select wire:model.live="mission_employee_id" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
+                    <x-ui.select wire:model.live="mission_employee_id" class="w-full" :disabled="!$canManageLeaveRequests">
                         <option value="">-- {{ tr('Select Employee') }} --</option>
                         @foreach($employeesForSelect as $e)
                             <option value="{{ $e->id }}">
@@ -2863,7 +2880,7 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <div class="text-xs text-gray-500 mb-1">{{ tr('Type') }}</div>
-                        <x-ui.select wire:model.live="mission_type" class="w-full" :disabled="!auth()->user()->can('attendance.manage')">
+                        <x-ui.select wire:model.live="mission_type" class="w-full" :disabled="!$canManageLeaveRequests">
                             <option value="full_day">{{ tr('Full day') }}</option>
                             <option value="partial">{{ tr('Hours') }}</option>
                         </x-ui.select>
@@ -2873,13 +2890,13 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <div class="text-xs text-gray-500 mb-1">{{ tr('Start Date') }}</div>
-                        <x-ui.company-date-picker model="mission_start_date" :disabled="!auth()->user()->can('attendance.manage')" />
+                        <x-ui.company-date-picker model="mission_start_date" :disabled="!$canManageLeaveRequests" />
                         @error('mission_start_date') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
                     </div>
                     @if($mission_type === 'full_day')
                     <div>
                         <div class="text-xs text-gray-500 mb-1">{{ tr('End Date') }}</div>
-                        <x-ui.company-date-picker model="mission_end_date" :disabled="!auth()->user()->can('attendance.manage')" />
+                        <x-ui.company-date-picker model="mission_end_date" :disabled="!$canManageLeaveRequests" />
                         @error('mission_end_date') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
                     </div>
                     @endif
@@ -2889,12 +2906,12 @@
                 <div class="grid grid-cols-2 gap-3">
                     <div>
                         <div class="text-xs text-gray-500 mb-1">{{ tr('From Time') }}</div>
-                        <x-ui.input type="time" wire:model.live="mission_from_time" class="w-full" :disabled="!auth()->user()->can('attendance.manage')" />
+                        <x-ui.input type="time" wire:model.live="mission_from_time" class="w-full" :disabled="!$canManageLeaveRequests" />
                         @error('mission_from_time') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
                     </div>
                     <div>
                         <div class="text-xs text-gray-500 mb-1">{{ tr('To Time') }}</div>
-                        <x-ui.input type="time" wire:model.live="mission_to_time" class="w-full" :disabled="!auth()->user()->can('attendance.manage')" />
+                        <x-ui.input type="time" wire:model.live="mission_to_time" class="w-full" :disabled="!$canManageLeaveRequests" />
                         @error('mission_to_time') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
                     </div>
                 </div>
@@ -2902,13 +2919,13 @@
 
                 <div>
                     <div class="text-xs text-gray-500 mb-1">{{ tr('Destination') }}</div>
-                    <x-ui.input type="text" wire:model.live="mission_destination" class="w-full" :disabled="!auth()->user()->can('attendance.manage')" />
+                    <x-ui.input type="text" wire:model.live="mission_destination" class="w-full" :disabled="!$canManageLeaveRequests" />
                     @error('mission_destination') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
                 </div>
 
                 <div>
                     <div class="text-xs text-gray-500 mb-1">{{ tr('Reason') }}</div>
-                    <x-ui.textarea wire:model.live="mission_reason" class="w-full" rows="3" :disabled="!auth()->user()->can('attendance.manage')"></x-ui.textarea>
+                    <x-ui.textarea wire:model.live="mission_reason" class="w-full" rows="3" :disabled="!$canManageLeaveRequests"></x-ui.textarea>
                     @error('mission_reason') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
                 </div>
             </div>
@@ -2925,7 +2942,7 @@
                     {{ tr('Cancel') }}
                 </x-ui.secondary-button>
 
-                @can('attendance.manage')
+                @if($canManageLeaveRequests)
                 <x-ui.primary-button 
                     type="button" 
                     wire:click="saveMission" 
@@ -2936,7 +2953,7 @@
                 >
                     {{ tr('Save') }}
                 </x-ui.primary-button>
-                @endcan
+                @endif
             </div>
         </x-slot>
     </x-ui.modal>

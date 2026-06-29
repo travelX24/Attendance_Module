@@ -74,6 +74,7 @@ class Index extends Component
 
     public function mount(LeaveSettingService $leaveSettingService): void
     {
+        $this->requireAttendanceAny(['attendance.leaves.view', 'attendance.leaves.view-subordinates', 'requests.leaves.view', 'requests.leaves.create', 'requests.leaves.approve', 'requests.permissions.view', 'requests.permissions.manage', 'attendance.leaves.manage', 'attendance.missions.manage']);
         $this->companyId = (int) $this->resolveCompanyId();
 
         $yearTable  = (new LeavePolicyYear())->getTable();
@@ -224,7 +225,7 @@ class Index extends Component
                 ->where('company_id', $this->companyId)
                 ->where('status', 'pending');
 
-            // ✅ Data scoping
+            // âœ… Data scoping
             $q = $this->applyDataScoping($q, 'attendance.leaves.view', 'attendance.leaves.view-subordinates');
 
             if ($this->selectedYearId) $q->where('policy_year_id', (int) $this->selectedYearId);
@@ -248,7 +249,7 @@ class Index extends Component
             ->when($permCoCol, fn ($qq) => $qq->where($permCoCol, $this->companyId))
             ->where('status', 'pending');
 
-        // âœ… Data scoping
+        // Ã¢Å“â€¦ Data scoping
         $q = $this->applyDataScoping($q, 'attendance.leaves.view', 'attendance.leaves.view-subordinates');
 
 
@@ -341,11 +342,9 @@ class Index extends Component
                     if (in_array($employee->contract_type, $excluded, true)) {
                         $entitled = 0.0;
                     } elseif ($isDefaultAnnual) {
-                        if ($employee->is_transferred_employee) {
-                            $entitled = (float) (($employee->opening_leave_balance ?? 0) + ($employee->leave_balance_adjustments ?? 0));
-                        } else {
-                            $entitled = (float) (($employee->annual_leave_days ?? $policy->days_per_year ?? 0) + ($employee->leave_balance_adjustments ?? 0));
-                        }
+                        $entitled = method_exists($employee, 'calculateLeaveEntitlementForPolicy')
+                            ? $employee->calculateLeaveEntitlementForPolicy($policy)
+                            : (float) (($employee->annual_leave_days ?? $policy->days_per_year ?? 0) + ($employee->leave_balance_adjustments ?? 0));
                     } else {
                         $entitled = (float) ($policy->days_per_year ?? 0);
                     }
@@ -385,7 +384,7 @@ class Index extends Component
                 ->with(['employee' => fn ($employee) => $employee->withoutGlobalScope('active_only'), 'policy', 'year'])
                 ->where('company_id', $this->companyId);
 
-            // ✅ Data scoping
+            // âœ… Data scoping
             $q = $this->applyDataScoping($q, 'attendance.leaves.view', 'attendance.leaves.view-subordinates');
 
             if ($this->selectedYearId) $q->where('policy_year_id', (int) $this->selectedYearId);
@@ -405,7 +404,7 @@ class Index extends Component
             ->where('company_id', $this->companyId)
             ->orderByDesc('id');
 
-        // âœ… Data scoping
+        // Ã¢Å“â€¦ Data scoping
         $q = $this->applyDataScoping($q, 'attendance.leaves.view', 'attendance.leaves.view-subordinates');
 
         $this->applyDateRangeBetweenFilter($q, 'created_at');
@@ -437,7 +436,7 @@ class Index extends Component
             ->where('company_id', $this->companyId)
             ->where('status', '!=', 'pending');
 
-        // âœ… Data scoping
+        // Ã¢Å“â€¦ Data scoping
         $q = $this->applyDataScoping($q, 'attendance.leaves.view', 'attendance.leaves.view-subordinates');
 
         if ($this->selectedYearId) $q->where('policy_year_id', (int) $this->selectedYearId);
@@ -461,7 +460,7 @@ class Index extends Component
             ->when($permCoCol, fn ($qq) => $qq->where($permCoCol, $this->companyId))
             ->where('status', '!=', 'pending');
 
-        // âœ… Data scoping
+        // Ã¢Å“â€¦ Data scoping
         $q = $this->applyDataScoping($q, 'attendance.leaves.view', 'attendance.leaves.view-subordinates');
 
 
@@ -481,7 +480,7 @@ class Index extends Component
             ->where('company_id', $this->companyId)
             ->where('status', 'pending');
 
-        // âœ… Data scoping
+        // Ã¢Å“â€¦ Data scoping
         $q = $this->applyDataScoping($q, 'attendance.leaves.view', 'attendance.leaves.view-subordinates');
 
         if ($this->selectedYearId) $q->where('policy_year_id', (int) $this->selectedYearId);
@@ -502,7 +501,7 @@ class Index extends Component
             ->where('company_id', $this->companyId)
             ->where('status', '!=', 'pending');
 
-        // âœ… Data scoping
+        // Ã¢Å“â€¦ Data scoping
         $q = $this->applyDataScoping($q, 'attendance.leaves.view', 'attendance.leaves.view-subordinates');
 
         if ($this->selectedYearId) $q->where('policy_year_id', (int) $this->selectedYearId);
@@ -519,7 +518,7 @@ class Index extends Component
     {
         $q = Employee::withoutGlobalScope('active_only');
 
-        // âœ… Data scoping
+        // Ã¢Å“â€¦ Data scoping
         $q = $this->applyDataScoping($q, 'attendance.leaves.view', 'attendance.leaves.view-subordinates', '');
 
         if ($this->employeeCompanyColumn) $q->where($this->employeeCompanyColumn, $this->companyId);
@@ -588,7 +587,7 @@ class Index extends Component
             ->where('status', 'approved')
             ->whereNull('salary_processed_at');
 
-        // âœ… Data scoping
+        // Ã¢Å“â€¦ Data scoping
         $q = $this->applyDataScoping($q, 'attendance.leaves.view', 'attendance.leaves.view-subordinates');
 
         if ($this->selectedYearId) $q->where('policy_year_id', (int) $this->selectedYearId);
@@ -645,7 +644,7 @@ class Index extends Component
 
         $qq->where(function ($w) use ($term, $allowed) {
 
-            // âœ… ØªÙ‚ÙŠÙŠØ¯ Ø¯Ø§Ø¦Ù… Ø¯Ø§Ø®Ù„ Ø§Ù„ÙØ±ÙˆØ¹ Ø§Ù„Ù…Ø³Ù…ÙˆØ­Ø©
+            // Ã¢Å“â€¦ Ã˜ÂªÃ™â€šÃ™Å Ã™Å Ã˜Â¯ Ã˜Â¯Ã˜Â§Ã˜Â¦Ã™â€¦ Ã˜Â¯Ã˜Â§Ã˜Â®Ã™â€ž Ã˜Â§Ã™â€žÃ™ÂÃ˜Â±Ã™Ë†Ã˜Â¹ Ã˜Â§Ã™â€žÃ™â€¦Ã˜Â³Ã™â€¦Ã™Ë†Ã˜Â­Ã˜Â©
             if ($this->employeeBranchColumn && !empty($allowed)) {
                 $w->whereIn($this->employeeBranchColumn, $allowed);
             }
@@ -658,7 +657,7 @@ class Index extends Component
                 });
             }
 
-            // âœ… ÙÙ„ØªØ± Ø§Ù„ÙØ±Ø¹ Ø§Ù„Ù…Ø®ØªØ§Ø± (Ø¥Ù† ÙˆØ¬Ø¯)
+            // Ã¢Å“â€¦ Ã™ÂÃ™â€žÃ˜ÂªÃ˜Â± Ã˜Â§Ã™â€žÃ™ÂÃ˜Â±Ã˜Â¹ Ã˜Â§Ã™â€žÃ™â€¦Ã˜Â®Ã˜ÂªÃ˜Â§Ã˜Â± (Ã˜Â¥Ã™â€  Ã™Ë†Ã˜Â¬Ã˜Â¯)
             if (($this->branchId ?? '') !== '' && $this->employeeBranchColumn) {
                 $w->where($this->employeeBranchColumn, (int) $this->branchId);
             }
@@ -704,14 +703,7 @@ class Index extends Component
 
     protected function ensureCanManage(): void
     {
-        // Allow if they have global manage permission
-        if (auth()->user()?->can('settings.attendance.manage') || auth()->user()?->can('attendance.manage')) {
-            return;
-        }
-
-        // Allow if they have basic view permissions as a manager
-        // The ApprovalInboxController will handle the strict per-request task authorization.
-        if (auth()->user()?->can('attendance.leaves.view') || auth()->user()?->can('attendance.leaves.view-subordinates')) {
+        if ($this->canAttendanceAny(['attendance.leaves.view', 'attendance.leaves.view-subordinates', 'requests.leaves.view', 'requests.permissions.view', 'attendance.leaves.manage', 'attendance.missions.manage'])) {
             return;
         }
 
@@ -949,12 +941,12 @@ private function allowedBranchIds(): array
     $user = auth()->user();
     if (!$user) return [];
 
-    // Ù„Ùˆ Ø¹Ù†Ø¯Ùƒ access_scope = all_branches
+    // Ã™â€žÃ™Ë† Ã˜Â¹Ã™â€ Ã˜Â¯Ã™Æ’ access_scope = all_branches
     if (isset($user->access_scope) && $user->access_scope === 'all_branches') {
-        return []; // empty = Ø¨Ø¯ÙˆÙ† Ù‚ÙŠÙˆØ¯
+        return []; // empty = Ã˜Â¨Ã˜Â¯Ã™Ë†Ã™â€  Ã™â€šÃ™Å Ã™Ë†Ã˜Â¯
     }
 
-    // Ù„Ùˆ Ø¹Ù†Ø¯Ùƒ method Ø¬Ø§Ù‡Ø²
+    // Ã™â€žÃ™Ë† Ã˜Â¹Ã™â€ Ã˜Â¯Ã™Æ’ method Ã˜Â¬Ã˜Â§Ã™â€¡Ã˜Â²
     if (method_exists($user, 'accessibleBranchIds')) {
         $ids = $user->accessibleBranchIds();
         $arr = is_array($ids) ? $ids : (method_exists($ids, 'toArray') ? $ids->toArray() : []);
@@ -972,7 +964,7 @@ private function allowedBranchIds(): array
         if (!empty($ids)) return $ids;
     }
 
-    // fallback Ø£Ø®ÙŠØ±: ÙØ±Ø¹ Ø§Ù„Ù…Ø³ØªØ®Ø¯Ù…
+    // fallback Ã˜Â£Ã˜Â®Ã™Å Ã˜Â±: Ã™ÂÃ˜Â±Ã˜Â¹ Ã˜Â§Ã™â€žÃ™â€¦Ã˜Â³Ã˜ÂªÃ˜Â®Ã˜Â¯Ã™â€¦
     $bid = (int) ($user->branch_id ?? 0);
     return $bid > 0 ? [$bid] : [];
 }
@@ -980,12 +972,8 @@ private function allowedBranchIds(): array
     {
         $user = auth()->user();
 
-        // ✅ HR / Admins should see ALL pending requests, not just their tasks
-        if (
-            $user->can('attendance.manage') ||
-            $user->can('settings.attendance.manage') ||
-            $user->can('attendance.manage-all')
-        ) {
+        // âœ… HR / Admins should see ALL pending requests, not just their tasks
+        if ($this->canAttendanceAny(['attendance.leaves.view', 'attendance.leaves.view-subordinates', 'requests.leaves.view', 'requests.leaves.approve', 'requests.permissions.view', 'requests.permissions.manage', 'attendance.leaves.manage', 'attendance.missions.manage'])) {
             // But we still want to ensure tasks exist for them to see in the list (workflow info)
             try {
                 $approvalService = app(\Athka\SystemSettings\Services\Approvals\ApprovalService::class);
@@ -1001,7 +989,7 @@ private function allowedBranchIds(): array
         $employeeId = $user->employee_id;
         if (!$employeeId) return $q;
 
-        // ✅ Ensure tasks exist for the current manager's pending items
+        // âœ… Ensure tasks exist for the current manager's pending items
         try {
             $approvalService = app(\Athka\SystemSettings\Services\Approvals\ApprovalService::class);
             $src = $approvalService->getRequestSource($type);
@@ -1064,5 +1052,7 @@ private function allowedBranchIds(): array
         $this->resetPage('permPage');
     }
 }
+
+
 
 

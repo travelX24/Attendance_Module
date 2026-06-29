@@ -54,6 +54,7 @@ trait WithAttendanceExports
 
     public function exportExcel()
     {
+        $this->requireAttendanceAny('attendance.daily.export');
         $companyId = auth()->user()->saas_company_id;
         $query = AttendanceDailyLog::forCompany($companyId)->with([
             'employee' => fn ($q) => $q->withoutGlobalScope('active_only'),
@@ -87,6 +88,7 @@ trait WithAttendanceExports
 
     public function exportPDF()
     {
+        $this->requireAttendanceAny('attendance.daily.export');
         $companyId = auth()->user()->saas_company_id;
         $query = AttendanceDailyLog::forCompany($companyId)->with([
             'employee' => fn ($q) => $q->withoutGlobalScope('active_only'),
@@ -95,7 +97,7 @@ trait WithAttendanceExports
         $query = $this->applyExportFilters($query);
         $logs = $query->orderByDesc('attendance_date')->get();
 
-        // ✅ Reshape Arabic text for PDF
+        // âœ… Reshape Arabic text for PDF
         $logs->each(function($log) {
             $log->pdf_name = $this->pdfReshape($log->employee->name_ar ?? $log->employee->name_en ?? '-');
             $log->pdf_schedule = $this->pdfReshape($log->workSchedule?->name ?? '-');

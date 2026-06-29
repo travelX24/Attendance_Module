@@ -15,7 +15,7 @@
                     :label="tr('Employee')"
                     error="createForm.employee_id"
                     required
-                    :disabled="!auth()->user()->can('attendance.manage')"
+                    :disabled="!$canManualDaily"
                 >
                     <option value="">{{ tr('Select employee...') }}</option>
                     @foreach($employees as $employee)
@@ -28,7 +28,7 @@
                 <x-ui.company-date-picker
                     model="createForm.attendance_date"
                     :label="tr('Attendance Date')"
-                    :disabled="!auth()->user()->can('attendance.manage')"
+                    :disabled="!$canManualDaily"
                 />
 
                 {{-- Dynamic Periods Section --}}
@@ -48,7 +48,7 @@
                                     :label="tr('Check In Time')"
                                     error="createForm.periods.{{ $index }}.check_in_time"
                                     required
-                                    :disabled="!auth()->user()->can('attendance.manage')"
+                                    :disabled="!$canManualDaily"
                                 />
 
                                 <x-ui.input
@@ -56,7 +56,7 @@
                                     wire:model="createForm.periods.{{ $index }}.check_out_time"
                                     :label="tr('Check Out Time')"
                                     error="createForm.periods.{{ $index }}.check_out_time"
-                                    :disabled="!auth()->user()->can('attendance.manage')"
+                                    :disabled="!$canManualDaily"
                                 />
                             </div>
                         </div>
@@ -69,7 +69,7 @@
                     :hint="tr('Optional: Add any notes or reason for manual entry')"
                     rows="3"
                     error="createForm.notes"
-                    :disabled="!auth()->user()->can('attendance.manage')"
+                    :disabled="!$canManualDaily"
                 />
             </div>
         </x-slot>
@@ -79,13 +79,13 @@
                 <x-ui.secondary-button wire:click="$set('showCreateModal', false)">
                     {{ tr('Cancel') }}
                 </x-ui.secondary-button>
-                @can('attendance.manage')
+                @if($canManualDaily)
                 <x-ui.primary-button wire:click="saveManualAttendance" wire:loading.attr="disabled" class="gap-2">
                     <i class="fas fa-save" wire:loading.remove></i>
                     <i class="fas fa-spinner fa-spin" wire:loading></i>
                     <span>{{ tr('Create Attendance') }}</span>
                 </x-ui.primary-button>
-                @endcan
+                @endif
             </div>
         </x-slot>
     </x-ui.modal>

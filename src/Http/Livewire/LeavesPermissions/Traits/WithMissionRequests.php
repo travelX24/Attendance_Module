@@ -22,6 +22,7 @@ trait WithMissionRequests
 
     public function openCreateMission(): void
     {
+        $this->requireAttendanceAny('attendance.missions.manage');
         $this->resetValidation();
         $this->mission_employee_id = null;
         $this->mission_type = 'full_day';
@@ -41,6 +42,7 @@ trait WithMissionRequests
 
     public function saveMission(): void
     {
+        $this->requireAttendanceAny('attendance.missions.manage');
         $this->ensureCanManage();
 
         $rules = [
@@ -56,7 +58,7 @@ trait WithMissionRequests
 
         $data = $this->validate($rules);
 
-        // ✅ Exceptional Day Overlap Check
+        // âœ… Exceptional Day Overlap Check
         if (class_exists(\Athka\SystemSettings\Services\WorkScheduleService::class)) {
             $wsService = app(\Athka\SystemSettings\Services\WorkScheduleService::class);
             $start = Carbon::parse($data['mission_start_date']);
@@ -101,7 +103,7 @@ trait WithMissionRequests
 
         $mission = AttendanceMissionRequest::create($payload);
 
-        // ✅ Trigger task generation
+        // âœ… Trigger task generation
         try {
             $approvalService = app(\Athka\SystemSettings\Services\Approvals\ApprovalService::class);
             $src = $approvalService->getRequestSource('missions');
@@ -126,7 +128,7 @@ trait WithMissionRequests
             ->when($coCol, fn ($qq) => $qq->where($coCol, $this->companyId))
             ->where('status', 'pending');
 
-        // âœ… Data scoping
+        // Ã¢Å“â€¦ Data scoping
         $q = $this->applyDataScoping($q, 'attendance.leaves.view', 'attendance.leaves.view-subordinates');
 
         $this->applySelectedYearDateRangeFilter($q, 'start_date');
@@ -148,7 +150,7 @@ trait WithMissionRequests
             ->when($coCol, fn ($qq) => $qq->where($coCol, $this->companyId))
             ->where('status', '!=', 'pending');
 
-        // âœ… Data scoping
+        // Ã¢Å“â€¦ Data scoping
         $q = $this->applyDataScoping($q, 'attendance.leaves.view', 'attendance.leaves.view-subordinates');
 
         if ($this->historyStatus !== '') {
@@ -162,5 +164,6 @@ trait WithMissionRequests
         return $q->orderByDesc('id')->paginate($this->perPage, ['*'], 'historyMissionPage');
     }
 }
+
 
 

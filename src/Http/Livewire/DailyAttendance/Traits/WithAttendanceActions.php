@@ -39,6 +39,7 @@ trait WithAttendanceActions
 
     public function openApprovalModal($logId)
     {
+        $this->requireAttendanceAny('attendance.daily.manage');
         $this->resetModalFlags();
         $companyId = auth()->user()->saas_company_id;
 
@@ -127,6 +128,7 @@ trait WithAttendanceActions
 
     public function approveSingle()
     {
+        $this->requireAttendanceAny('attendance.daily.manage');
         $companyId = auth()->user()->saas_company_id;
         $logQ = AttendanceDailyLog::forCompany($companyId);
 
@@ -156,6 +158,7 @@ trait WithAttendanceActions
 
     public function openRejectModal($logId)
     {
+        $this->requireAttendanceAny('attendance.daily.manage');
         $this->resetModalFlags();
         $companyId = auth()->user()->saas_company_id;
         
@@ -179,6 +182,7 @@ trait WithAttendanceActions
 
     public function rejectSingle()
     {
+        $this->requireAttendanceAny('attendance.daily.manage');
         $this->validate(['rejectNotes' => 'required|string|min:3|max:500']);
 
         $companyId = auth()->user()->saas_company_id;
@@ -203,6 +207,7 @@ trait WithAttendanceActions
 
     public function openUnapproveModal($logId)
     {
+        $this->requireAttendanceAny('attendance.daily.manage');
         $this->resetModalFlags();
         $companyId = auth()->user()->saas_company_id;
         $log = AttendanceDailyLog::forCompany($companyId)->findOrFail($logId);
@@ -215,6 +220,7 @@ trait WithAttendanceActions
 
     public function unapproveSingle()
     {
+        $this->requireAttendanceAny('attendance.daily.manage');
         $this->validate(['unapproveReason' => 'required|string|min:3|max:500', 'unapproveUnderstood' => 'accepted']);
 
         $companyId = auth()->user()->saas_company_id;
@@ -244,6 +250,7 @@ trait WithAttendanceActions
 
     public function openBulkApprovalModal()
     {
+        $this->requireAttendanceAny('attendance.daily.manage');
         if (empty($this->selectedLogs)) {
             $this->dispatch('toast', ['type' => 'warning', 'message' => tr('No records selected')]);
             return;
@@ -282,6 +289,7 @@ trait WithAttendanceActions
 
     public function confirmBulkApprove()
     {
+        $this->requireAttendanceAny('attendance.daily.manage');
         $companyId = auth()->user()->saas_company_id;
         $approvedCount = 0;
         $skippedCount = 0;
@@ -331,6 +339,7 @@ trait WithAttendanceActions
 
     public function generateMissingLogs($silent = false)
     {
+        $this->requireAttendanceAny('attendance.daily.manage');
         $companyId = auth()->user()->saas_company_id;
         $start = Carbon::parse($this->date_from);
         $end = Carbon::parse($this->date_to);

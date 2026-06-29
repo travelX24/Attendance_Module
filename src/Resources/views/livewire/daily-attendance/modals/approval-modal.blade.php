@@ -170,7 +170,7 @@
                         :label="tr('Final Remarks')"
                         :placeholder="tr('Optional internal notes regarding this approval...')"
                         rows="2"
-                        :disabled="!auth()->user()->can('attendance.manage')"
+                        :disabled="!$canManageDaily"
                     />
                 </div>
             </div>
@@ -184,7 +184,7 @@
                     </x-ui.secondary-button>
                 </div>
                 <div class="flex flex-col sm:flex-row gap-3 w-full sm:w-auto">
-                     @can('attendance.manage')
+                     @if($canManageDaily)
                      <x-ui.secondary-button wire:click="openRejectModal({{ $approvingLogId }})" class="w-full sm:w-auto justify-center !bg-[color:var(--error)]/10 !text-[color:var(--error)] !border-[color:var(--error)]/25 hover:!bg-[color:var(--error)]/15">
                         {{ tr('Reject') }}
                     </x-ui.secondary-button>
@@ -193,7 +193,7 @@
                         <i class="fas fa-spinner fa-spin" wire:loading></i>
                         <span>{{ tr('Approve Record') }}</span>
                     </x-ui.primary-button>
-                    @endcan
+                    @endif
                 </div>
             </div>
         </x-slot>

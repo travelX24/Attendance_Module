@@ -13,7 +13,7 @@
                     {{-- Department --}}
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-1.5">{{ tr('Department') }}</label>
-                        <x-ui.select wire:model.live="criteriaForm.department_id" class="w-full" align="down" :search="true" :disabled="!auth()->user()->can('attendance.manage')">
+                        <x-ui.select wire:model.live="criteriaForm.department_id" class="w-full" align="down" :search="true" :disabled="!$canManageSchedules">
                             <option value="all">{{ tr('All Departments') }}</option>
                             @foreach($departments as $d)
                                 <option value="{{ $d->id }}">{{ $d->name }}</option>
@@ -24,7 +24,7 @@
                     {{-- Job Title --}}
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-1.5">{{ tr('Job Title') }}</label>
-                        <x-ui.select wire:model.live="criteriaForm.job_title_id" class="w-full" align="down" :disabled="empty($jobTitles) || !auth()->user()->can('attendance.manage')">
+                        <x-ui.select wire:model.live="criteriaForm.job_title_id" class="w-full" align="down" :disabled="empty($jobTitles) || !$canManageSchedules">
                             <option value="all">{{ tr('All Job Titles') }}</option>
                             @foreach(($jobTitles ?? []) as $jt)
                                 @php
@@ -44,7 +44,7 @@
                     {{-- Location --}}
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-1.5">{{ tr('Location') }}</label>
-                        <x-ui.select wire:model.live="criteriaForm.location_id" class="w-full" align="down" :disabled="empty($locations) || !auth()->user()->can('attendance.manage')">
+                        <x-ui.select wire:model.live="criteriaForm.location_id" class="w-full" align="down" :disabled="empty($locations) || !$canManageSchedules">
                             <option value="all">{{ tr('All Locations') }}</option>
                             @foreach(($locations ?? []) as $loc)
                                 <option value="{{ $loc->id }}">{{ $loc->name ?? '-' }}</option>
@@ -58,7 +58,7 @@
                     {{-- Contract Type --}}
                     <div>
                         <label class="block text-sm font-semibold text-gray-700 mb-1.5">{{ tr('Contract') }}</label>
-                        <x-ui.select wire:model.live="criteriaForm.contract_type" class="w-full" align="down" :disabled="empty($contractTypes) || !auth()->user()->can('attendance.manage')">
+                        <x-ui.select wire:model.live="criteriaForm.contract_type" class="w-full" align="down" :disabled="empty($contractTypes) || !$canManageSchedules">
                             <option value="all">{{ tr('All Contracts') }}</option>
                             @foreach(($contractTypes ?? []) as $ct)
                                 <option value="{{ $ct }}">{{ $ct }}</option>
@@ -74,11 +74,11 @@
                         <label class="block text-sm font-semibold text-gray-700 mb-1.5">{{ tr('Selection Mode') }}</label>
                         <div class="flex flex-wrap items-center gap-4">
                             <label class="inline-flex items-center gap-2 text-sm">
-                                <input type="radio" wire:model.live="criteriaForm.mode" value="replace" @cannot('attendance.manage') disabled @endcannot>
+                                <input type="radio" wire:model.live="criteriaForm.mode" value="replace" @if(!$canManageSchedules) disabled @endif>
                                 <span>{{ tr('Replace current selection') }}</span>
                             </label>
                             <label class="inline-flex items-center gap-2 text-sm">
-                                <input type="radio" wire:model.live="criteriaForm.mode" value="add" @cannot('attendance.manage') disabled @endcannot>
+                                <input type="radio" wire:model.live="criteriaForm.mode" value="add" @if(!$canManageSchedules) disabled @endif>
                                 <span>{{ tr('Add to current selection') }}</span>
                             </label>
                         </div>
@@ -86,14 +86,14 @@
 
                 </div>
 
-                @can('attendance.manage')
+                @if($canManageSchedules)
                 <div class="flex items-center justify-end gap-3 mt-4">
                     <x-ui.secondary-button type="button" wire:click="previewCriteriaSelection" class="gap-2">
                         <i class="fas fa-eye"></i>
                         <span>{{ tr('Preview') }}</span>
                     </x-ui.secondary-button>
                 </div>
-                @endcan
+                @endif
             </x-ui.card>
 
             {{-- Preview --}}
@@ -107,14 +107,14 @@
                     </div>
 
                     <div class="flex items-center gap-2">
-                        @can('attendance.manage')
+                        @if($canManageSchedules)
                         <x-ui.secondary-button type="button" wire:click="selectAllCriteriaPreview" class="!text-xs">
                             {{ tr('Select All') }}
                         </x-ui.secondary-button>
                         <x-ui.secondary-button type="button" wire:click="clearCriteriaPreviewSelection" class="!text-xs">
                             {{ tr('Clear') }}
                         </x-ui.secondary-button>
-                        @endcan
+                        @endif
                     </div>
                 </div>
 
@@ -137,7 +137,7 @@
                                             wire:model.live="criteriaPreviewSelected"
                                             value="{{ $row['id'] }}"
                                             class="w-4 h-4 text-[color:var(--accent-orange)] border-gray-300 rounded focus:ring-[color:var(--accent-orange)]"
-                                            @cannot('attendance.manage') disabled @endcannot
+                                            @if(!$canManageSchedules) disabled @endif
                                         >
                                     </td>
                                     <td class="px-6 py-4">
@@ -167,7 +167,7 @@
                 {{ tr('Close') }}
             </x-ui.secondary-button>
 
-            @can('attendance.manage')
+            @if($canManageSchedules)
             <x-ui.primary-button
                 wire:click="applyCriteriaSelectionToBulk"
                 wire:loading.attr="disabled"
@@ -177,7 +177,7 @@
                 <i class="fas fa-spinner fa-spin" wire:loading wire:target="applyCriteriaSelectionToBulk"></i>
                 <span>{{ tr('Apply to Bulk') }} ({{ is_array($criteriaPreviewSelected) ? count($criteriaPreviewSelected) : 0 }})</span>
             </x-ui.primary-button>
-            @endcan
+            @endif
         </div>
     </x-slot>
 </x-ui.modal>
