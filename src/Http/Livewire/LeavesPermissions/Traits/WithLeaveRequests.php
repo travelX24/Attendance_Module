@@ -221,12 +221,12 @@ trait WithLeaveRequests
 
     public function updatedLeavePolicyId($value): void
     {
-        $this->hydrateCreateLeavePolicyMeta(true); // Ã¢Å“â€¦ Ã™â€¡Ã™â€ Ã˜Â§ Ã™ÂÃ™â€šÃ˜Â·
+        $this->hydrateCreateLeavePolicyMeta(true); // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Ãƒâ„¢Ã¢â‚¬Â¡Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â§ Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â·
     }
 
     public function updatedStartDate($value): void
     {
-        // Ã™â€žÃ™Ë† Ã™â€ Ã˜ÂµÃ™Â Ã™Å Ã™Ë†Ã™â€¦ Ã˜Â£Ã™Ë† Ã˜Â³Ã˜Â§Ã˜Â¹Ã˜Â§Ã˜Âª Ã™â€ Ã˜Â®Ã™â€žÃ™Å  end_date = start_date Ã˜ÂªÃ™â€žÃ™â€šÃ˜Â§Ã˜Â¦Ã™Å Ã˜Â§Ã™â€¹
+        // Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã‹â€  Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚ÂµÃƒâ„¢Ã‚Â Ãƒâ„¢Ã…Â Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Â¦ ÃƒËœÃ‚Â£Ãƒâ„¢Ã‹â€  ÃƒËœÃ‚Â³ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â®Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã…Â  end_date = start_date ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¦Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¹
         if ($this->create_leave_duration_unit !== 'full_day') {
             $this->end_date = (string) $value;
         }
@@ -245,7 +245,7 @@ trait WithLeaveRequests
     }
 
     // =========================================================
-    // Ã¢Å“â€¦ Open/Close
+    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Open/Close
     // =========================================================
     public function openCreateLeave(): void
     {
@@ -267,7 +267,7 @@ trait WithLeaveRequests
     public function closeCreateLeave(): void { $this->createLeaveOpen = false; }
 
     // =========================================================
-    // Ã¢Å“â€¦ Save Leave (policy-driven)
+    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Save Leave (policy-driven)
     // =========================================================
     public function saveLeave(): void
     {
@@ -300,7 +300,7 @@ trait WithLeaveRequests
             $this->leaveRequestsValidationAttributes()
         );
 
-        // âœ… Check Workflow existence
+        // Ã¢Å“â€¦ Check Workflow existence
         if (class_exists(\Athka\SystemSettings\Services\Approvals\ApprovalService::class)) {
             $approvalService = app(\Athka\SystemSettings\Services\Approvals\ApprovalService::class);
             $workflowReason = null;
@@ -309,10 +309,14 @@ trait WithLeaveRequests
 
             if ($hasPolicies) {
                 if (!$hasWorkflow) {
-                    $msg = tr('You are not authorized to apply for this leave type as per current approval policies.');
-                    if ($workflowReason === 'missing_direct_manager') {
-                        $msg = tr('Cannot submit request: Your direct manager is not assigned in the system.');
-                    }
+                    $msg = match ($workflowReason) {
+                        'missing_direct_manager' => tr('Cannot submit request: Your direct manager is not assigned in the system.'),
+                        'invalid_user_approver' => tr('Cannot submit request: The approval workflow has an approver user that is not linked to an employee.'),
+                        'no_steps_defined' => tr('Cannot submit request: The approval policy has no approval steps.'),
+                        'no_matching_policy' => tr('Cannot submit request: No approval policy matches this employee.'),
+                        'invalid_employee_approver', 'unresolvable_approver_step' => tr('Cannot submit request: The approval workflow contains an invalid approver.'),
+                        default => tr('Cannot submit request, please contact administration to review the approval workflow.'),
+                    };
                     $this->addError('start_date', $msg);
                     return;
                 }
@@ -337,7 +341,7 @@ trait WithLeaveRequests
             return;
         }
 
-        // âœ… Exceptional Day Overlap Check
+        // Ã¢Å“â€¦ Exceptional Day Overlap Check
         if (class_exists(\Athka\SystemSettings\Services\WorkScheduleService::class)) {
             $wsService = app(\Athka\SystemSettings\Services\WorkScheduleService::class);
             $currDate = $start->copy();
@@ -407,7 +411,7 @@ trait WithLeaveRequests
                 return;
             }
 
-            // Ã¢Å“â€¦ NEW: workday minutes Ã™â€¦Ã™â€  policy.settings Ã˜Â£Ã™Ë† Ã™â€¦Ã™â€  work_schedules Ã˜Â£Ã™Ë† fallback config
+            // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ NEW: workday minutes Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Â  policy.settings ÃƒËœÃ‚Â£Ãƒâ„¢Ã‹â€  Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Â  work_schedules ÃƒËœÃ‚Â£Ãƒâ„¢Ã‹â€  fallback config
             $settings = (array) ($policy->settings ?? []);
             $workdayMinutesSetting = data_get($settings, 'workday_minutes', null);
 
@@ -425,7 +429,7 @@ trait WithLeaveRequests
             $minutes = $mins;
             $this->leave_minutes = $mins;
 
-            // Store as fraction of day (Ã™â€¦Ã˜Â«Ã™â€žÃ˜Â§Ã™â€¹ 2 Ã˜Â³Ã˜Â§Ã˜Â¹Ã˜Â§Ã˜Âª Ã™â€¦Ã™â€  8 = 0.25)
+            // Store as fraction of day (Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â«Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¹ 2 ÃƒËœÃ‚Â³ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Â  8 = 0.25)
             $requestedDays = round($mins / $workdayMinutes, 6);
         }
         else {
@@ -504,7 +508,7 @@ trait WithLeaveRequests
             'requested_days' => $requestedDays,
             'reason' => $data['reason'] ?? null,
 
-            // âœ… NEW fields
+            // Ã¢Å“â€¦ NEW fields
             'duration_unit' => $this->create_leave_duration_unit,
             'half_day_part' => $halfPart,
             'from_time' => $fromTime,
@@ -526,7 +530,7 @@ trait WithLeaveRequests
             'replacement_status' => !empty($data['replacement_employee_id']) ? 'pending' : null,
         ]);
 
-        // âœ… Integrate with Approval Workflow
+        // Ã¢Å“â€¦ Integrate with Approval Workflow
         try {
             $approvalService = app(\Athka\SystemSettings\Services\Approvals\ApprovalService::class);
             $src = $approvalService->getRequestSource('leaves');
@@ -555,7 +559,7 @@ trait WithLeaveRequests
     }
 
     // =========================================================
-    // Ã¢Å“â€¦ Helpers: policy meta/rules/filtering
+    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Helpers: policy meta/rules/filtering
     // =========================================================
     protected function resetCreateLeavePolicyMeta(): void
     {
@@ -616,7 +620,7 @@ trait WithLeaveRequests
         $requiresAttachment = (bool) ($policy->requires_attachment ?? false);
         $needAttachment = $requiresAttachment || $noteRequired || trim($noteText) !== '';
 
-        // Ã¢Å“â€¦ meta Ã™ÂÃ™â€šÃ˜Â· (Ã˜Â¨Ã˜Â¯Ã™Ë†Ã™â€  Ã™â€žÃ™â€¦Ã˜Â³ Ã™â€¦Ã˜Â¯Ã˜Â®Ã™â€žÃ˜Â§Ã˜Âª Ã˜Â§Ã™â€žÃ™â€¦Ã˜Â³Ã˜ÂªÃ˜Â®Ã˜Â¯Ã™â€¦)
+        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ meta Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â· (ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â¯Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Â  Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â³ Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â®Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â³ÃƒËœÃ‚ÂªÃƒËœÃ‚Â®ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬Â¦)
         $this->create_leave_duration_unit = $unit;
         $this->create_leave_note_text = $noteText;
         $this->create_leave_note_ack_required = $noteAckRequired;
@@ -629,7 +633,7 @@ trait WithLeaveRequests
             $this->end_date = $this->start_date;
         }
 
-        // Ã¢Å“â€¦ Reset Ã˜Â§Ã™â€žÃ™â€¦Ã˜Â¯Ã˜Â®Ã™â€žÃ˜Â§Ã˜Âª Ã™ÂÃ™â€šÃ˜Â· Ã˜Â¹Ã™â€ Ã˜Â¯ Ã˜ÂªÃ˜ÂºÃ™Å Ã™Å Ã˜Â± policy (Ã™â€¦Ã˜Â´ Ã˜Â¹Ã™â€ Ã˜Â¯ Ã˜Â§Ã™â€žÃ˜Â­Ã™ÂÃ˜Â¸)
+        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Reset ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â®Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â· ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â¯ ÃƒËœÃ‚ÂªÃƒËœÃ‚ÂºÃƒâ„¢Ã…Â Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â± policy (Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â´ ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â¯ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â­Ãƒâ„¢Ã‚ÂÃƒËœÃ‚Â¸)
         if ($resetInputs) {
             $this->leave_attachment = null;
             $this->leave_note_ack = false;
@@ -745,10 +749,10 @@ trait WithLeaveRequests
 
         if (Schema::hasColumn('leave_policies', 'is_active')) $q->where('is_active', true);
 
-        // Ã¢Å“â€¦ HR screen: Ã™â€žÃ˜Â§ Ã™â€ Ã™â€šÃ™Å Ã™â€˜Ã˜Â¯ Ã˜Â¨Ã™â‚¬ show_in_app Ã˜Â­Ã˜ÂªÃ™â€° Ã˜ÂªÃ˜Â¸Ã™â€¡Ã˜Â± Ã™Æ’Ã™â€ž Ã˜Â§Ã™â€žÃ˜Â³Ã™Å Ã˜Â§Ã˜Â³Ã˜Â§Ã˜Âª Ã˜Â§Ã™â€žÃ™ÂÃ˜Â¹Ã™â€˜Ã˜Â§Ã™â€žÃ˜Â©
+        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ HR screen: Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§ Ãƒâ„¢Ã¢â‚¬Â Ãƒâ„¢Ã¢â‚¬Å¡Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬ËœÃƒËœÃ‚Â¯ ÃƒËœÃ‚Â¨Ãƒâ„¢Ã¢â€šÂ¬ show_in_app ÃƒËœÃ‚Â­ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Â° ÃƒËœÃ‚ÂªÃƒËœÃ‚Â¸Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â± Ãƒâ„¢Ã†â€™Ãƒâ„¢Ã¢â‚¬Å¾ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â³Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â§ÃƒËœÃ‚Â³ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã‚ÂÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬ËœÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â©
         // if (Schema::hasColumn('leave_policies', 'show_in_app')) $q->where('show_in_app', true);
 
-        // Ã¢Å“â€¦ year filter (id vs year)
+        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ year filter (id vs year)
         $this->applyLeavePolicyYearFilter($q);
 
         if (Schema::hasColumn('leave_policies', 'gender') && in_array($gender, ['male', 'female'], true)) {
@@ -761,7 +765,7 @@ trait WithLeaveRequests
             abort(422, tr('This policy is not available for the selected employee.'));
         }
 
-        // Ã¢Å“â€¦ Check contract type exclusions
+        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Check contract type exclusions
         $excluded = (array) ($policy->excluded_contract_types ?? []);
         if (in_array($employee->contract_type, $excluded)) {
             abort(422, tr('Your contract type is not eligible for this leave policy.'));
@@ -775,15 +779,15 @@ trait WithLeaveRequests
         $raw = strtolower(trim((string) ($employee->gender ?? $employee->sex ?? '')));
 
         $map = [
-            'm' => 'male', 'male' => 'male', 'Ã˜Â°Ã™Æ’Ã˜Â±' => 'male', 'man' => 'male',
-            'f' => 'female', 'female' => 'female', 'Ã˜Â£Ã™â€ Ã˜Â«Ã™â€°' => 'female', 'woman' => 'female',
+            'm' => 'male', 'male' => 'male', 'ÃƒËœÃ‚Â°Ãƒâ„¢Ã†â€™ÃƒËœÃ‚Â±' => 'male', 'man' => 'male',
+            'f' => 'female', 'female' => 'female', 'ÃƒËœÃ‚Â£Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â«Ãƒâ„¢Ã¢â‚¬Â°' => 'female', 'woman' => 'female',
         ];
 
         return $map[$raw] ?? $raw;
     }
 
     // =========================================================
-    // Ã¢Å“â€¦ NEW: work_schedules helpers (safe fallback)
+    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ NEW: work_schedules helpers (safe fallback)
     // =========================================================
     protected function normalizeWorkingDaysArray($raw): array
     {
@@ -943,7 +947,7 @@ trait WithLeaveRequests
     }
 
     // =========================================================
-    // Ã¢Å“â€¦ Time parsing + minutes
+    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Time parsing + minutes
     // =========================================================
     protected function computeMinutesSafe(string $from, string $to): int
     {
@@ -952,15 +956,15 @@ trait WithLeaveRequests
 
         if (! $a || ! $b) return 0;
 
-        // Ã¢Å“â€¦ NEW: Ã™â€žÃ™Ë† "Ã˜Â¥Ã™â€žÃ™â€°" <= "Ã™â€¦Ã™â€ " => Ã˜ÂºÃ˜Â§Ã™â€žÃ˜Â¨Ã˜Â§Ã™â€¹ Ã™Ë†Ã˜Â±Ã˜Â¯Ã™Å Ã˜Â© Ã™â€žÃ™Å Ã™â€žÃ™Å Ã˜Â© (Ã˜ÂªÃ˜Â¹Ã˜Â¨Ã˜Â± Ã™â€¦Ã™â€ Ã˜ÂªÃ˜ÂµÃ™Â Ã˜Â§Ã™â€žÃ™â€žÃ™Å Ã™â€ž)
+        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ NEW: Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã‹â€  "ÃƒËœÃ‚Â¥Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â°" <= "Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Â " => ÃƒËœÃ‚ÂºÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¹ Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¯Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© (ÃƒËœÃ‚ÂªÃƒËœÃ‚Â¹ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â± Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚ÂªÃƒËœÃ‚ÂµÃƒâ„¢Ã‚Â ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Å¾)
         if ($b->lte($a)) {
             $hasAmPm = (bool) preg_match('/\b(AM|PM)\b/i', ($from . ' ' . $to));
 
-            // Ã™â€žÃ™Ë† Ã˜Â¯Ã˜Â§Ã˜Â®Ã™â€ž AM/PM: Ã˜Â§Ã˜Â¹Ã˜ÂªÃ˜Â¨Ã˜Â± "Ã˜Â¥Ã™â€žÃ™â€°" Ã™ÂÃ™Å  Ã˜Â§Ã™â€žÃ™Å Ã™Ë†Ã™â€¦ Ã˜Â§Ã™â€žÃ˜ÂªÃ˜Â§Ã™â€žÃ™Å 
+            // Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã‹â€  ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â§ÃƒËœÃ‚Â®Ãƒâ„¢Ã¢â‚¬Å¾ AM/PM: ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¹ÃƒËœÃ‚ÂªÃƒËœÃ‚Â¨ÃƒËœÃ‚Â± "ÃƒËœÃ‚Â¥Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â°" Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â  ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã…Â Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Â¦ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã…Â 
             if ($hasAmPm) {
                 $b = $b->copy()->addDay();
             } else {
-                // fallback: Ã™â€žÃ™Ë† Ã™Æ’Ã™â€žÃ˜Â§Ã™â€¡Ã™â€¦Ã˜Â§ Ã˜Â£Ã™â€šÃ™â€ž Ã™â€¦Ã™â€  12 Ã™Ë†Ã™ÂÃ™Å Ã™â€¡ Ã˜Â§Ã˜Â­Ã˜ÂªÃ™â€¦Ã˜Â§Ã™â€ž Ã˜Â¥Ã˜Â¯Ã˜Â®Ã˜Â§Ã™â€ž Ã˜Â¨Ã˜Â¯Ã™Ë†Ã™â€  24h
+                // fallback: Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã‹â€  Ãƒâ„¢Ã†â€™Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¡Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§ ÃƒËœÃ‚Â£Ãƒâ„¢Ã¢â‚¬Å¡Ãƒâ„¢Ã¢â‚¬Å¾ Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Â  12 Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Â¡ ÃƒËœÃ‚Â§ÃƒËœÃ‚Â­ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ ÃƒËœÃ‚Â¥ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â®ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â¯Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Â  24h
                 if ($a->hour < 12 && $b->hour < 12) {
                     $try = $b->copy()->addHours(12);
                     $b = $try->gt($a) ? $try : $b->copy()->addDay();
@@ -979,30 +983,30 @@ trait WithLeaveRequests
         $t = trim($t);
         if ($t === '') return null;
 
-        // Ã¢Å“â€¦ Ã™â€ Ã˜Â¸Ã™â€˜Ã™Â Ã™Æ’Ã™â€ž Ã˜Â¹Ã™â€žÃ˜Â§Ã™â€¦Ã˜Â§Ã˜Âª Ã˜Â§Ã™â€žÃ˜Â§Ã˜ÂªÃ˜Â¬Ã˜Â§Ã™â€¡/Ã˜Â§Ã™â€žÃ™â€¦Ã˜Â­Ã˜Â§Ã˜Â±Ã™Â Ã˜Â§Ã™â€žÃ˜Â®Ã™ÂÃ™Å Ã˜Â© Ã˜Â§Ã™â€žÃ™â€¦Ã˜Â­Ã˜ÂªÃ™â€¦Ã™â€žÃ˜Â© (RTL/LTR/Bidi)
+        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â¸Ãƒâ„¢Ã¢â‚¬ËœÃƒâ„¢Ã‚Â Ãƒâ„¢Ã†â€™Ãƒâ„¢Ã¢â‚¬Å¾ ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§ÃƒËœÃ‚ÂªÃƒËœÃ‚Â¬ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¡/ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â­ÃƒËœÃ‚Â§ÃƒËœÃ‚Â±Ãƒâ„¢Ã‚Â ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â®Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â ÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â­ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â© (RTL/LTR/Bidi)
         $t = preg_replace('/[\x{061C}\x{200E}\x{200F}\x{202A}-\x{202E}\x{2066}-\x{2069}]/u', '', $t);
 
-        // Ã¢Å“â€¦ Ã˜Â§Ã˜Â³Ã˜ÂªÃ˜Â¨Ã˜Â¯Ã˜Â§Ã™â€ž Ã™â€¦Ã˜Â³Ã˜Â§Ã™ÂÃ˜Â§Ã˜Âª Ã˜Â®Ã˜Â§Ã˜ÂµÃ˜Â© (NBSP Ã™Ë†Ã˜ÂºÃ™Å Ã˜Â±Ã™â€¡Ã˜Â§) Ã˜Â¥Ã™â€žÃ™â€° Ã™â€¦Ã˜Â³Ã˜Â§Ã™ÂÃ˜Â© Ã˜Â¹Ã˜Â§Ã˜Â¯Ã™Å Ã˜Â©
+        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ ÃƒËœÃ‚Â§ÃƒËœÃ‚Â³ÃƒËœÃ‚ÂªÃƒËœÃ‚Â¨ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â³ÃƒËœÃ‚Â§Ãƒâ„¢Ã‚ÂÃƒËœÃ‚Â§ÃƒËœÃ‚Âª ÃƒËœÃ‚Â®ÃƒËœÃ‚Â§ÃƒËœÃ‚ÂµÃƒËœÃ‚Â© (NBSP Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚ÂºÃƒâ„¢Ã…Â ÃƒËœÃ‚Â±Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â§) ÃƒËœÃ‚Â¥Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â° Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â³ÃƒËœÃ‚Â§Ãƒâ„¢Ã‚ÂÃƒËœÃ‚Â© ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¯Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â©
         $t = str_replace(["\xC2\xA0"], ' ', $t);
         $t = preg_replace('/\s+/u', ' ', $t);
 
-        // Ã¢Å“â€¦ Ã˜ÂªÃ˜Â­Ã™Ë†Ã™Å Ã™â€ž Ã˜Â§Ã™â€žÃ˜Â£Ã˜Â±Ã™â€šÃ˜Â§Ã™â€¦ Ã˜Â§Ã™â€žÃ˜Â¹Ã˜Â±Ã˜Â¨Ã™Å Ã˜Â©/Ã˜Â§Ã™â€žÃ™ÂÃ˜Â§Ã˜Â±Ã˜Â³Ã™Å Ã˜Â© Ã˜Â¥Ã™â€žÃ™â€° Ã˜Â£Ã˜Â±Ã™â€šÃ˜Â§Ã™â€¦ Ã˜Â¥Ã™â€ Ã˜Â¬Ã™â€žÃ™Å Ã˜Â²Ã™Å Ã˜Â© (Ã˜Â§Ã˜Â­Ã˜ÂªÃ™Å Ã˜Â§Ã˜Â·)
+        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ ÃƒËœÃ‚ÂªÃƒËœÃ‚Â­Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Å¾ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â£ÃƒËœÃ‚Â±Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¦ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¨Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â©/ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã‚ÂÃƒËœÃ‚Â§ÃƒËœÃ‚Â±ÃƒËœÃ‚Â³Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© ÃƒËœÃ‚Â¥Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â° ÃƒËœÃ‚Â£ÃƒËœÃ‚Â±Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¦ ÃƒËœÃ‚Â¥Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â¬Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â²Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© (ÃƒËœÃ‚Â§ÃƒËœÃ‚Â­ÃƒËœÃ‚ÂªÃƒâ„¢Ã…Â ÃƒËœÃ‚Â§ÃƒËœÃ‚Â·)
         $t = str_replace(
-            ['Ã™Â ','Ã™Â¡','Ã™Â¢','Ã™Â£','Ã™Â¤','Ã™Â¥','Ã™Â¦','Ã™Â§','Ã™Â¨','Ã™Â©','Ã›Â°','Ã›Â±','Ã›Â²','Ã›Â³','Ã›Â´','Ã›Âµ','Ã›Â¶','Ã›Â·','Ã›Â¸','Ã›Â¹'],
+            ['Ãƒâ„¢Ã‚Â ','Ãƒâ„¢Ã‚Â¡','Ãƒâ„¢Ã‚Â¢','Ãƒâ„¢Ã‚Â£','Ãƒâ„¢Ã‚Â¤','Ãƒâ„¢Ã‚Â¥','Ãƒâ„¢Ã‚Â¦','Ãƒâ„¢Ã‚Â§','Ãƒâ„¢Ã‚Â¨','Ãƒâ„¢Ã‚Â©','Ãƒâ€ºÃ‚Â°','Ãƒâ€ºÃ‚Â±','Ãƒâ€ºÃ‚Â²','Ãƒâ€ºÃ‚Â³','Ãƒâ€ºÃ‚Â´','Ãƒâ€ºÃ‚Âµ','Ãƒâ€ºÃ‚Â¶','Ãƒâ€ºÃ‚Â·','Ãƒâ€ºÃ‚Â¸','Ãƒâ€ºÃ‚Â¹'],
             ['0','1','2','3','4','5','6','7','8','9','0','1','2','3','4','5','6','7','8','9'],
             $t
         );
 
-        // Ã¢Å“â€¦ Ã˜Â¯Ã˜Â¹Ã™â€¦ Ã˜Â¹Ã˜Â±Ã˜Â¨Ã™Å  (Ã™â€žÃ™Ë† Ã˜Â­Ã˜ÂµÃ™â€ž)
-        $t = str_replace(['Ã˜Âµ', 'Ã˜ÂµÃ˜Â¨Ã˜Â§Ã˜Â­Ã˜Â§Ã™â€¹', 'Ã˜ÂµÃ˜Â¨Ã˜Â§Ã˜Â­Ã˜Â§'], 'AM', $t);
-        $t = str_replace(['Ã™â€¦', 'Ã™â€¦Ã˜Â³Ã˜Â§Ã˜Â¡Ã™â€¹', 'Ã™â€¦Ã˜Â³Ã˜Â§Ã˜Â¡'], 'PM', $t);
+        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â¹Ãƒâ„¢Ã¢â‚¬Â¦ ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â±ÃƒËœÃ‚Â¨Ãƒâ„¢Ã…Â  (Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã‹â€  ÃƒËœÃ‚Â­ÃƒËœÃ‚ÂµÃƒâ„¢Ã¢â‚¬Å¾)
+        $t = str_replace(['ÃƒËœÃ‚Âµ', 'ÃƒËœÃ‚ÂµÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§ÃƒËœÃ‚Â­ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¹', 'ÃƒËœÃ‚ÂµÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§ÃƒËœÃ‚Â­ÃƒËœÃ‚Â§'], 'AM', $t);
+        $t = str_replace(['Ãƒâ„¢Ã¢â‚¬Â¦', 'Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â³ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¡Ãƒâ„¢Ã¢â‚¬Â¹', 'Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â³ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¡'], 'PM', $t);
 
-        // Ã¢Å“â€¦ Ã™Ë†Ã˜Â­Ã™â€˜Ã˜Â¯ AM/PM + Ã˜Â¹Ã˜Â§Ã™â€žÃ˜Â¬ "03:28PM" Ã˜Â¨Ã˜Â¯Ã™Ë†Ã™â€  Ã™â€¦Ã˜Â³Ã˜Â§Ã™ÂÃ˜Â©
+        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â­Ãƒâ„¢Ã¢â‚¬ËœÃƒËœÃ‚Â¯ AM/PM + ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¬ "03:28PM" ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â¯Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Â  Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â³ÃƒËœÃ‚Â§Ãƒâ„¢Ã‚ÂÃƒËœÃ‚Â©
         $t = str_ireplace(['am', 'pm'], ['AM', 'PM'], $t);
         $t = preg_replace('/(\d)(AM|PM)$/i', '$1 $2', $t);
 
-        // Ã¢Å“â€¦ Regex fallback Ã™â€šÃ™Ë†Ã™Å  Ã˜Â¬Ã˜Â¯Ã™â€¹Ã˜Â§: Ã™Å Ã™â€žÃ™â€šÃ˜Â· "03:40 PM" Ã˜Â­Ã˜ÂªÃ™â€° Ã™â€žÃ™Ë† Ã™ÂÃ™Å Ã™â€¡ Ã˜Â±Ã™â€¦Ã™Ë†Ã˜Â²/Ã™ÂÃ™Ë†Ã˜Â§Ã˜ÂµÃ™â€ž Ã˜ÂºÃ˜Â±Ã™Å Ã˜Â¨Ã˜Â©
-        if (preg_match('/^\s*(\d{1,2})\s*[:Ã¯Â¼Å¡Ã™Â«.]\s*(\d{2})(?:\s*[:Ã¯Â¼Å¡Ã™Â«.]\s*(\d{2}))?\s*(AM|PM)?\s*$/i', $t, $m)) {
+        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Regex fallback Ãƒâ„¢Ã¢â‚¬Å¡Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã…Â  ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬Â¹ÃƒËœÃ‚Â§: Ãƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â· "03:40 PM" ÃƒËœÃ‚Â­ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Â° Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã‹â€  Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â Ãƒâ„¢Ã¢â‚¬Â¡ ÃƒËœÃ‚Â±Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â²/Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§ÃƒËœÃ‚ÂµÃƒâ„¢Ã¢â‚¬Å¾ ÃƒËœÃ‚ÂºÃƒËœÃ‚Â±Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â©
+        if (preg_match('/^\s*(\d{1,2})\s*[:ÃƒÂ¯Ã‚Â¼Ã…Â¡Ãƒâ„¢Ã‚Â«.]\s*(\d{2})(?:\s*[:ÃƒÂ¯Ã‚Â¼Ã…Â¡Ãƒâ„¢Ã‚Â«.]\s*(\d{2}))?\s*(AM|PM)?\s*$/i', $t, $m)) {
             $h = (int) $m[1];
             $i = (int) $m[2];
             $ampm = strtoupper(trim((string)($m[4] ?? '')));
@@ -1015,7 +1019,7 @@ trait WithLeaveRequests
             }
         }
 
-        // Ã¢Å“â€¦ Ã˜ÂµÃ™Å Ã˜Âº Ã™â€¦Ã˜Â¨Ã˜Â§Ã˜Â´Ã˜Â±Ã˜Â©
+        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ ÃƒËœÃ‚ÂµÃƒâ„¢Ã…Â ÃƒËœÃ‚Âº Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â§ÃƒËœÃ‚Â´ÃƒËœÃ‚Â±ÃƒËœÃ‚Â©
         $formats = [
             'H:i', 'H:i:s',
             'h:i A', 'h:i:s A',
@@ -1031,7 +1035,7 @@ trait WithLeaveRequests
             } catch (\Throwable $e) {}
         }
 
-        // Ã¢Å“â€¦ fallback Ã˜Â£Ã˜Â®Ã™Å Ã˜Â±
+        // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ fallback ÃƒËœÃ‚Â£ÃƒËœÃ‚Â®Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â±
         try {
             return Carbon::parse($t)->setDate(2000, 1, 1);
         } catch (\Throwable $e) {
@@ -1040,7 +1044,7 @@ trait WithLeaveRequests
     }
 
     // =========================================================
-    // Ã¢Å“â€¦ Existing Group Leave/Cut Leave code (unchanged)
+    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Existing Group Leave/Cut Leave code (unchanged)
     // =========================================================
     public function openCreateGroupLeave(): void
     {
@@ -1063,8 +1067,8 @@ trait WithLeaveRequests
         $this->groupBranchId = null;
         $this->groupContractType = '';
 
-        // Ã™â€šÃ˜Â¨Ã™â€ž: $this->resetGroupLeavePolicyMeta();
-        // Ã˜Â¨Ã˜Â¹Ã˜Â¯: Ã™â€ Ã˜Â¬Ã˜Â¨Ã˜Â±Ã™â€¡Ã˜Â§ Full Day (Ã˜Â¨Ã˜Â¯Ã™Ë†Ã™â€  Ã˜Â³Ã™Å Ã˜Â§Ã˜Â³Ã˜Â©)
+        // Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â¨Ãƒâ„¢Ã¢â‚¬Å¾: $this->resetGroupLeavePolicyMeta();
+        // ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â¯: Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â¬ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â±Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â§ Full Day (ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â¯Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Â  ÃƒËœÃ‚Â³Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â§ÃƒËœÃ‚Â³ÃƒËœÃ‚Â©)
         $this->group_leave_duration_unit = 'full_day';
         $this->group_leave_half_day_part = 'first_half';
         $this->group_leave_from_time = '';
@@ -1128,7 +1132,7 @@ trait WithLeaveRequests
 
         $cutEnd = Carbon::parse($data['cut_new_end_date'])->startOfDay();
 
-        // Ã™â€žÃ˜Â§Ã˜Â²Ã™â€¦ Ã™Å Ã™Æ’Ã™Ë†Ã™â€  Ã˜Â¯Ã˜Â§Ã˜Â®Ã™â€ž Ã˜Â§Ã™â€žÃ™â€¦Ã˜Â¯Ã˜Â© Ã™Ë†Ã˜Â£Ã™â€šÃ™â€ž Ã™â€¦Ã™â€  Ã˜Â§Ã™â€žÃ™â€ Ã™â€¡Ã˜Â§Ã™Å Ã˜Â©
+        // Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â§ÃƒËœÃ‚Â²Ãƒâ„¢Ã¢â‚¬Â¦ Ãƒâ„¢Ã…Â Ãƒâ„¢Ã†â€™Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Â  ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â§ÃƒËœÃ‚Â®Ãƒâ„¢Ã¢â‚¬Å¾ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â© Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â£Ãƒâ„¢Ã¢â‚¬Å¡Ãƒâ„¢Ã¢â‚¬Å¾ Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Â  ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â§Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â©
         if ($cutEnd->lt($origStart) || $cutEnd->gte($origEnd)) {
             session()->flash('error', tr('Invalid cut end date.'));
             return;
@@ -1288,7 +1292,7 @@ trait WithLeaveRequests
             'leave_note_ack.accepted'   => tr('You must acknowledge the note.'),
 
             // ====== Group Leave (NOW: no policy) ======
-            // Ã™â€šÃ˜Â¨Ã™â€ž:
+            // Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â¨Ãƒâ„¢Ã¢â‚¬Å¾:
             // 'group_leave_policy_id.required' => tr('Please select a leave policy.'),
             // 'group_leave_policy_id.min'      => tr('Please select a leave policy.'),
 
@@ -1302,7 +1306,7 @@ trait WithLeaveRequests
             'group_end_date.date'            => tr('End date is not valid.'),
             'group_end_date.after_or_equal'  => tr('End date must be after or equal to start date.'),
 
-            // Ã¢Å“â€¦ NEW: group reason required
+            // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ NEW: group reason required
             'group_reason.required'          => tr('Reason is required.'),
 
             'groupEmployeeIds.required'      => tr('Please select at least one employee.'),
@@ -1736,7 +1740,7 @@ trait WithLeaveRequests
             return;
         }
 
-        // âœ… Exceptional Day Overlap Check (Group)
+        // Ã¢Å“â€¦ Exceptional Day Overlap Check (Group)
         if (class_exists(\Athka\SystemSettings\Services\WorkScheduleService::class)) {
             $wsService = app(\Athka\SystemSettings\Services\WorkScheduleService::class);
             $currDate = $start->copy();
@@ -1848,7 +1852,7 @@ trait WithLeaveRequests
 
     protected function computeGroupAbsenceDays(Carbon $start, Carbon $end): float
     {
-        // Ã™â€ Ã˜Â¹Ã˜ÂªÃ˜Â¨Ã˜Â±Ã™â€¡ "Ã˜ÂºÃ™Å Ã˜Â§Ã˜Â¨ Ã™â€¦Ã™ÂÃ˜Â¨Ã˜Â±Ã™â€˜Ã˜Â±" => Ã™â€ Ã˜Â¹Ã˜Â¯ Ã™ÂÃ™â€šÃ˜Â· Ã˜Â£Ã™Å Ã˜Â§Ã™â€¦ Ã˜Â§Ã™â€žÃ˜Â¯Ã™Ë†Ã˜Â§Ã™â€¦Ã˜Å’ Ã™Ë†Ã™â€ Ã˜Â³Ã˜ÂªÃ˜Â«Ã™â€ Ã™Å  Ã˜Â§Ã™â€žÃ˜Â¹Ã˜Â·Ã™â€ž Ã˜Â§Ã™â€žÃ˜Â±Ã˜Â³Ã™â€¦Ã™Å Ã˜Â©
+        // Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â¹ÃƒËœÃ‚ÂªÃƒËœÃ‚Â¨ÃƒËœÃ‚Â±Ãƒâ„¢Ã¢â‚¬Â¡ "ÃƒËœÃ‚ÂºÃƒâ„¢Ã…Â ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¨ Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã‚ÂÃƒËœÃ‚Â¨ÃƒËœÃ‚Â±Ãƒâ„¢Ã¢â‚¬ËœÃƒËœÃ‚Â±" => Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â¯ Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â· ÃƒËœÃ‚Â£Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¦ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¯Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ…â€™ Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â³ÃƒËœÃ‚ÂªÃƒËœÃ‚Â«Ãƒâ„¢Ã¢â‚¬Â Ãƒâ„¢Ã…Â  ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â·Ãƒâ„¢Ã¢â‚¬Å¾ ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â±ÃƒËœÃ‚Â³Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â©
         $workingDays = $this->companyWorkingDays();
 
         $holidays = OfficialHolidayOccurrence::where('company_id', $this->companyId)
@@ -1955,7 +1959,7 @@ trait WithLeaveRequests
 
         $this->group_leave_duration_unit = $unit;
 
-        // Ã™â€žÃ™Ë† Ã™â€ Ã˜ÂµÃ™Â Ã™Å Ã™Ë†Ã™â€¦ Ã˜Â£Ã™Ë† Ã˜Â³Ã˜Â§Ã˜Â¹Ã˜Â§Ã˜Âª: Ã˜Â§Ã™â€žÃ™â€ Ã™â€¡Ã˜Â§Ã™Å Ã˜Â© = Ã˜Â§Ã™â€žÃ˜Â¨Ã˜Â¯Ã˜Â§Ã™Å Ã˜Â©
+        // Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã‹â€  Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚ÂµÃƒâ„¢Ã‚Â Ãƒâ„¢Ã…Â Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Â¦ ÃƒËœÃ‚Â£Ãƒâ„¢Ã‹â€  ÃƒËœÃ‚Â³ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª: ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Â Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â§Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© = ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â§Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â©
         if ($this->group_leave_duration_unit !== 'full_day' && $this->group_start_date !== '') {
             $this->group_end_date = $this->group_start_date;
         }
@@ -2036,22 +2040,22 @@ trait WithLeaveRequests
     }
     protected function lpAllowedBranchIdsSafe(): array
     {
-        // Ã™â€žÃ™Ë† Ã™â€¦Ã™Ë†Ã˜Â¬Ã™Ë†Ã˜Â¯Ã˜Â© Ã˜Â§Ã™â€žÃ˜Â¯Ã˜Â§Ã™â€žÃ˜Â© Ã˜Â§Ã™â€žÃ˜Â£Ã˜Â³Ã˜Â§Ã˜Â³Ã™Å Ã˜Â© Ã˜Â§Ã™â€žÃ˜ÂªÃ™Å  Ã˜Â£Ã˜Â¶Ã™ÂÃ™â€ Ã˜Â§Ã™â€¡Ã˜Â§ Ã™ÂÃ™Å  WithLeavePermissionsFilters Ã˜Â§Ã˜Â³Ã˜ÂªÃ˜Â®Ã˜Â¯Ã™â€¦Ã™â€¡Ã˜Â§
+        // Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã‹â€  Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¬Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â¯ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚Â£ÃƒËœÃ‚Â³ÃƒËœÃ‚Â§ÃƒËœÃ‚Â³Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â© ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Å¾ÃƒËœÃ‚ÂªÃƒâ„¢Ã…Â  ÃƒËœÃ‚Â£ÃƒËœÃ‚Â¶Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â§ Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã…Â  WithLeavePermissionsFilters ÃƒËœÃ‚Â§ÃƒËœÃ‚Â³ÃƒËœÃ‚ÂªÃƒËœÃ‚Â®ÃƒËœÃ‚Â¯Ãƒâ„¢Ã¢â‚¬Â¦Ãƒâ„¢Ã¢â‚¬Â¡ÃƒËœÃ‚Â§
         if (method_exists($this, 'lpAllowedBranchIds')) {
             try {
                 $ids = $this->lpAllowedBranchIds();
                 return is_array($ids) ? array_values(array_filter(array_map('intval', $ids))) : [];
             } catch (\Throwable $e) {
-                // fallback Ã˜ÂªÃ˜Â­Ã˜Âª
+                // fallback ÃƒËœÃ‚ÂªÃƒËœÃ‚Â­ÃƒËœÃ‚Âª
             }
         }
 
-        // fallback Ã˜Â¨Ã˜Â³Ã™Å Ã˜Â· (Ã™â€žÃ™Ë† Ã™â€¦Ã˜Â§ Ã˜Â·Ã˜Â¨Ã™â€šÃ˜Âª lpAllowedBranchIds Ã˜Â¨Ã˜Â¹Ã˜Â¯)
+        // fallback ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â³Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â· (Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã‹â€  Ãƒâ„¢Ã¢â‚¬Â¦ÃƒËœÃ‚Â§ ÃƒËœÃ‚Â·ÃƒËœÃ‚Â¨Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Âª lpAllowedBranchIds ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â¯)
         $user = auth()->user();
         if (!$user) return [];
 
         if (isset($user->access_scope) && $user->access_scope === 'all_branches') {
-            return []; // Ã˜Â¨Ã˜Â¯Ã™Ë†Ã™â€  Ã™â€šÃ™Å Ã™Ë†Ã˜Â¯
+            return []; // ÃƒËœÃ‚Â¨ÃƒËœÃ‚Â¯Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Â  Ãƒâ„¢Ã¢â‚¬Å¡Ãƒâ„¢Ã…Â Ãƒâ„¢Ã‹â€ ÃƒËœÃ‚Â¯
         }
 
         if (Schema::hasTable('branch_user_access')) {
