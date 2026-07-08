@@ -563,18 +563,34 @@ class Index extends Component
         $stats = $this->stats;
         [$dateFrom, $dateTo] = $this->getEffectiveDateRange();
 
+        $penalties->each(function ($penalty) {
+            $employee = $penalty->employee;
+            $penalty->pdf_employee_name = $this->pdfReshape($employee?->name_ar ?? $employee?->name_en ?? '-');
+            $penalty->pdf_violation = $this->pdfReshape(tr(ucfirst((string) $penalty->violation_type)));
+            $penalty->pdf_status = $this->pdfReshape(tr(ucfirst((string) $penalty->status)));
+        });
+
         $pdf = Pdf::loadView('attendance::pdf.daily-penalties', [
             'penalties' => $penalties,
             'stats' => $stats,
             'date_from' => $dateFrom,
             'date_to' => $dateTo,
-        ]);
+            'reshaper' => fn ($text) => $this->pdfReshape($text),
+        ])->setPaper('a4', 'landscape');
 
         return response()->streamDownload(function () use ($pdf) {
             echo $pdf->stream();
         }, "daily_penalties_" . now()->format('YmdHis') . ".pdf");
     }
 
+    private function pdfReshape($text)
+    {
+        if (class_exists('\Athka\Employees\Support\ArabicHelper')) {
+            return \Athka\Employees\Support\ArabicHelper::prepareForPdf((string) $text);
+        }
+
+        return $text;
+    }
     private function getPenaltiesQuery()
     {
         return $this->buildPenaltiesQuery(true)->orderByDesc('attendance_date');
