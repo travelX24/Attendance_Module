@@ -247,18 +247,7 @@ class Index extends Component
 
     public function loadStats()
     {
-        $companyId = auth()->user()->saas_company_id;
-        $query = AttendanceDailyPenalty::forCompany($companyId);
-
-        $query = $this->applyDataScoping($query, 'attendance.penalties.view', 'attendance.penalties.view-subordinates');
-        $query = $this->applyBranchScopeToPenaltiesQuery($query);
-        $query = $this->applyPenaltyDateFilters($query);
-
-        if ($this->status_emp_filter !== 'all') {
-            $query->whereHas('employee', fn($q) => $q->withoutGlobalScope('active_only')->where('status', (string) $this->status_emp_filter));
-        }
-
-        $base = clone $query;
+        $base = $this->buildPenaltiesQuery(false);
 
         $this->stats = [
             'total_calculated' => (clone $base)->sum('calculated_amount'),
@@ -267,52 +256,12 @@ class Index extends Component
             'total_waivers'    => (clone $base)->where('status', 'waived')->count(),
         ];
     }
-
     public function getPenaltiesProperty()
     {
-        $companyId = auth()->user()->saas_company_id;
-        $query = AttendanceDailyPenalty::forCompany($companyId)
-            ->with([
-                'employee' => fn ($q) => $q->withoutGlobalScope('active_only')->with(['department', 'jobTitle', 'branch']),
-                'attendanceLog',
-            ]);
-
-        $query = $this->applyDataScoping($query, 'attendance.penalties.view', 'attendance.penalties.view-subordinates');
-        $query = $this->applyBranchScopeToPenaltiesQuery($query);
-        $query = $this->applyPenaltyDateFilters($query);
-
-        if ($this->violation_type_filter !== 'all') {
-            $query->where('violation_type', $this->violation_type_filter);
-        }
-
-        if ($this->status_filter !== 'all') {
-            $query->where('status', $this->status_filter);
-        }
-
-        if ($this->status_emp_filter !== 'all') {
-            $query->whereHas('employee', fn($q) => $q->withoutGlobalScope('active_only')->where('status', (string) $this->status_emp_filter));
-        }
-
-        if (!$this->isAll($this->department_id)) {
-            $query->whereHas('employee', fn($q) => $q->withoutGlobalScope('active_only')->where('department_id', (int) $this->department_id));
-        }
-
-        if (!$this->isAll($this->job_title_id)) {
-            $query->whereHas('employee', fn($q) => $q->withoutGlobalScope('active_only')->where('job_title_id', (int) $this->job_title_id));
-        }
-
-        if ($this->search) {
-            $query->whereHas('employee', function ($q) {
-                $q->withoutGlobalScope('active_only');
-                $q->where('name_ar', 'like', '%' . $this->search . '%')
-                    ->orWhere('name_en', 'like', '%' . $this->search . '%')
-                    ->orWhere('employee_no', 'like', '%' . $this->search . '%');
-            });
-        }
-
-        return $query->orderByDesc('attendance_date')->paginate(10);
+        return $this->buildPenaltiesQuery(true)
+            ->orderByDesc('attendance_date')
+            ->paginate(10);
     }
-
     public function runCalculation(PenaltyService $service)
     {
         $this->requireAttendanceAny('attendance.penalties.manage');
@@ -628,43 +577,63 @@ class Index extends Component
 
     private function getPenaltiesQuery()
     {
+        return $this->buildPenaltiesQuery(true)->orderByDesc('attendance_date');
+    }
+
+    private function buildPenaltiesQuery(bool $withRelations = false)
+    {
         $companyId = auth()->user()->saas_company_id;
-        $query = AttendanceDailyPenalty::forCompany($companyId)
-            ->with([
+        $query = AttendanceDailyPenalty::forCompany($companyId);
+
+        if ($withRelations) {
+            $query->with([
                 'employee' => fn ($q) => $q->withoutGlobalScope('active_only')->with(['department', 'jobTitle', 'branch']),
                 'attendanceLog',
             ]);
+        }
 
         $query = $this->applyDataScoping($query, 'attendance.penalties.view', 'attendance.penalties.view-subordinates');
         $query = $this->applyBranchScopeToPenaltiesQuery($query);
         $query = $this->applyPenaltyDateFilters($query);
+        $query = $this->applyPenaltyFilters($query);
 
-        if ($this->violation_type_filter !== 'all') $query->where('violation_type', $this->violation_type_filter);
-        if ($this->status_filter !== 'all') $query->where('status', $this->status_filter);
+        return $query;
+    }
+
+    private function applyPenaltyFilters($query)
+    {
+        if ($this->violation_type_filter !== 'all') {
+            $query->where('violation_type', $this->violation_type_filter);
+        }
+
+        if ($this->status_filter !== 'all') {
+            $query->where('status', $this->status_filter);
+        }
+
         if ($this->status_emp_filter !== 'all') {
             $query->whereHas('employee', fn($q) => $q->withoutGlobalScope('active_only')->where('status', (string) $this->status_emp_filter));
         }
 
-        if ($this->department_id !== 'all') {
-            $query->whereHas('employee', fn($q) => $q->withoutGlobalScope('active_only')->where('department_id', $this->department_id));
+        if (!$this->isAll($this->department_id)) {
+            $query->whereHas('employee', fn($q) => $q->withoutGlobalScope('active_only')->where('department_id', (int) $this->department_id));
         }
 
-        if ($this->job_title_id !== 'all') {
-            $query->whereHas('employee', fn($q) => $q->withoutGlobalScope('active_only')->where('job_title_id', $this->job_title_id));
+        if (!$this->isAll($this->job_title_id)) {
+            $query->whereHas('employee', fn($q) => $q->withoutGlobalScope('active_only')->where('job_title_id', (int) $this->job_title_id));
         }
 
         if ($this->search) {
-            $query->whereHas('employee', function ($q) {
+            $search = '%' . $this->search . '%';
+            $query->whereHas('employee', function ($q) use ($search) {
                 $q->withoutGlobalScope('active_only');
-                $q->where('name_ar', 'like', '%' . $this->search . '%')
-                    ->orWhere('name_en', 'like', '%' . $this->search . '%')
-                    ->orWhere('employee_no', 'like', '%' . $this->search . '%');
+                $q->where('name_ar', 'like', $search)
+                    ->orWhere('name_en', 'like', $search)
+                    ->orWhere('employee_no', 'like', $search);
             });
         }
 
-        return $query->orderByDesc('attendance_date');
+        return $query;
     }
-
     private function allowedBranchIds(): array
     {
         $user = auth()->user();

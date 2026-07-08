@@ -35,7 +35,7 @@ class PenaltyService
 
         $logs = AttendanceDailyLog::forCompany($companyId)
             ->whereBetween('attendance_date', [$dateFrom, $dateTo])
-            ->whereIn('attendance_status', ['late', 'early_departure', 'absent', 'auto_checkout'])
+            ->whereIn('attendance_status', ['present', 'late', 'early_departure', 'absent', 'auto_checkout'])
             ->when(!empty($employeeIds), fn ($q) => $q->whereIn('employee_id', $employeeIds))
             ->get();
 
@@ -126,19 +126,21 @@ class PenaltyService
 
         $created = false;
 
-        if ($log->attendance_status === 'late') {
+        $status = $this->resolvePenaltyStatus($log);
+
+        if ($status === 'late') {
             $created = $this->processViolation($log, $policyId, 'delay') || $created;
         }
 
-        if ($log->attendance_status === 'early_departure') {
+        if ($status === 'early_departure') {
             $created = $this->processViolation($log, $policyId, 'early_departure') || $created;
         }
 
-        if ($log->attendance_status === 'absent') {
+        if ($status === 'absent') {
             $created = $this->processViolation($log, $policyId, 'absent') || $created;
         }
 
-        if ($log->attendance_status === 'auto_checkout') {
+        if ($status === 'auto_checkout') {
             $grace = \Athka\SystemSettings\Models\AttendanceGraceSetting::where('saas_company_id', $log->saas_company_id)->first();
             if ($grace && (bool)$grace->auto_checkout_penalty_enabled) {
                 $created = $this->processViolation($log, $policyId, 'auto_checkout') || $created;
@@ -389,6 +391,11 @@ class PenaltyService
 
     private function getLateMinutes(AttendanceDailyLog $log): int
     {
+        $detailMinutes = $this->sumDetailLateMinutes($log);
+        if ($detailMinutes > 0) {
+            return $detailMinutes;
+        }
+
         $s = $this->parseTimeOnDate($log->attendance_date, $log->scheduled_check_in);
         $a = $this->parseTimeOnDate($log->attendance_date, $log->check_in_time);
 
@@ -401,6 +408,11 @@ class PenaltyService
 
     private function getEarlyDepartureMinutes(AttendanceDailyLog $log): int
     {
+        $detailMinutes = $this->sumDetailEarlyDepartureMinutes($log);
+        if ($detailMinutes > 0) {
+            return $detailMinutes;
+        }
+
         $s = $this->parseTimeOnDate($log->attendance_date, $log->scheduled_check_out);
         $a = $this->parseTimeOnDate($log->attendance_date, $log->check_out_time);
 
@@ -409,6 +421,92 @@ class PenaltyService
         }
 
         return max(0, $a->diffInMinutes($s, false));
+    }
+
+    private function resolvePenaltyStatus(AttendanceDailyLog $log): string
+    {
+        if (in_array($log->attendance_status, ['late', 'early_departure', 'absent', 'auto_checkout'], true)) {
+            return (string) $log->attendance_status;
+        }
+
+        $grace = \Athka\SystemSettings\Models\AttendanceGraceSetting::where('saas_company_id', $log->saas_company_id)->first();
+        $lateGrace = (int) ($grace->late_grace_minutes ?? 0);
+        $earlyGrace = (int) ($grace->early_leave_grace_minutes ?? 0);
+
+        if ($this->getEarlyDepartureMinutes($log) > $earlyGrace) {
+            return 'early_departure';
+        }
+
+        if ($this->getLateMinutes($log) > $lateGrace) {
+            return 'late';
+        }
+
+        return (string) $log->attendance_status;
+    }
+
+    private function sumDetailLateMinutes(AttendanceDailyLog $log): int
+    {
+        return $this->sumDetailViolationMinutes($log, 'late');
+    }
+
+    private function sumDetailEarlyDepartureMinutes(AttendanceDailyLog $log): int
+    {
+        return $this->sumDetailViolationMinutes($log, 'early_departure');
+    }
+
+    private function sumDetailViolationMinutes(AttendanceDailyLog $log, string $type): int
+    {
+        $details = DB::table('attendance_daily_details')
+            ->where('daily_log_id', $log->id)
+            ->get();
+
+        if ($details->isEmpty()) {
+            return 0;
+        }
+
+        $periodIds = $details->pluck('work_schedule_period_id')->filter()->unique()->values();
+        if ($periodIds->isEmpty()) {
+            return 0;
+        }
+
+        $periods = DB::table('work_schedule_periods')
+            ->whereIn('id', $periodIds)
+            ->get()
+            ->keyBy('id');
+
+        $total = 0;
+
+        foreach ($details as $detail) {
+            if (! $detail->work_schedule_period_id || ! isset($periods[$detail->work_schedule_period_id])) {
+                continue;
+            }
+
+            $period = $periods[$detail->work_schedule_period_id];
+
+            if ($type === 'late') {
+                $scheduled = $this->parseTimeOnDate($log->attendance_date, $period->start_time);
+                $actual = $this->parseTimeOnDate($log->attendance_date, $detail->check_in_time);
+                if ($scheduled && $actual) {
+                    $total += max(0, $scheduled->diffInMinutes($actual, false));
+                }
+            }
+
+            if ($type === 'early_departure') {
+                $scheduledStart = $this->parseTimeOnDate($log->attendance_date, $period->start_time);
+                $scheduledEnd = $this->parseTimeOnDate($log->attendance_date, $period->end_time);
+                $actual = $this->parseTimeOnDate($log->attendance_date, $detail->check_out_time);
+
+                if ($scheduledStart && $scheduledEnd && $actual) {
+                    if ((bool) $period->is_night_shift || $scheduledEnd->lt($scheduledStart)) {
+                        $scheduledEnd->addDay();
+                    }
+
+                    $total += max(0, $actual->diffInMinutes($scheduledEnd, false));
+                }
+            }
+        }
+
+        return $total;
     }
 
     private function parseTimeOnDate($date, $time): ?Carbon

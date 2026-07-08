@@ -3,9 +3,15 @@
     $isRtl  = in_array(substr($locale, 0, 2), ['ar','fa','ur','he']);
     $dir    = $isRtl ? 'rtl' : 'ltr';
     $attendanceUser = auth()->user();
-    $canManagePenalties = $attendanceUser?->can('attendance.penalties.manage');
-    $canWaivePenalties = $canManagePenalties;
-    $canExportPenalties = $canManagePenalties;
+    $canManagePenalties = (bool) $attendanceUser?->can('attendance.penalties.manage');
+    $canWaivePenalties = $canManagePenalties || (bool) $attendanceUser?->can('attendance.penalties.waive');
+    $canExportPenalties = $canManagePenalties || (bool) $attendanceUser?->can('attendance.penalties.export');
+    $canViewPenalties = $canManagePenalties
+        || $canWaivePenalties
+        || $canExportPenalties
+        || (bool) $attendanceUser?->can('attendance.penalties.view')
+        || (bool) $attendanceUser?->can('attendance.penalties.view-subordinates');
+    $canFilterPenalties = $canViewPenalties;
 @endphp
 
 @section('topbar-left-content')
@@ -76,7 +82,7 @@
                     <x-ui.search-box
                         model="search"
                         :placeholder="tr('Search employee...')"
-                        :disabled="!$canManagePenalties"
+                        :disabled="!$canFilterPenalties"
                     />
                 </div>
 
@@ -90,7 +96,7 @@
                             ['value' => 'range', 'label' => tr('Range')],
                         ]"
                         width="full"
-                        :disabled="!$canManagePenalties"
+                        :disabled="!$canFilterPenalties"
                     />
                 </div>
 
@@ -106,7 +112,7 @@
                                 type="button"
                                 wire:click="goToPreviousDay"
                                 class="h-11 w-11 shrink-0 inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 hover:text-[color:var(--accent-orange)] hover:border-[color:var(--accent-orange)]/30 transition"
-                                @disabled(!$canManagePenalties)
+                                @disabled(!$canFilterPenalties)
                                 title="{{ tr('Previous day') }}"
                             >
                                 <i class="fas fa-chevron-{{ $isRtl ? 'right' : 'left' }}"></i>
@@ -117,7 +123,7 @@
                                     type="date"
                                     wire:model.live="date_from"
                                     class="absolute inset-0 opacity-0 cursor-pointer z-10"
-                                    @disabled(!$canManagePenalties)
+                                    @disabled(!$canFilterPenalties)
                                 >
 
                                 <div class="h-11 px-4 border border-gray-200 rounded-xl bg-white flex items-center justify-center gap-3 shadow-sm">
@@ -132,7 +138,7 @@
                                 type="button"
                                 wire:click="goToNextDay"
                                 class="h-11 w-11 shrink-0 inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 hover:text-[color:var(--accent-orange)] hover:border-[color:var(--accent-orange)]/30 transition"
-                                @disabled(!$canManagePenalties)
+                                @disabled(!$canFilterPenalties)
                                 title="{{ tr('Next day') }}"
                             >
                                 <i class="fas fa-chevron-{{ $isRtl ? 'left' : 'right' }}"></i>
@@ -144,7 +150,7 @@
                         <x-ui.company-date-picker
                             model="date_from"
                             :label="tr('From Date')"
-                            :disabled="!$canManagePenalties"
+                            :disabled="!$canFilterPenalties"
                         />
                     </div>
 
@@ -152,7 +158,7 @@
                         <x-ui.company-date-picker
                             model="date_to"
                             :label="tr('To Date')"
-                            :disabled="!$canManagePenalties"
+                            :disabled="!$canFilterPenalties"
                         />
                     </div>
                 @endif
@@ -169,7 +175,7 @@
                             ['value' => 'auto_checkout', 'label' => tr('Auto Checkout (System-generated due to missing manual punch)')],
                         ]"
                         width="full"
-                        :disabled="!$canManagePenalties"
+                        :disabled="!$canFilterPenalties"
                     />
                 </div>
 
@@ -184,7 +190,7 @@
                             ['value' => 'waived', 'label' => tr('Waived')],
                         ]"
                         width="full"
-                        :disabled="!$canManagePenalties"
+                        :disabled="!$canFilterPenalties"
                     />
                 </div>
 
@@ -195,7 +201,7 @@
                         :placeholder="tr('All')"
                         :options="\Athka\Employees\Support\EmployeeStatus::filterOptions(true)"
                         width="full"
-                        :disabled="!$canManagePenalties"
+                        :disabled="!$canFilterPenalties"
                     />
                 </div>
 
@@ -206,7 +212,7 @@
                         :placeholder="tr('All')"
                         :options="$branches->map(fn($b) => ['value' => $b->id, 'label' => $b->name])->toArray()"
                         width="full"
-                        :disabled="!$canManagePenalties"
+                        :disabled="!$canFilterPenalties"
                     />
                 </div>
 
@@ -217,7 +223,7 @@
                         :placeholder="tr('All')"
                         :options="$departments->map(fn($d) => ['value' => $d->id, 'label' => $d->name])->toArray()"
                         width="full"
-                        :disabled="!$canManagePenalties"
+                        :disabled="!$canFilterPenalties"
                     />
                 </div>
 
@@ -228,7 +234,7 @@
                         :placeholder="tr('All')"
                         :options="$jobTitles->map(fn($j) => ['value' => $j->id, 'label' => $j->name])->toArray()"
                         width="full"
-                        :disabled="!$canManagePenalties"
+                        :disabled="!$canFilterPenalties"
                     />
                 </div>
             </div>
@@ -306,14 +312,14 @@
                             <span class="font-bold">{{ tr('Refresh') }}</span>
                         </x-ui.secondary-button>
 
-                        @if($canManagePenalties)
+                        @if($canExportPenalties)
                             <x-ui.secondary-button wire:click="exportExcel" size="sm" class="!rounded-xl gap-2 flex-1 sm:flex-none justify-center">
                                 <i class="fas fa-file-excel text-xs"></i>
                                 <span class="font-bold">{{ tr('Excel') }}</span>
                             </x-ui.secondary-button>
                         @endif
 
-                        @if($canManagePenalties)
+                        @if($canExportPenalties)
                             <x-ui.secondary-button wire:click="exportPdf" size="sm" class="!rounded-xl gap-2 flex-1 sm:flex-none justify-center">
                                 <i class="fas fa-file-pdf text-xs"></i>
                                 <span class="font-bold">{{ tr('PDF') }}</span>
@@ -476,19 +482,23 @@
                         </td>
                         <td class="px-6 py-4 text-center">
                             <x-ui.actions-menu>
-                                @if($canManagePenalties)
-                                    <x-ui.dropdown-item wire:click="openExemptionModal({{ $penalty->id }})" :disabled="$penalty->status === 'confirmed'">
-                                        <i class="fas fa-gift me-2 text-[color:var(--warning)]"></i>
-                                        <span>{{ tr('Exempt/Waive') }}</span>
-                                    </x-ui.dropdown-item>
-                                    <x-ui.dropdown-item wire:click="openConfirmModal({{ $penalty->id }})" :disabled="$penalty->status !== 'pending'">
-                                        <i class="fas fa-check-circle me-2 text-[color:var(--success)]"></i>
-                                        <span>{{ tr('Confirm for Payroll') }}</span>
-                                    </x-ui.dropdown-item>
-                                    <x-ui.dropdown-item danger wire:click="deletePenalty({{ $penalty->id }})" :disabled="$penalty->status === 'confirmed'">
-                                        <i class="fas fa-trash me-2"></i>
-                                        <span>{{ tr('Delete') }}</span>
-                                    </x-ui.dropdown-item>
+                                @if($canManagePenalties || $canWaivePenalties)
+                                    @if($canWaivePenalties)
+                                        <x-ui.dropdown-item wire:click="openExemptionModal({{ $penalty->id }})" :disabled="$penalty->status === 'confirmed'">
+                                            <i class="fas fa-gift me-2 text-[color:var(--warning)]"></i>
+                                            <span>{{ tr('Exempt/Waive') }}</span>
+                                        </x-ui.dropdown-item>
+                                    @endif
+                                    @if($canManagePenalties)
+                                        <x-ui.dropdown-item wire:click="openConfirmModal({{ $penalty->id }})" :disabled="$penalty->status !== 'pending'">
+                                            <i class="fas fa-check-circle me-2 text-[color:var(--success)]"></i>
+                                            <span>{{ tr('Confirm for Payroll') }}</span>
+                                        </x-ui.dropdown-item>
+                                        <x-ui.dropdown-item danger wire:click="deletePenalty({{ $penalty->id }})" :disabled="$penalty->status === 'confirmed'">
+                                            <i class="fas fa-trash me-2"></i>
+                                            <span>{{ tr('Delete') }}</span>
+                                        </x-ui.dropdown-item>
+                                    @endif
                                 @else
                                     <span class="text-gray-400 p-2 italic whitespace-nowrap"><i class="fas fa-lock text-[10px] me-1"></i> {{ tr('Read Only') }}</span>
                                 @endif
@@ -517,7 +527,7 @@
             <div class="space-y-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">{{ tr('Exemption Type') }}</label>
-                    <select wire:model.live="exemptionForm.type" class="w-full border-gray-300 rounded-lg shadow-sm" :disabled="!$canManagePenalties">
+                    <select wire:model.live="exemptionForm.type" class="w-full border-gray-300 rounded-lg shadow-sm" :disabled="!$canWaivePenalties">
                         <option value="full">{{ tr('Full Waiver (100%)') }}</option>
                         <option value="partial">{{ tr('Partial Exemption') }}</option>
                     </select>
@@ -525,7 +535,7 @@
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">{{ tr('Exemption Reason') }}</label>
-                    <select wire:model="exemptionForm.reason" class="w-full border-gray-300 rounded-lg shadow-sm" :disabled="!$canManagePenalties">
+                    <select wire:model="exemptionForm.reason" class="w-full border-gray-300 rounded-lg shadow-sm" :disabled="!$canWaivePenalties">
                         <option value="">{{ tr('Select reason...') }}</option>
                         <option value="business_mission">{{ tr('Business Mission') }}</option>
                         <option value="emergency_case">{{ tr('Emergency Case') }}</option>
@@ -539,13 +549,13 @@
                 @if($exemptionForm['type'] === 'partial')
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ tr('Exempt Amount') }}</label>
-                        <x-ui.input type="number" wire:model="exemptionForm.amount" :disabled="!$canManagePenalties" />
+                        <x-ui.input type="number" wire:model="exemptionForm.amount" :disabled="!$canWaivePenalties" />
                     </div>
                 @endif
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">{{ tr('Reason') }}</label>
-                    <textarea wire:model="exemptionForm.details" rows="3" class="w-full border-gray-300 rounded-lg shadow-sm" placeholder="{{ tr('Why is this penalty being waived?') }}" :disabled="!$canManagePenalties"></textarea>
+                    <textarea wire:model="exemptionForm.details" rows="3" class="w-full border-gray-300 rounded-lg shadow-sm" placeholder="{{ tr('Why is this penalty being waived?') }}" :disabled="!$canWaivePenalties"></textarea>
                 </div>
 
                 <div>
@@ -556,7 +566,7 @@
                             <div class="flex text-sm text-gray-600">
                                 <label for="file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-[color:var(--accent-orange)] hover:brightness-90">
                                     <span>{{ tr('Upload a file') }}</span>
-                                    <input id="file-upload" type="file" wire:model="exemptionForm.attachment" class="sr-only" @if(!$canManagePenalties) disabled @endif>
+                                    <input id="file-upload" type="file" wire:model="exemptionForm.attachment" class="sr-only" @if(!$canWaivePenalties) disabled @endif>
                                 </label>
                             </div>
                             <p class="text-xs text-gray-500">PNG, JPG, PDF up to 10MB</p>
@@ -574,7 +584,7 @@
 
         <x-slot name="footer">
             <x-ui.secondary-button @click="showExemptionModal = false">{{ tr('Cancel') }}</x-ui.secondary-button>
-            @if($canManagePenalties)
+            @if($canWaivePenalties)
                 <x-ui.primary-button wire:click="saveExemption">{{ tr('Apply Waiver') }}</x-ui.primary-button>
             @endif
         </x-slot>
