@@ -513,7 +513,7 @@
                                             </span>
                                         @endif
 
-                                        {{-- â­ Exceptional Day Badge --}}
+                                        {{-- * Exceptional Day Badge --}}
                                         @if($log->scheduleException && $log->scheduleException->exception_date->format('Y-m-d') === $log->attendance_date->format('Y-m-d'))
                                             <span class="text-[color:var(--warning)] bg-[color:var(--warning)]/10 px-1.5 py-0.5 rounded-md border border-[color:var(--warning)]/25 cursor-help" title="{{ tr('Exceptional Day') }}: {{ $log->scheduleException->exception_type }}">
                                                 <i class="fas fa-star text-[10px]"></i>

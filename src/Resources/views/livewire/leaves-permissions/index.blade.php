@@ -17,7 +17,7 @@
 
         if ($unit === 'hours') {
             $mins = (int) ($r->minutes ?? 0);
-            if ($mins <= 0) return 'Ã¢â‚¬â€';
+            if ($mins <= 0) return '-';
             $hours = $mins / 60;
             return $smartNumber((float)$hours, 2) . ' ' . tr('Hours');
         }
@@ -45,7 +45,7 @@
 
     $formatMissionDuration = function ($r) use ($smartNumber): string {
         if ($r->type === 'partial') {
-            return ($r->from_time ?? '--') . ' Ã¢â€ â€™ ' . ($r->to_time ?? '--');
+            return ($r->from_time ?? '--') . ' - ' . ($r->to_time ?? '--');
         }
         $start = \Carbon\Carbon::parse($r->start_date);
         $end = \Carbon\Carbon::parse($r->end_date ?: $r->start_date);
@@ -437,7 +437,7 @@
 
                                 <td class="p-3">
                                     <div class="text-xs text-gray-600">
-                                        {{ company_date($r->start_date) }} Ã¢â€ â€™ {{ company_date($r->end_date) }}
+                                        {{ company_date($r->start_date) }} - {{ company_date($r->end_date) }}
                                     </div>
                                     <div class="mt-1 font-bold text-gray-900">
                                         {{ $formatLeaveDuration($r) }}
@@ -452,7 +452,7 @@
                                             : ($r->reason ?? null);
                                     @endphp
                                     <div class="max-w-[150px] truncate" title="{{ $reason }}">
-                                        {{ $reason ?: 'Ã¢â‚¬â€' }}
+                                        {{ $reason ?: '-' }}
                                     </div>
                                 </td>
 
@@ -598,7 +598,7 @@
                                         {{ company_date($r->permission_date) }}
                                     </div>
                                     <div class="mt-1 font-mono text-xs text-gray-800 font-bold">
-                                        {{ $r->from_time ?? '--:--' }} Ã¢â€ â€™ {{ $r->to_time ?? '--:--' }}
+                                        {{ $r->from_time ?? '--:--' }} - {{ $r->to_time ?? '--:--' }}
                                     </div>
                                 </td>
 
@@ -608,7 +608,7 @@
 
                                 <td class="p-3 text-gray-700">
                                     <div class="max-w-[150px] truncate" title="{{ $r->reason }}">
-                                        {{ $r->reason ?: 'Ã¢â‚¬â€' }}
+                                        {{ $r->reason ?: '-' }}
                                     </div>
                                 </td>
 
@@ -734,7 +734,7 @@
 
                                 <td class="p-3 text-gray-700">
                                     <div class="font-mono text-xs">
-                                        {{ company_date($row->original_start_date) }} Ã¢â€ â€™ {{ company_date($row->original_end_date) }}
+                                        {{ company_date($row->original_start_date) }} - {{ company_date($row->original_end_date) }}
                                     </div>
                                 </td>
 
@@ -865,7 +865,7 @@
                                 </td>
 
                                 <td class="p-3 text-gray-700 font-mono text-xs">
-                                    {{ company_date($r->start_date) }} {{ $r->end_date && $r->end_date !== $r->start_date ? 'Ã¢â€ â€™ '.company_date($r->end_date) : '' }}
+                                    {{ company_date($r->start_date) }} {{ $r->end_date && $r->end_date !== $r->start_date ? '- '.company_date($r->end_date) : '' }}
                                 </td>
 
                                 <td class="p-3 font-bold text-gray-900">
@@ -873,11 +873,11 @@
                                 </td>
 
                                 <td class="p-3 text-gray-700">
-                                    {{ $r->destination ?: 'Ã¢â‚¬â€' }}
+                                    {{ $r->destination ?: '-' }}
                                 </td>
 
                                 <td class="p-3 text-gray-700">
-                                    {{ $r->reason ?: 'Ã¢â‚¬â€' }}
+                                    {{ $r->reason ?: '-' }}
                                 </td>
 
                                 <td class="p-3">
@@ -1161,7 +1161,7 @@
                                     $taken = (float) $b->taken_days;
                                     $usage = $entitled > 0 ? ($taken / $entitled) * 100 : null;
                                 @endphp
-                                {{ $usage === null ? 'Ã¢â‚¬â€' : number_format($usage, 2) . '%' }}
+                                {{ $usage === null ? '-' : number_format($usage, 2) . '%' }}
                             </td>
 
                              <td class="p-3">
@@ -1310,7 +1310,7 @@
 
                                 <td class="p-3 text-gray-700">
                                     <div class="font-mono text-[10px] whitespace-nowrap">
-                                        {{ company_date($r->start_date) }}<br/>Ã¢â€ â€™ {{ company_date($r->end_date) }}
+                                        {{ company_date($r->start_date) }}<br/>- {{ company_date($r->end_date) }}
                                     </div>
                                 </td>
 
@@ -1326,7 +1326,7 @@
                                             : ($r->reason ?? null);
                                     @endphp
                                     <div class="max-w-[150px] truncate" title="{{ $reason }}">
-                                        {{ $reason ?: 'Ã¢â‚¬â€' }}
+                                        {{ $reason ?: '-' }}
                                     </div>
                                 </td>
 
@@ -1379,7 +1379,7 @@
                                                 <span class="text-xs text-gray-400 italic">{{ tr('Locked') }}</span>
                                             @endif
                                         @else
-                                            <span class="text-xs text-gray-400">Ã¢â‚¬â€</span>
+                                            <span class="text-xs text-gray-400">-</span>
                                         @endif
                                     </div>
                                 </td>
@@ -1452,7 +1452,7 @@
                                         {{ company_date($r->permission_date) }}
                                     </div>
                                     <div class="mt-1 font-mono text-xs text-gray-800 font-bold">
-                                        {{ $r->from_time ?? '--:--' }} Ã¢â€ â€™ {{ $r->to_time ?? '--:--' }}
+                                        {{ $r->from_time ?? '--:--' }} - {{ $r->to_time ?? '--:--' }}
                                     </div>
                                     <div class="mt-1 text-[10px] font-bold text-gray-400">
                                         {{ (int) $r->minutes }} {{ tr('min') }}
@@ -1461,7 +1461,7 @@
 
                                 <td class="p-3 text-gray-700">
                                     <div class="max-w-[150px] truncate" title="{{ $r->reason }}">
-                                        {{ $r->reason ?: 'Ã¢â‚¬â€' }}
+                                        {{ $r->reason ?: '-' }}
                                     </div>
                                 </td>
 
@@ -1500,7 +1500,7 @@
                                                 <i class="fas fa-paperclip"></i>
                                             </a>
                                         @endif
-                                        <span class="text-xs text-gray-400">Ã¢â‚¬â€</span>
+                                        <span class="text-xs text-gray-400">-</span>
                                     </div>
                                 </td>
                             </tr>
@@ -1567,7 +1567,7 @@
 
                                 <td class="p-3 text-gray-700">
                                     <div class="font-mono text-xs">
-                                        {{ company_date($row->original_start_date) }} Ã¢â€ â€™ {{ company_date($row->original_end_date) }}
+                                        {{ company_date($row->original_start_date) }} - {{ company_date($row->original_end_date) }}
                                     </div>
                                 </td>
 
@@ -1673,7 +1673,7 @@
                                 </td>
 
                                 <td class="p-3 text-gray-700 font-mono text-xs">
-                                    {{ company_date($r->start_date) }} {{ $r->end_date && $r->end_date !== $r->start_date ? 'Ã¢â€ â€™ '.company_date($r->end_date) : '' }}
+                                    {{ company_date($r->start_date) }} {{ $r->end_date && $r->end_date !== $r->start_date ? '- '.company_date($r->end_date) : '' }}
                                 </td>
 
                                 <td class="p-3 font-bold text-gray-900">
@@ -1682,7 +1682,7 @@
 
                                 <td class="p-3 text-gray-700">
                                     <div class="max-w-[150px] truncate" title="{{ $r->reason }}">
-                                        {{ $r->reason ?: 'Ã¢â‚¬â€' }}
+                                        {{ $r->reason ?: '-' }}
                                     </div>
                                 </td>
 
@@ -1721,7 +1721,7 @@
                                                 <i class="fas fa-paperclip"></i>
                                             </a>
                                         @else
-                                            <span class="text-xs text-gray-400">Ã¢â‚¬â€</span>
+                                            <span class="text-xs text-gray-400">-</span>
                                         @endif
                                     </div>
                                 </td>
@@ -1790,7 +1790,7 @@
                                             <span class="text-[10px] text-{{ $empStatusColor }}-700 font-bold uppercase">{{ \Athka\Employees\Support\EmployeeStatus::label($empStatus) }}</span>
                                         </div>
                                     @else
-                                        <span class="text-xs text-gray-400">Ã¢â‚¬â€</span>
+                                        <span class="text-xs text-gray-400">-</span>
                                     @endif
                                 </td>
 
@@ -1887,7 +1887,7 @@
                     </div>
                 </div>
 
-                {{-- Ã¢Å“â€¦ Duration (from policy settings) --}}
+                {{-- Duration (from policy settings) --}}
                 @if($leave_policy_id > 0)
                     <div class="bg-gray-50 border border-gray-100 rounded-xl p-3">
                         <div class="text-[11px] text-gray-500 font-bold mb-1">{{ tr('Duration') }}</div>
@@ -1910,7 +1910,7 @@
                     </div>
                 @endif
 
-                {{-- Ã¢Å“â€¦ Date/Time fields based on duration unit --}}
+                {{-- Date/Time fields based on duration unit --}}
                 @if($create_leave_duration_unit === 'full_day')
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
@@ -1952,7 +1952,7 @@
                             @error('start_date') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
                         </div>
                         @php
-                        // Ã˜Â³Ã™â€ Ã™â€¦Ã˜Â±Ã˜Â±Ã™â€¡Ã˜Â§ Ã™â€¦Ã™â€  Ã˜Â§Ã™â€žÃ˜Â³Ã™Å Ã˜Â±Ã™ÂÃ˜Â± Ã˜Â¨Ã˜Â¹Ã˜Â¯ Ã™â€¦Ã˜Â§ Ã™â€ Ã˜Â¹Ã˜Â±Ã™Â Ã˜Â§Ã™â€žÃ˜Â£Ã˜Â¹Ã™â€¦Ã˜Â¯Ã˜Â©
+                        // Passed from the server after columns are known
                         $workStart = $workStart ?? '08:00';
                         $workEnd   = $workEnd   ?? '16:00';
                         @endphp
@@ -1975,7 +1975,7 @@
                     </div>
                 @endif
 
-                {{-- Ã¢Å“â€¦ Policy Note --}}
+                {{-- Policy Note --}}
                 @if(trim($create_leave_note_text) !== '')
                     <div class="bg-[color:var(--warning)]/10 border border-[color:var(--warning)]/20 rounded-xl p-3">
                         <div class="text-[11px] text-[color:var(--warning)] font-bold mb-1">
@@ -1995,7 +1995,7 @@
                     </div>
                 @endif
 
-                {{-- Ã¢Å“â€¦ Attachment (required by policy OR note exists) --}}
+                {{-- Attachment (required by policy OR note exists) --}}
                 @if($create_leave_attachment_required)
                     <div class="bg-gray-50 border border-gray-100 rounded-xl p-3">
                         <div class="text-[11px] text-gray-500 font-bold mb-1">{{ tr('Attachment') }}</div>
@@ -2014,7 +2014,7 @@
 
                         <div class="text-[11px] text-gray-500 mt-2">
                             {{ tr('Allowed') }}: {{ implode(', ', $create_leave_attachment_types) }}
-                            Ã¢â‚¬Â¢ {{ tr('Max') }}: {{ (int) $create_leave_attachment_max_mb }}MB
+                            - {{ tr('Max') }}: {{ (int) $create_leave_attachment_max_mb }}MB
                         </div>
 
                         <div wire:loading wire:target="leave_attachment" class="text-[11px] text-[color:var(--accent-orange)] mt-2">
@@ -2283,7 +2283,7 @@
                     </div>
                 @endif
 
-                {{-- Ã¢Å“â€¦ Date/Time fields based on duration unit --}}
+                {{-- Date/Time fields based on duration unit --}}
                 @if($group_leave_duration_unit === 'full_day')
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                         <div>
@@ -2454,7 +2454,7 @@
                         <option value="{{ $l->id }}">
                             #{{ $l->id }} -
                             {{ $l->employee->name_ar ?? $l->employee->name_en ?? ('#'.$l->employee_id) }}
-                            ({{ optional($l->start_date)->toDateString() }} Ã¢â€ â€™ {{ optional($l->end_date)->toDateString() }})
+                            ({{ optional($l->start_date)->toDateString() }} - {{ optional($l->end_date)->toDateString() }})
                         </option>
                     @endforeach
                 </x-ui.select>
@@ -2558,10 +2558,10 @@
                                                 -{{ number_format($log->requested_days, 2) }}
                                             </td>
                                             <td class="p-3 text-gray-600 truncate max-w-[150px]" title="{{ $log->reason }}">
-                                                {{ $log->reason ?: 'Ã¢â‚¬â€' }}
+                                                {{ $log->reason ?: '-' }}
                                             </td>
                                             <td class="p-3 text-center text-gray-400">
-                                                {{ $log->approved_at ? $log->approved_at->format('Y-m-d') : 'Ã¢â‚¬â€' }}
+                                                {{ $log->approved_at ? $log->approved_at->format('Y-m-d') : '-' }}
                                             </td>
                                         </tr>
                                     @empty
