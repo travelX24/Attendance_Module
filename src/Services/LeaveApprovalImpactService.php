@@ -43,6 +43,9 @@ class LeaveApprovalImpactService
 
     protected function syncAttendanceLogs(AttendanceLeaveRequest $leave): void
     {
+        if ($this->isPartialPeriodLeave($leave)) {
+            return;
+        }
         foreach ($this->leaveDates($leave) as $dateStr) {
             AttendanceDailyLog::updateOrCreate(
                 [
@@ -66,6 +69,9 @@ class LeaveApprovalImpactService
 
     protected function restoreAttendanceLogs(AttendanceLeaveRequest $leave): void
     {
+        if ($this->isPartialPeriodLeave($leave)) {
+            return;
+        }
         foreach ($this->leaveDates($leave) as $dateStr) {
             $log = AttendanceDailyLog::where('saas_company_id', $leave->company_id)
                 ->where('employee_id', $leave->employee_id)
@@ -150,6 +156,12 @@ class LeaveApprovalImpactService
         }
 
         return $entitled;
+    }
+
+    protected function isPartialPeriodLeave(AttendanceLeaveRequest $leave): bool
+    {
+        return (string) ($leave->duration_unit ?? '') === 'half_day'
+            && (!empty($leave->work_schedule_period_id) || (!empty($leave->from_time) && !empty($leave->to_time)));
     }
 
     protected function leaveDates(AttendanceLeaveRequest $leave): array

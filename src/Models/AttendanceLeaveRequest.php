@@ -34,7 +34,7 @@ class AttendanceLeaveRequest extends Model
         'rejected_at',
         'reject_reason',
         'salary_processed_at',
-        'duration_unit', 'half_day_part', 'from_time', 'to_time', 'minutes',
+        'duration_unit', 'half_day_part', 'from_time', 'to_time', 'minutes', 'work_schedule_period_id',
         'attachment_path', 'attachment_name', 'note_ack',
         'is_exception', 'exception_status',
         'replacement_employee_id',

@@ -7,6 +7,7 @@ use Athka\SystemSettings\Models\LeavePolicy;
 use Athka\SystemSettings\Models\LeavePolicyYear; 
 use Athka\SystemSettings\Models\OperationalCalendar;
 use Athka\SystemSettings\Models\OfficialHolidayOccurrence;
+use Athka\SystemSettings\Services\WorkScheduleService;
 use Athka\Attendance\Models\AttendanceLeaveRequest;
 use Athka\Attendance\Models\AttendanceLeaveCutRequest;
 use Carbon\Carbon;
@@ -49,6 +50,7 @@ trait WithLeaveRequests
     public bool $leave_note_ack = false;
 
     public string $leave_half_day_part = 'first_half'; 
+    public int $leave_work_schedule_period_id = 0;
     public string $leave_from_time = ''; 
     public string $leave_to_time = '';   
     public int $leave_minutes = 0;
@@ -230,6 +232,8 @@ trait WithLeaveRequests
         if ($this->create_leave_duration_unit !== 'full_day') {
             $this->end_date = (string) $value;
         }
+
+        $this->leave_work_schedule_period_id = 0;
     }
 
     public function updatedLeaveFromTime(): void { $this->syncLeaveMinutes(); }
@@ -382,13 +386,27 @@ trait WithLeaveRequests
         $fromTime = null;
         $toTime = null;
         $minutes = null;
+        $workSchedulePeriodId = null;
 
         if ($this->create_leave_duration_unit === 'half_day') {
-            $halfPart = (string) ($data['leave_half_day_part'] ?? 'first_half');
+            $periodId = (int) ($data['leave_work_schedule_period_id'] ?? 0);
+            $period = $this->resolveLeaveWorkSchedulePeriod($employee, $start, $periodId);
+            if (!$period) {
+                return;
+            }
 
-            // Ensure it's a valid day (not holiday/weekend if excluded)
             $base = $this->computeRequestedDays($policy, $start, $start);
-            $requestedDays = $base > 0 ? 0.5 : 0.0;
+            if ($base <= 0) {
+                $this->addError('start_date', tr('Selected date is not eligible for this policy'));
+                return;
+            }
+
+            $halfPart = 'work_period';
+            $fromTime = substr((string) $period['start_time'], 0, 5);
+            $toTime = substr((string) $period['end_time'], 0, 5);
+            $minutes = $this->computePeriodMinutes($start, $period);
+            $workSchedulePeriodId = $periodId;
+            $requestedDays = 0.5;
         }
         elseif ($this->create_leave_duration_unit === 'hours') {
             $fromTime = (string) ($data['leave_from_time'] ?? '');
@@ -514,6 +532,7 @@ trait WithLeaveRequests
             'from_time' => $fromTime,
             'to_time' => $toTime,
             'minutes' => $minutes,
+            'work_schedule_period_id' => $workSchedulePeriodId,
 
             'attachment_path' => $attachmentPath,
             'attachment_name' => $attachmentName,
@@ -545,6 +564,7 @@ trait WithLeaveRequests
             'requested_days' => $requestedDays,
             'duration_unit' => $this->create_leave_duration_unit,
             'minutes' => $minutes,
+            'work_schedule_period_id' => $workSchedulePeriodId,
         ], (int) $row->employee_id);
 
         session()->flash('success', tr('Saved successfully'));
@@ -574,6 +594,7 @@ trait WithLeaveRequests
         $this->leave_note_ack = false;
 
         $this->leave_half_day_part = 'first_half';
+        $this->leave_work_schedule_period_id = 0;
         $this->leave_from_time = '';
         $this->leave_to_time = '';
         $this->leave_minutes = 0;
@@ -641,6 +662,7 @@ trait WithLeaveRequests
             $this->leave_from_time = '';
             $this->leave_to_time = '';
             $this->leave_half_day_part = 'first_half';
+            $this->leave_work_schedule_period_id = 0;
         }
     }
 
@@ -665,8 +687,10 @@ trait WithLeaveRequests
         ];
 
         if ($this->create_leave_duration_unit === 'half_day') {
-            $rules['leave_half_day_part'] = ['required', Rule::in(['first_half', 'second_half'])];
+            $rules['leave_work_schedule_period_id'] = ['required', 'integer', 'min:1'];
+            $rules['leave_half_day_part'] = ['nullable'];
         } else {
+            $rules['leave_work_schedule_period_id'] = ['nullable', 'integer'];
             $rules['leave_half_day_part'] = ['nullable'];
         }
 
@@ -922,6 +946,108 @@ trait WithLeaveRequests
         })->values()->all();
     }
 
+    public function getLeaveWorkPeriodOptionsProperty(): array
+    {
+        if ($this->create_leave_duration_unit !== 'half_day' || (int) $this->employee_id <= 0 || trim($this->start_date) === '') {
+            return [];
+        }
+
+        try {
+            $employee = Employee::query()
+                ->when($this->employeeCompanyColumn, fn ($q) => $q->where($this->employeeCompanyColumn, $this->companyId))
+                ->find((int) $this->employee_id);
+
+            if (!$employee) {
+                return [];
+            }
+
+            return $this->getEmployeeWorkSchedulePeriodsForDate($employee, Carbon::parse($this->start_date));
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    protected function getEmployeeWorkSchedulePeriodsForDate(Employee $employee, Carbon $date): array
+    {
+        if (!class_exists(WorkScheduleService::class)) {
+            return [];
+        }
+
+        try {
+            $service = app(WorkScheduleService::class);
+            $dateStr = $date->toDateString();
+            $schedule = $service->getEffectiveSchedule((int) $this->companyId, $employee, $dateStr);
+            $holidays = $service->getHolidays((int) $this->companyId, $dateStr, $dateStr);
+            $metrics = $service->getMetricsForDate($dateStr, $schedule, $holidays, $employee, [
+                'leaves' => collect(),
+                'missions' => collect(),
+                'permissions' => collect(),
+            ]);
+
+            return collect($metrics['periods'] ?? [])
+                ->map(function ($period) {
+                    $start = substr((string) ($period['start_time'] ?? $period['start'] ?? ''), 0, 5);
+                    $end = substr((string) ($period['end_time'] ?? $period['end'] ?? ''), 0, 5);
+                    $id = (int) ($period['id'] ?? 0);
+
+                    return [
+                        'id' => $id,
+                        'start_time' => $start,
+                        'end_time' => $end,
+                        'is_night_shift' => (bool) ($period['is_night_shift'] ?? $period['is_night'] ?? false),
+                        'label' => trim(($start ?: '--:--') . ' - ' . ($end ?: '--:--')),
+                    ];
+                })
+                ->filter(fn ($period) => (int) $period['id'] > 0 && $period['start_time'] !== '' && $period['end_time'] !== '')
+                ->values()
+                ->all();
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    protected function resolveLeaveWorkSchedulePeriod(Employee $employee, Carbon $date, int $periodId): ?array
+    {
+        $periods = $this->getEmployeeWorkSchedulePeriodsForDate($employee, $date);
+
+        if (count($periods) <= 1) {
+            $this->addError('leave_work_schedule_period_id', tr('Half-day leave is only available when the employee schedule has more than one work period.'));
+            return null;
+        }
+
+        if ($periodId <= 0) {
+            $this->addError('leave_work_schedule_period_id', tr('Please select the work period.'));
+            return null;
+        }
+
+        foreach ($periods as $period) {
+            if ((int) $period['id'] === $periodId) {
+                return $period;
+            }
+        }
+
+        $this->addError('leave_work_schedule_period_id', tr('Selected work period is not available for this employee.'));
+        return null;
+    }
+
+    protected function computePeriodMinutes(Carbon $date, array $period): int
+    {
+        $start = $this->parseTimeSafe((string) ($period['start_time'] ?? ''));
+        $end = $this->parseTimeSafe((string) ($period['end_time'] ?? ''));
+
+        if (!$start || !$end) {
+            return 0;
+        }
+
+        $startAt = $date->copy()->setTime($start->hour, $start->minute, 0);
+        $endAt = $date->copy()->setTime($end->hour, $end->minute, 0);
+
+        if ((bool) ($period['is_night_shift'] ?? false) || $endAt->lte($startAt)) {
+            $endAt->addDay();
+        }
+
+        return max(0, (int) $startAt->diffInMinutes($endAt, false));
+    }
     protected function getWorkdayMinutesForDate(Carbon $date): int
     {
         $periods = $this->getWorkSchedulePeriodsForDate($date);
@@ -1331,6 +1457,7 @@ trait WithLeaveRequests
             'start_date'         => tr('Start Date'),
             'end_date'           => tr('End Date'),
             'leave_half_day_part'=> tr('Half day'),
+            'leave_work_schedule_period_id'=> tr('Work period'),
             'leave_from_time'    => tr('From'),
             'leave_to_time'      => tr('To'),
             'leave_attachment'   => tr('Attachment'),

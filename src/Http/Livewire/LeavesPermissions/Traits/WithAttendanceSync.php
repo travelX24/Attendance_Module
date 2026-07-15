@@ -11,6 +11,10 @@ trait WithAttendanceSync
 {
     protected function syncAttendanceLogForLeave(AttendanceLeaveRequest $leave): void
     {
+        if ($this->isPartialPeriodLeave($leave)) {
+            return;
+        }
+
         $start = Carbon::parse($leave->start_date)->startOfDay();
         $end = Carbon::parse($leave->end_date)->startOfDay();
         $cursor = $start->copy();
@@ -28,6 +32,10 @@ trait WithAttendanceSync
 
     protected function removeAttendanceLogSync(AttendanceLeaveRequest $leave): void
     {
+        if ($this->isPartialPeriodLeave($leave)) {
+            return;
+        }
+
         $start = Carbon::parse($leave->start_date)->startOfDay();
         $end = Carbon::parse($leave->end_date)->startOfDay();
         $this->removeAttendanceLogSyncInRange((int)$leave->employee_id, $start, $end);
@@ -49,6 +57,11 @@ trait WithAttendanceSync
                 $log->update(['attendance_status' => 'absent']);
             }
         }
+    }
+    protected function isPartialPeriodLeave(AttendanceLeaveRequest $leave): bool
+    {
+        return (string) ($leave->duration_unit ?? '') === 'half_day'
+            && (!empty($leave->work_schedule_period_id) || (!empty($leave->from_time) && !empty($leave->to_time)));
     }
 }
 

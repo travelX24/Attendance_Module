@@ -240,6 +240,7 @@ trait WithAttendanceFilters
 
             $employeeIds = $employees->getCollection()->pluck('id')->filter()->values()->all();
             $summaryByEmployee = collect();
+            $partialLeaveDaysByEmployee = collect();
             $scheduleNames = collect();
 
             if (!empty($employeeIds)) {
@@ -274,6 +275,43 @@ trait WithAttendanceFilters
                     ->get()
                     ->keyBy('employee_id');
 
+                if (Schema::hasTable('attendance_leave_requests')) {
+                    $leaveColumns = Schema::getColumnListing('attendance_leave_requests');
+
+                    if (in_array('employee_id', $leaveColumns, true)
+                        && in_array('requested_days', $leaveColumns, true)
+                        && in_array('duration_unit', $leaveColumns, true)
+                        && in_array('start_date', $leaveColumns, true)
+                    ) {
+                        $partialLeaveQuery = DB::table('attendance_leave_requests')
+                            ->whereIn('employee_id', $employeeIds)
+                            ->where('status', 'approved')
+                            ->where('duration_unit', 'half_day')
+                            ->whereBetween('start_date', [$startDate, $endDate])
+                            ->where(function ($q) use ($leaveColumns) {
+                                if (in_array('work_schedule_period_id', $leaveColumns, true)) {
+                                    $q->whereNotNull('work_schedule_period_id');
+                                }
+
+                                if (in_array('half_day_part', $leaveColumns, true)) {
+                                    $method = in_array('work_schedule_period_id', $leaveColumns, true) ? 'orWhere' : 'where';
+                                    $q->{$method}('half_day_part', 'work_period');
+                                }
+                            });
+
+                        if (in_array('company_id', $leaveColumns, true)) {
+                            $partialLeaveQuery->where('company_id', $companyId);
+                        } elseif (in_array('saas_company_id', $leaveColumns, true)) {
+                            $partialLeaveQuery->where('saas_company_id', $companyId);
+                        }
+
+                        $partialLeaveDaysByEmployee = $partialLeaveQuery
+                            ->select('employee_id', DB::raw('SUM(requested_days) as partial_leave_days'))
+                            ->groupBy('employee_id')
+                            ->pluck('partial_leave_days', 'employee_id');
+                    }
+                }
+
                 $scheduleIds = $summaryByEmployee
                     ->pluck('schedule_id')
                     ->filter()
@@ -291,6 +329,7 @@ trait WithAttendanceFilters
             foreach ($employees as $employee) {
                 $summary = $summaryByEmployee->get($employee->id);
                 $scheduleId = $summary->schedule_id ?? null;
+                $partialLeaveDays = (float) ($partialLeaveDaysByEmployee->get($employee->id) ?? 0);
 
                 $employee->summary = (object)[
                     'total_days' => (int) ($summary->total_days ?? 0),
@@ -298,7 +337,7 @@ trait WithAttendanceFilters
                     'late_days' => (int) ($summary->late_days ?? 0),
                     'absent_days' => (int) ($summary->absent_days ?? 0),
                     'early_departure_days' => (int) ($summary->early_departure_days ?? 0),
-                    'on_leave_days' => (int) ($summary->on_leave_days ?? 0),
+                    'on_leave_days' => (float) ($summary->on_leave_days ?? 0) + $partialLeaveDays,
                     'auto_checkout_days' => (int) ($summary->auto_checkout_days ?? 0),
                     'total_scheduled_hours' => (float) ($summary->total_scheduled_hours ?? 0),
                     'total_actual_hours' => (float) ($summary->total_actual_hours ?? 0),

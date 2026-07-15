@@ -23,7 +23,10 @@
         }
 
         if ($unit === 'half_day') {
-            return tr('Half day');
+            $from = $r->from_time ? substr((string) $r->from_time, 0, 5) : null;
+            $to = $r->to_time ? substr((string) $r->to_time, 0, 5) : null;
+            $period = ($from && $to) ? (' - ' . $from . ' - ' . $to) : '';
+            return tr('Half day') . $period;
         }
 
         // For full day leaves, if requested_days is in the DB, use it.
@@ -1935,12 +1938,27 @@
                         </div>
 
                         <div>
-                            <div class="text-xs text-gray-500 mb-1">{{ tr('Half day') }}</div>
-                            <x-ui.select wire:model="leave_half_day_part" class="w-full" :disabled="!$canManageLeaveRequests">
-                                <option value="first_half">{{ tr('First half') }}</option>
-                                <option value="second_half">{{ tr('Second half') }}</option>
-                            </x-ui.select>
-                            @error('leave_half_day_part') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                            <div class="text-xs text-gray-500 mb-1">{{ tr('Work period') }}</div>
+                            @php($leaveWorkPeriodOptions = $this->leaveWorkPeriodOptions)
+
+                            @if((int) $employee_id <= 0 || trim($start_date) === '')
+                                <div class="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
+                                    {{ tr('Please select employee and date first.') }}
+                                </div>
+                            @elseif(count($leaveWorkPeriodOptions) <= 1)
+                                <div class="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">
+                                    {{ tr('Half-day leave is only available when the employee schedule has more than one work period.') }}
+                                </div>
+                            @else
+                                <x-ui.select wire:model="leave_work_schedule_period_id" class="w-full" :disabled="!$canManageLeaveRequests">
+                                    <option value="0">{{ tr('Select work period') }}</option>
+                                    @foreach($leaveWorkPeriodOptions as $period)
+                                        <option value="{{ (int) $period['id'] }}">{{ $period['label'] }}</option>
+                                    @endforeach
+                                </x-ui.select>
+                            @endif
+
+                            @error('leave_work_schedule_period_id') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
                         </div>
                     </div>
 
