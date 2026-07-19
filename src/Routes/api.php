@@ -3,7 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Athka\Attendance\Http\Controllers\Api\OfflineAttendanceController;
 
-Route::post('sync', [OfflineAttendanceController::class, 'sync']);
+Route::post('sync', [OfflineAttendanceController::class, 'sync'])->middleware('throttle:attendance-action');
 Route::get('prep-data', [OfflineAttendanceController::class, 'getPrepData']);
 Route::get('pending', [OfflineAttendanceController::class, 'pending']);
-Route::post('{id}/sync-one', [OfflineAttendanceController::class, 'syncOne']);
+Route::post('{id}/sync-one', [OfflineAttendanceController::class, 'syncOne'])->middleware('throttle:attendance-action');
