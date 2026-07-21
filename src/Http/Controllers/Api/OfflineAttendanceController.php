@@ -180,12 +180,16 @@ class OfflineAttendanceController extends Controller
     {
         $user      = $request->user();
         $companyId = (int) ($user->saas_company_id ?? $user->company_id ?? 0);
-
-        $rows = OfflineAttendanceQueue::forCompany($companyId)
+        $query = OfflineAttendanceQueue::forCompany($companyId)
             ->pending()
-            ->with(['employee:id,name_ar,name_en'])
-            ->latest()
-            ->paginate(30);
+            ->with(['employee:id,name_ar,name_en']);
+
+        if (!$this->canManageOfflineAttendance($user)) {
+            $query->where('submitted_by_user_id', $user->id)
+                ->where('employee_id', (int) ($user->employee_id ?? 0));
+        }
+
+        $rows = $query->latest()->paginate(30);
 
         $items = $rows->getCollection()->map(fn($r) => [
             'id'               => $r->id,
@@ -220,8 +224,14 @@ class OfflineAttendanceController extends Controller
     {
         $user      = $request->user();
         $companyId = (int) ($user->saas_company_id ?? $user->company_id ?? 0);
+        $itemQuery = OfflineAttendanceQueue::forCompany($companyId);
 
-        $item = OfflineAttendanceQueue::forCompany($companyId)->findOrFail($id);
+        if (!$this->canManageOfflineAttendance($user)) {
+            $itemQuery->where('submitted_by_user_id', $user->id)
+                ->where('employee_id', (int) ($user->employee_id ?? 0));
+        }
+
+        $item = $itemQuery->findOrFail($id);
 
         if ($item->sync_status === 'synced') {
             return response()->json(['ok' => false, 'message' => tr('Already synced.')]);
@@ -240,6 +250,29 @@ class OfflineAttendanceController extends Controller
     // Private Helpers
     // =========================================================
 
+    private function canManageOfflineAttendance($user): bool
+    {
+        if (!$user || !method_exists($user, 'can')) {
+            return false;
+        }
+
+        foreach (['attendance.daily.manage', 'attendance.logs.sync'] as $permission) {
+            if ($user->can($permission)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private function canSyncOfflineRecordForEmployee($user, int $employeeId): bool
+    {
+        if ($this->canManageOfflineAttendance($user)) {
+            return true;
+        }
+
+        return (int) ($user->employee_id ?? 0) === $employeeId;
+    }
     private function processRecord(array $rec, $user, int $companyId): array
     {
         $employeeId = (int) ($rec['employee_id'] ?? 0);
@@ -254,6 +287,17 @@ class OfflineAttendanceController extends Controller
                 'employee_id' => $employeeId,
                 'date'        => $rec['attendance_date'] ?? null,
                 'message'     => tr('Employee not found or does not belong to your company.'),
+                'queue_id'    => null,
+            ];
+        }
+
+        
+        if (!$this->canSyncOfflineRecordForEmployee($user, $employeeId)) {
+            return [
+                'ok'          => false,
+                'employee_id' => $employeeId,
+                'date'        => $rec['attendance_date'] ?? null,
+                'message'     => tr('You are not allowed to sync attendance for this employee.'),
                 'queue_id'    => null,
             ];
         }
