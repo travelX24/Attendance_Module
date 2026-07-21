@@ -43,11 +43,11 @@
 
                     @foreach($editForm['periods'] as $index => $period)
                         <div class="group relative grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 p-4 bg-white rounded-lg border border-gray-200 shadow-sm">
-                            
+
                             {{-- Remove Button (absolute) --}}
                             @if(count($editForm['periods']) > 1)
                                 @if($canManageDaily)
-                                <button type="button" wire:click="removePeriodRow({{ $index }})" 
+                                <button type="button" wire:click="removePeriodRow({{ $index }})"
                                     class="absolute -top-2 -right-2 w-6 h-6 bg-[color:var(--error)]/10 text-[color:var(--error)] rounded-full border border-[color:var(--error)]/20 flex items-center justify-center hover:bg-[color:var(--error)] hover:text-white transition-colors shadow-sm z-10"
                                     title="{{ tr('Remove Period') }}">
                                     <i class="fas fa-times text-xs"></i>
@@ -62,17 +62,17 @@
                                     <div class="px-2.5 bg-gray-50/50 text-gray-400 text-[10px] font-mono border-r border-gray-100 flex items-center justify-center min-w-[70px]" title="{{ tr('Scheduled Time') }}">
                                         {{ $period['scheduled_in'] ?? '--:--' }}
                                     </div>
-                                    
+
                                     {{-- Actual Input --}}
-                                    <input 
-                                        type="time" 
+                                    <input
+                                        type="time"
                                         wire:model="editForm.periods.{{ $index }}.check_in_time"
                                         class="flex-1 w-full border-0 focus:ring-0 text-sm px-3 text-gray-900 placeholder-gray-400 h-full bg-transparent"
                                         @if(!$canManageDaily) disabled @endif
                                     >
                                 </div>
-                                @error("editForm.periods.$index.check_in_time") 
-                                    <span class="text-xs text-[color:var(--error)]">{{ $message }}</span> 
+                                @error("editForm.periods.$index.check_in_time")
+                                    <span class="text-xs text-[color:var(--error)]">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</span>
                                 @enderror
                             </div>
 
@@ -83,17 +83,17 @@
                                     <div class="px-2.5 bg-gray-50/50 text-gray-400 text-[10px] font-mono border-r border-gray-100 flex items-center justify-center min-w-[70px]" title="{{ tr('Scheduled Time') }}">
                                         {{ $period['scheduled_out'] ?? '--:--' }}
                                     </div>
-                                    
+
                                     {{-- Actual Input --}}
-                                    <input 
-                                        type="time" 
+                                    <input
+                                        type="time"
                                         wire:model="editForm.periods.{{ $index }}.check_out_time"
                                         class="flex-1 w-full border-0 focus:ring-0 text-sm px-3 text-gray-900 placeholder-gray-400 h-full bg-transparent"
                                         @if(!$canManageDaily) disabled @endif
                                     >
                                 </div>
-                                @error("editForm.periods.$index.check_out_time") 
-                                    <span class="text-xs text-[color:var(--error)]">{{ $message }}</span> 
+                                @error("editForm.periods.$index.check_out_time")
+                                    <span class="text-xs text-[color:var(--error)]">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</span>
                                 @enderror
                             </div>
                         </div>
@@ -121,7 +121,7 @@
                         hover:file:bg-[color:var(--accent-orange)]/15
                         disabled:opacity-50
                      " @if(!$canManageDaily) disabled @endif />
-                     @error('editAttachment') <span class="text-xs text-[color:var(--error)]">{{ $message }}</span> @enderror
+                     @error('editAttachment') <span class="text-xs text-[color:var(--error)]">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</span> @enderror
                      <div wire:loading wire:target="editAttachment" class="text-xs text-gray-500 mt-1">
                          <i class="fas fa-spinner fa-spin"></i> {{ tr('Uploading...') }}
                      </div>
@@ -141,7 +141,7 @@
                                     <div class="absolute -left-[9px] top-0 w-4 h-4 rounded-full bg-white border-2 border-gray-200 flex items-center justify-center">
                                         <div class="w-1.5 h-1.5 rounded-full bg-gray-400"></div>
                                     </div>
-                                    
+
                                     <div class="bg-gray-50/50 rounded-lg p-3 border border-gray-100 hover:border-gray-200 transition-colors">
                                         <div class="flex items-center justify-between mb-1.5">
                                             <span class="text-xs font-bold text-gray-800">{{ $entry['actor_name'] }}</span>

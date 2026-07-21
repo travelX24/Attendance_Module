@@ -315,7 +315,7 @@
                             ['value' => 'all', 'label' => tr('All')],
                             ['value' => 'no_schedule', 'label' => tr('No Schedule')],
                             ['value' => 'ending_soon', 'label' => tr('Ending Soon')],
-                            ['value' => 'contract_conflict', 'label' => app()->isLocale('ar') ? 'Ù…Ù†ØªÙ‡ÙŠ Ø§Ù„Ø¹Ù‚Ø¯' : 'Expired Contract'],
+                            ['value' => 'contract_conflict', 'label' => tr('Expired Contract')],
                             ['value' => 'changed_too_much', 'label' => tr('Too many changes')],
                             ['value' => 'inactive_schedule', 'label' => tr('Inactive Schedule')],
                         ]"
@@ -436,10 +436,8 @@
                 @php
                     $isContractExpired = $this->isEmployeeContractExpired($employee);
                     $contractEndLabel = $isContractExpired ? $this->employeeContractEndDateLabel($employee) : '';
-                    $expiredContractLabel = app()->isLocale('ar') ? 'Ù…Ù†ØªÙ‡ÙŠ Ø§Ù„Ø¹Ù‚Ø¯' : 'Expired Contract';
-                    $expiredContractMessage = app()->isLocale('ar')
-                        ? 'Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø¥Ø¶Ø§ÙØ© Ø¬Ø¯ÙˆÙ„ Ø¹Ù…Ù„ Ù„Ù…ÙˆØ¸Ù Ù…Ù†ØªÙ‡ÙŠ Ø§Ù„Ø¹Ù‚Ø¯'
-                        : 'Cannot add a work schedule for an employee with an expired contract.';
+                    $expiredContractLabel = tr('Expired Contract');
+                    $expiredContractMessage = tr('Cannot add a work schedule for an employee with an expired contract.');
                 @endphp
                 <tr class="hover:bg-gray-50/50 transition-colors">
                     <td class="px-6 py-4">

@@ -147,15 +147,9 @@ trait WithScheduleAssignments
         }
 
         $messages = [
-            'bulkFormData.end_date.after_or_equal' => app()->getLocale() === 'ar' 
-                ? 'Ù„Ø§ ÙŠÙ…ÙƒÙ† Ø£Ù† ÙŠÙƒÙˆÙ† ØªØ§Ø±ÙŠØ® Ø§Ù„Ù†Ù‡Ø§ÙŠØ© Ù‚Ø¨Ù„ ØªØ§Ø±ÙŠØ® Ø§Ù„Ø¨Ø¯Ø§ÙŠØ©' 
-                : 'The end date cannot be before the start date.',
-            'bulkFormData.work_schedule_id.required' => app()->getLocale() === 'ar'
-                ? 'ÙŠØ±Ø¬Ù‰ Ø§Ø®ØªÙŠØ§Ø± Ø§Ù„Ø¬Ø¯ÙˆÙ„ Ø§Ù„Ø²Ù…Ù†ÙŠ'
-                : 'Please select a work schedule.',
-            'bulkFormData.rotation_work_schedule_id.required' => app()->getLocale() === 'ar'
-                ? 'ÙŠØ±Ø¬Ù‰ Ø§Ø®ØªÙŠØ§Ø± Ø§Ù„Ø¬Ø¯ÙˆÙ„ Ø§Ù„Ø²Ù…Ù†ÙŠ Ø§Ù„Ø¨Ø¯ÙŠÙ„'
-                : 'Please select an alternate work schedule.',
+            'bulkFormData.end_date.after_or_equal' => tr('The end date cannot be before the start date.'),
+            'bulkFormData.work_schedule_id.required' => tr('Please select a work schedule.'),
+            'bulkFormData.rotation_work_schedule_id.required' => tr('Please select an alternate work schedule.'),
         ];
 
         $this->validate($rules, $messages);

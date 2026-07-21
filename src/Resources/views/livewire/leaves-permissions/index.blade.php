@@ -1865,7 +1865,7 @@
                                 </option>
                             @endforeach
                         </x-ui.select>
-                        @error('employee_id') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                        @error('employee_id') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                     </div>
 
                     <div>
@@ -1886,7 +1886,7 @@
                             </div>
                         @endif
 
-                        @error('leave_policy_id') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                        @error('leave_policy_id') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                     </div>
                 </div>
 
@@ -1919,13 +1919,13 @@
                         <div>
                             <div class="text-xs text-gray-500 mb-1">{{ tr('Start Date') }}</div>
                             <x-ui.company-date-picker model="start_date" :disabled="!$canManageLeaveRequests" />
-                            @error('start_date') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                            @error('start_date') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                         </div>
 
                         <div>
                             <div class="text-xs text-gray-500 mb-1">{{ tr('End Date') }}</div>
                             <x-ui.company-date-picker model="end_date" :disabled="!$canManageLeaveRequests" />
-                            @error('end_date') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                            @error('end_date') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                         </div>
                     </div>
 
@@ -1934,7 +1934,7 @@
                         <div>
                             <div class="text-xs text-gray-500 mb-1">{{ tr('Date') }}</div>
                             <x-ui.company-date-picker model="start_date" />
-                            @error('start_date') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                            @error('start_date') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                         </div>
 
                         <div>
@@ -1958,7 +1958,7 @@
                                 </x-ui.select>
                             @endif
 
-                            @error('leave_work_schedule_period_id') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                            @error('leave_work_schedule_period_id') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                         </div>
                     </div>
 
@@ -1967,7 +1967,7 @@
                         <div>
                             <div class="text-xs text-gray-500 mb-1">{{ tr('Date') }}</div>
                             <x-ui.company-date-picker model="start_date" />
-                            @error('start_date') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                            @error('start_date') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                         </div>
                         @php
                         // Passed from the server after columns are known
@@ -1981,14 +1981,14 @@
                                 <x-ui.input type="time" wire:model.blur="leave_from_time" class="w-full"
                                     min="{{ $workStart }}" max="{{ $workEnd }}" step="60" />
 
-                            @error('leave_from_time') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                            @error('leave_from_time') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                         </div>
 
                         <div>
                             <div class="text-xs text-gray-500 mb-1">{{ tr('To') }}</div>
                             <x-ui.input type="time" wire:model.blur="leave_to_time" class="w-full"
                                 min="{{ $workStart }}" max="{{ $workEnd }}" step="60" :disabled="!$canManageLeaveRequests" />
-                            @error('leave_to_time') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                            @error('leave_to_time') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                         </div>
                     </div>
                 @endif
@@ -2008,7 +2008,7 @@
                                 <input type="checkbox" wire:model="leave_note_ack" class="rounded border-[color:var(--warning)]/30 text-[color:var(--accent-orange)] focus:ring-[color:var(--accent-orange)]" @if(!$canManageLeaveRequests) disabled @endif />
                                 <span class="font-semibold">{{ tr('I acknowledge this note') }}</span>
                             </label>
-                            @error('leave_note_ack') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                            @error('leave_note_ack') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                         @endif
                     </div>
                 @endif
@@ -2039,7 +2039,7 @@
                             {{ tr('Uploading...') }}
                         </div>
 
-                        @error('leave_attachment') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                        @error('leave_attachment') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                     </div>
                 @endif
 
@@ -2053,13 +2053,13 @@
                             </option>
                         @endforeach
                     </x-ui.select>
-                    @error('replacement_employee_id') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                    @error('replacement_employee_id') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                 </div>
 
                 <div>
                     <div class="text-xs text-gray-500 mb-1">{{ tr('Reason') }}</div>
                     <x-ui.textarea wire:model="reason" class="w-full" :disabled="!$canManageLeaveRequests" />
-                    @error('reason') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                    @error('reason') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                 </div>
             </div>
         </x-slot>
@@ -2118,26 +2118,26 @@
                             </option>
                         @endforeach
                     </x-ui.select>
-                    @error('permission_employee_id') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                    @error('permission_employee_id') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                 </div>
 
                 <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
                     <div>
                         <div class="text-xs text-gray-500 mb-1">{{ tr('Date') }}</div>
                         <x-ui.company-date-picker model="permission_date" :disabled="!$canManageLeaveRequests" />
-                        @error('permission_date') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                        @error('permission_date') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                     </div>
 
                     <div>
                         <div class="text-xs text-gray-500 mb-1">{{ tr('From') }}</div>
                         <x-ui.input type="time" wire:model="from_time" class="w-full" :disabled="!$canManageLeaveRequests" />
-                        @error('from_time') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                        @error('from_time') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                     </div>
 
                     <div>
                         <div class="text-xs text-gray-500 mb-1">{{ tr('To') }}</div>
                         <x-ui.input type="time" wire:model="to_time" class="w-full" :disabled="!$canManageLeaveRequests" />
-                        @error('to_time') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                        @error('to_time') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                     </div>
                 </div>
 
@@ -2153,14 +2153,14 @@
                             readonly
                         />
 
-                        @error('minutes') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                        @error('minutes') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                     </div>
 
 
                     <div>
                         <div class="text-xs text-gray-500 mb-1">{{ tr('Reason') }}</div>
                         <x-ui.input type="text" wire:model="permission_reason" class="w-full" :disabled="!$canManageLeaveRequests" />
-                        @error('permission_reason') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                        @error('permission_reason') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                     </div>
                 </div>
             </div>
@@ -2275,7 +2275,7 @@
                                 @endif
                             @endforeach
                         </x-ui.select>
-                        @error('group_leave_policy_id') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                        @error('group_leave_policy_id') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                     </div>
                 @endif
 
@@ -2307,13 +2307,13 @@
                         <div>
                             <div class="text-xs text-gray-500 mb-1">{{ tr('Start Date') }}</div>
                             <x-ui.company-date-picker model="group_start_date" />
-                            @error('group_start_date') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                            @error('group_start_date') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                         </div>
 
                         <div>
                             <div class="text-xs text-gray-500 mb-1">{{ tr('End Date') }}</div>
                             <x-ui.company-date-picker model="group_end_date" />
-                            @error('group_end_date') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                            @error('group_end_date') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                         </div>
                     </div>
 
@@ -2322,7 +2322,7 @@
                         <div>
                             <div class="text-xs text-gray-500 mb-1">{{ tr('Date') }}</div>
                             <x-ui.company-date-picker model="group_start_date" />
-                            @error('group_start_date') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                            @error('group_start_date') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                         </div>
 
                         <div>
@@ -2331,7 +2331,7 @@
                                 <option value="first_half">{{ tr('First half') }}</option>
                                 <option value="second_half">{{ tr('Second half') }}</option>
                             </x-ui.select>
-                            @error('group_leave_half_day_part') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                            @error('group_leave_half_day_part') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                         </div>
                     </div>
 
@@ -2340,21 +2340,21 @@
                         <div>
                             <div class="text-xs text-gray-500 mb-1">{{ tr('Date') }}</div>
                             <x-ui.company-date-picker model="group_start_date" />
-                            @error('group_start_date') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                            @error('group_start_date') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                         </div>
 
                         <div>
                             <div class="text-xs text-gray-500 mb-1">{{ tr('From') }}</div>
                             <x-ui.input type="time" wire:model.defer="group_leave_from_time" class="w-full"
                                         min="{{ $workStart }}" max="{{ $workEnd }}" step="60" />
-                            @error('group_leave_from_time') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                            @error('group_leave_from_time') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                         </div>
 
                         <div>
                             <div class="text-xs text-gray-500 mb-1">{{ tr('To') }}</div>
                             <x-ui.input type="time" wire:model.defer="group_leave_to_time" class="w-full"
                                         min="{{ $workStart }}" max="{{ $workEnd }}" step="60" />
-                            @error('group_leave_to_time') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                            @error('group_leave_to_time') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                         </div>
                     </div>
                 @endif
@@ -2431,7 +2431,7 @@
                         </div>
                     </div>
 
-                    @error('groupEmployeeIds') <div class="text-xs text-red-600 mt-2">{{ $message }}</div> @enderror
+                    @error('groupEmployeeIds') <div class="text-xs text-red-600 mt-2">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                 </x-ui.card>
 
                 <x-slot name="footer">
@@ -2476,19 +2476,19 @@
                         </option>
                     @endforeach
                 </x-ui.select>
-                @error('cut_leave_request_id') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                @error('cut_leave_request_id') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
             </div>
 
             <div>
                 <div class="text-xs text-gray-500 mb-1">{{ tr('Cut End Date') }}</div>
                 <x-ui.company-date-picker model="cut_new_end_date" :disabled="!$canManageLeaveRequests" />
-                @error('cut_new_end_date') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                @error('cut_new_end_date') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
             </div>
 
             <div>
                 <div class="text-xs text-gray-500 mb-1">{{ tr('Reason') }}</div>
                 <x-ui.textarea rows="3" wire:model="cut_reason" class="w-full" :disabled="!$canManageLeaveRequests" />
-                @error('cut_reason') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                @error('cut_reason') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
             </div>
 
             <x-slot name="footer">
@@ -2635,19 +2635,19 @@
                     <div>
                         <div class="text-xs text-gray-500 mb-1">{{ tr('Date') }}</div>
                         <x-ui.company-date-picker model="group_permission_date" :disabled="!$canManageLeaveRequests" />
-                        @error('group_permission_date') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                        @error('group_permission_date') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                     </div>
 
                     <div>
                         <div class="text-xs text-gray-500 mb-1">{{ tr('From') }}</div>
                         <x-ui.input type="time" wire:model="group_from_time" class="w-full" :disabled="!$canManageLeaveRequests" />
-                        @error('group_from_time') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                        @error('group_from_time') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                     </div>
 
                     <div>
                         <div class="text-xs text-gray-500 mb-1">{{ tr('To') }}</div>
                         <x-ui.input type="time" wire:model="group_to_time" class="w-full" :disabled="!$canManageLeaveRequests" />
-                        @error('group_to_time') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                        @error('group_to_time') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                     </div>
                 </div>
 
@@ -2655,13 +2655,13 @@
                     <div>
                         <div class="text-xs text-gray-500 mb-1">{{ tr('Minutes') }}</div>
                         <x-ui.input type="number" min="0" wire:model="group_minutes" class="w-full" readonly />
-                        @error('group_minutes') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                        @error('group_minutes') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                     </div>
 
                     <div>
                         <div class="text-xs text-gray-500 mb-1">{{ tr('Reason') }}</div>
                         <x-ui.input type="text" wire:model="group_permission_reason" class="w-full" :disabled="!$canManageLeaveRequests" />
-                        @error('group_permission_reason') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                        @error('group_permission_reason') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                     </div>
                 </div>
 
@@ -2742,7 +2742,7 @@
                         </div>
                     </div>
 
-                    @error('groupPermissionEmployeeIds') <div class="text-xs text-red-600 mt-2">{{ $message }}</div> @enderror
+                    @error('groupPermissionEmployeeIds') <div class="text-xs text-red-600 mt-2">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                 </x-ui.card>
 
                 <x-slot name="footer">
@@ -2892,7 +2892,7 @@
                             </option>
                         @endforeach
                     </x-ui.select>
-                    @error('mission_employee_id') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                    @error('mission_employee_id') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                 </div>
 
                 <div class="grid grid-cols-2 gap-3">
@@ -2909,13 +2909,13 @@
                     <div>
                         <div class="text-xs text-gray-500 mb-1">{{ tr('Start Date') }}</div>
                         <x-ui.company-date-picker model="mission_start_date" :disabled="!$canManageLeaveRequests" />
-                        @error('mission_start_date') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                        @error('mission_start_date') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                     </div>
                     @if($mission_type === 'full_day')
                     <div>
                         <div class="text-xs text-gray-500 mb-1">{{ tr('End Date') }}</div>
                         <x-ui.company-date-picker model="mission_end_date" :disabled="!$canManageLeaveRequests" />
-                        @error('mission_end_date') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                        @error('mission_end_date') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                     </div>
                     @endif
                 </div>
@@ -2925,12 +2925,12 @@
                     <div>
                         <div class="text-xs text-gray-500 mb-1">{{ tr('From Time') }}</div>
                         <x-ui.input type="time" wire:model.live="mission_from_time" class="w-full" :disabled="!$canManageLeaveRequests" />
-                        @error('mission_from_time') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                        @error('mission_from_time') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                     </div>
                     <div>
                         <div class="text-xs text-gray-500 mb-1">{{ tr('To Time') }}</div>
                         <x-ui.input type="time" wire:model.live="mission_to_time" class="w-full" :disabled="!$canManageLeaveRequests" />
-                        @error('mission_to_time') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                        @error('mission_to_time') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                     </div>
                 </div>
                 @endif
@@ -2938,13 +2938,13 @@
                 <div>
                     <div class="text-xs text-gray-500 mb-1">{{ tr('Destination') }}</div>
                     <x-ui.input type="text" wire:model.live="mission_destination" class="w-full" :disabled="!$canManageLeaveRequests" />
-                    @error('mission_destination') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                    @error('mission_destination') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                 </div>
 
                 <div>
                     <div class="text-xs text-gray-500 mb-1">{{ tr('Reason') }}</div>
                     <x-ui.textarea wire:model.live="mission_reason" class="w-full" rows="3" :disabled="!$canManageLeaveRequests"></x-ui.textarea>
-                    @error('mission_reason') <div class="text-xs text-red-600 mt-1">{{ $message }}</div> @enderror
+                    @error('mission_reason') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                 </div>
             </div>
         </x-slot>

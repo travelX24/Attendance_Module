@@ -26,7 +26,7 @@
                     @endforeach
                 </x-ui.select>
                 @error('editScheduleForm.work_schedule_id')
-                    <span class="text-[color:var(--error)] text-xs mt-1 block">{{ $message }}</span>
+                    <span class="text-[color:var(--error)] text-xs mt-1 block">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</span>
                 @enderror
             </div>
 

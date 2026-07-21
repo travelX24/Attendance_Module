@@ -22,7 +22,7 @@
                     <input type="checkbox" wire:model="approvedEditConfirmUnderstood" class="text-[color:var(--accent-orange)] rounded border-gray-300 focus:ring-[color:var(--accent-orange)]" @if(!$canManageDaily) disabled @endif>
                     <span>{{ tr('I understand this will reopen the record for re-approval') }}</span>
                 </label>
-                @error('approvedEditConfirmUnderstood') <div class="text-xs text-[color:var(--error)]">{{ $message }}</div> @enderror
+                @error('approvedEditConfirmUnderstood') <div class="text-xs text-[color:var(--error)]">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
             </div>
         </x-slot>
 

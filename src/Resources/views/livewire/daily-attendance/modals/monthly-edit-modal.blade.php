@@ -194,7 +194,7 @@
                     placeholder="{{ tr('Please describe the reason for these changes...') }}"
                     @if(!$canManageDaily) disabled @endif
                 ></textarea>
-                @error('monthlyEditReason') <span class="text-[color:var(--error)] text-xs mt-1 block font-bold">{{ $message }}</span> @enderror
+                @error('monthlyEditReason') <span class="text-[color:var(--error)] text-xs mt-1 block font-bold">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</span> @enderror
             </div>
         </div>
     </x-slot:content>

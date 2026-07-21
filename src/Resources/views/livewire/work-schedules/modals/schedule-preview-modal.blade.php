@@ -57,7 +57,7 @@
                             :disabled="!$canManageSchedules"
                         />
                         @error('previewForm.from')
-                            <p class="text-xs text-[color:var(--error)] mt-1">{{ $message }}</p>
+                            <p class="text-xs text-[color:var(--error)] mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</p>
                         @enderror
                     </div>
 
@@ -68,7 +68,7 @@
                             :disabled="!$canManageSchedules"
                         />
                         @error('previewForm.to')
-                            <p class="text-xs text-[color:var(--error)] mt-1">{{ $message }}</p>
+                            <p class="text-xs text-[color:var(--error)] mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</p>
                         @enderror
                     </div>
 
