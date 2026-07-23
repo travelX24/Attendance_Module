@@ -1834,6 +1834,7 @@
             </div>
         </div>
     @endif
+    @if($createLeaveOpen)
 
     {{-- Create Leave Modal --}}
     <x-ui.modal wire:model="createLeaveOpen" max-width="lg">
@@ -2090,6 +2091,8 @@
             </div>
         </x-slot>
     </x-ui.modal>
+    @endif
+    @if($createPermissionOpen)
 
     {{-- Create Permission Modal --}}
     <x-ui.modal wire:model="createPermissionOpen" max-width="lg">
@@ -2192,6 +2195,8 @@
             </div>
         </x-slot>
     </x-ui.modal>
+    @endif
+    @if($rejectOpen)
 
     {{-- Reject Modal --}}
     <x-ui.modal wire:model="rejectOpen" max-width="md">
@@ -2227,6 +2232,8 @@
             </div>
         </x-slot>
     </x-ui.modal>
+    @endif
+    @if($createGroupLeaveOpen)
 
     {{-- Create Group Leave Modal --}}
     <x-ui.modal wire:model="createGroupLeaveOpen" max-width="4xl">
@@ -2446,6 +2453,8 @@
 
         </x-slot>
     </x-ui.modal>
+    @endif
+    @if($cutLeaveOpen)
 
     {{-- Cut Leave Modal --}}
     <x-ui.modal wire:model="cutLeaveOpen" max-width="lg">
@@ -2503,6 +2512,8 @@
 
         </x-slot>
     </x-ui.modal>
+    @endif
+    @if($balanceAuditOpen)
 
     {{-- Balance Audit Modal --}}
     <x-ui.modal wire:model="balanceAuditOpen" max-width="2xl">
@@ -2612,6 +2623,8 @@
             @endif
         </x-slot>
     </x-ui.modal>
+    @endif
+    @if($createGroupPermissionOpen)
 
 
     {{-- Create Group Permission Modal --}}
@@ -2756,6 +2769,8 @@
             </div>
         </x-slot>
     </x-ui.modal>
+    @endif
+    @if($workflowModalOpen)
 
     {{-- Workflow Modal --}}
     <x-ui.modal wire:model="workflowModalOpen" max-width="2xl">
@@ -2865,6 +2880,8 @@
             </div>
         </x-slot>
     </x-ui.modal>
+    @endif
+    @if($createMissionOpen)
 
     {{-- Create Mission Modal --}}
     <x-ui.modal wire:model="createMissionOpen" max-width="lg">
@@ -2975,6 +2992,7 @@
             </div>
         </x-slot>
     </x-ui.modal>
+    @endif
 
     {{-- Tab Loading Bar JavaScript --}}
     <script>

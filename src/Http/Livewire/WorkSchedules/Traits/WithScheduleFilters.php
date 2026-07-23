@@ -170,10 +170,24 @@ trait WithScheduleFilters
         $this->stats['total_employees'] = count($employeeIdsScope);
         $this->warningEmployees['total_employees'] = $this->getEmployeeNamesForPop($employeeIdsScope);
 
-        $employeesWithScheduleIds = EmployeeWorkSchedule::where('saas_company_id', $companyId)
-            ->where('is_active', true)
-            ->when(!empty($employeeIdsScope), fn ($q) => $q->whereIn('employee_id', $employeeIdsScope), fn ($q) => $q->whereRaw('1=0'))
-            ->pluck('employee_id')
+        $today = now()->startOfDay();
+        $todayDate = $today->toDateString();
+
+        $employeesWithScheduleIds = EmployeeWorkSchedule::query()
+            ->where('employee_work_schedules.saas_company_id', $companyId)
+            ->join('work_schedules', function ($join) use ($companyId) {
+                $join->on('work_schedules.id', '=', 'employee_work_schedules.work_schedule_id')
+                    ->where('work_schedules.saas_company_id', '=', $companyId);
+            })
+            ->whereDate('employee_work_schedules.start_date', '<=', $todayDate)
+            ->where(function ($q) use ($todayDate) {
+                $q->whereNull('employee_work_schedules.end_date')
+                    ->orWhereDate('employee_work_schedules.end_date', '>=', $todayDate);
+            })
+            ->when(!empty($employeeIdsScope), fn ($q) => $q->whereIn('employee_work_schedules.employee_id', $employeeIdsScope), fn ($q) => $q->whereRaw('1=0'))
+            ->pluck('employee_work_schedules.employee_id')
+            ->unique()
+            ->values()
             ->toArray();
 
         $this->stats['without_schedule'] = empty($employeeIdsScope)
@@ -187,7 +201,6 @@ trait WithScheduleFilters
             ->where('is_active', true)
             ->count();
             
-        $today = now()->startOfDay();
         $soonEndDate      = $this->addBusinessDays($today,  3)->toDateString();
 
         $noScheduleIds = empty($employeeIdsScope)
@@ -202,11 +215,11 @@ trait WithScheduleFilters
         $this->warningEmployees['no_schedule_overdue'] = $this->getEmployeeNamesForPop($noScheduleIds);
 
        $endingSoonIds = EmployeeWorkSchedule::where('saas_company_id', $companyId)
-            ->where('is_active', true)
             ->when(!empty($employeeIdsScope), fn ($q) => $q->whereIn('employee_id', $employeeIdsScope), fn ($q) => $q->whereRaw('1=0'))
             ->where('assignment_type', '!=', 'rotation')
+            ->whereDate('start_date', '<=', $todayDate)
             ->whereNotNull('end_date')
-            ->whereBetween('end_date', [$today->toDateString(), $soonEndDate])
+            ->whereBetween('end_date', [$todayDate, $soonEndDate])
             ->pluck('employee_id')
             ->unique()
             ->all();
@@ -244,9 +257,14 @@ trait WithScheduleFilters
 
         $inactiveScheduleIds = EmployeeWorkSchedule::query()
             ->where('employee_work_schedules.saas_company_id', $companyId)
-            ->when(!empty($employeeIdsScope), fn ($q) => $q->whereIn('employee_id', $employeeIdsScope), fn ($q) => $q->whereRaw('1=0'))
-            ->where('employee_work_schedules.is_active', true)
+            ->when(!empty($employeeIdsScope), fn ($q) => $q->whereIn('employee_work_schedules.employee_id', $employeeIdsScope), fn ($q) => $q->whereRaw('1=0'))
+            ->whereDate('employee_work_schedules.start_date', '<=', $todayDate)
+            ->where(function ($q) use ($todayDate) {
+                $q->whereNull('employee_work_schedules.end_date')
+                    ->orWhereDate('employee_work_schedules.end_date', '>=', $todayDate);
+            })
             ->join('work_schedules', 'work_schedules.id', '=', 'employee_work_schedules.work_schedule_id')
+            ->where('work_schedules.saas_company_id', $companyId)
             ->where('work_schedules.is_active', false)
             ->pluck('employee_work_schedules.employee_id')
             ->unique()

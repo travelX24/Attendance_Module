@@ -883,13 +883,28 @@
     </x-ui.card>
 
     <div wire:key="attendance-modals-{{ $modalTrigger }}">
-        @include('attendance::livewire.daily-attendance.modals.edit-modal')
-        @include('attendance::livewire.daily-attendance.modals.approval-modal')
-        @include('attendance::livewire.daily-attendance.modals.reject-modal')
-        @include('attendance::livewire.daily-attendance.modals.unapprove-modal')
-        @include('attendance::livewire.daily-attendance.modals.create-manual-modal')
-        @include('attendance::livewire.daily-attendance.modals.edit-confirm-modal')
-        @include('attendance::livewire.daily-attendance.modals.bulk-approval-modal')
-        @include('attendance::livewire.daily-attendance.modals.monthly-edit-modal')
-    </div>
-</div>
+        @if($showEditModal)
+            @include('attendance::livewire.daily-attendance.modals.edit-modal')
+        @endif
+        @if($showApprovalModal)
+            @include('attendance::livewire.daily-attendance.modals.approval-modal')
+        @endif
+        @if($showRejectModal)
+            @include('attendance::livewire.daily-attendance.modals.reject-modal')
+        @endif
+        @if($showUnapproveModal)
+            @include('attendance::livewire.daily-attendance.modals.unapprove-modal')
+        @endif
+        @if($showCreateModal)
+            @include('attendance::livewire.daily-attendance.modals.create-manual-modal')
+        @endif
+        @if($showApprovedEditConfirmModal)
+            @include('attendance::livewire.daily-attendance.modals.edit-confirm-modal')
+        @endif
+        @if($showBulkApprovalModal)
+            @include('attendance::livewire.daily-attendance.modals.bulk-approval-modal')
+        @endif
+        @if($showMonthlyEditModal)
+            @include('attendance::livewire.daily-attendance.modals.monthly-edit-modal')
+        @endif
+    </div></div>

@@ -387,12 +387,14 @@ trait WithAttendanceActions
             $existingQ->whereIn('employee_id', $employeeIds);
         }
 
-        $existingLogs = $existingQ->get();
+        $existingLogs = $existingQ->withCount([
+            'details as open_periods_count' => fn ($q) => $q->whereNull('check_out_time'),
+        ])->get();
         
         foreach ($existingLogs as $log) {
             // Trigger save to run our model's auto-checkout and status logic
             // We do this for logs that look incomplete or have open periods
-            $hasOpenPeriod = $log->details()->whereNull('check_out_time')->exists();
+            $hasOpenPeriod = ((int) ($log->open_periods_count ?? 0)) > 0;
             if ($log->scheduled_hours <= 0 || $hasOpenPeriod || $log->attendance_status === 'absent' || $log->attendance_status === 'on_leave' || $log->attendance_status === 'auto_checkout') {
                 $log->save();
             }

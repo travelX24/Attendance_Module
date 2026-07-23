@@ -193,40 +193,77 @@ class Index extends Component
             'current_schedule_name' => WorkSchedule::select('name')
                 ->join('employee_work_schedules', 'work_schedules.id', '=', 'employee_work_schedules.work_schedule_id')
                 ->whereColumn('employee_work_schedules.employee_id', 'employees.id')
-                ->where('employee_work_schedules.is_active', true)
                 ->where('employee_work_schedules.saas_company_id', $companyId)
                 ->where('work_schedules.saas_company_id', $companyId)
+                ->whereDate('employee_work_schedules.start_date', '<=', $today)
+                ->where(function ($q) use ($today) {
+                    $q->whereNull('employee_work_schedules.end_date')
+                        ->orWhereDate('employee_work_schedules.end_date', '>=', $today);
+                })
+                ->orderByDesc('employee_work_schedules.start_date')
+                ->orderByDesc('employee_work_schedules.id')
                 ->limit(1),
 
             'current_schedule_id' => EmployeeWorkSchedule::select('work_schedule_id')
                 ->whereColumn('employee_id', 'employees.id')
-                ->where('is_active', true)
                 ->where('saas_company_id', $companyId)
+                ->whereDate('start_date', '<=', $today)
+                ->where(function ($q) use ($today) {
+                    $q->whereNull('end_date')
+                        ->orWhereDate('end_date', '>=', $today);
+                })
+                ->orderByDesc('start_date')
+                ->orderByDesc('id')
                 ->limit(1),
 
             'current_assignment_type' => EmployeeWorkSchedule::select('assignment_type')
                 ->whereColumn('employee_id', 'employees.id')
-                ->where('is_active', true)
                 ->where('saas_company_id', $companyId)
+                ->whereDate('start_date', '<=', $today)
+                ->where(function ($q) use ($today) {
+                    $q->whereNull('end_date')
+                        ->orWhereDate('end_date', '>=', $today);
+                })
+                ->orderByDesc('start_date')
+                ->orderByDesc('id')
                 ->limit(1),
 
             'current_schedule_start' => EmployeeWorkSchedule::select('start_date')
                 ->whereColumn('employee_id', 'employees.id')
-                ->where('is_active', true)
                 ->where('saas_company_id', $companyId)
+                ->whereDate('start_date', '<=', $today)
+                ->where(function ($q) use ($today) {
+                    $q->whereNull('end_date')
+                        ->orWhereDate('end_date', '>=', $today);
+                })
+                ->orderByDesc('start_date')
+                ->orderByDesc('id')
                 ->limit(1),
 
             'current_schedule_end' => EmployeeWorkSchedule::select('end_date')
                 ->whereColumn('employee_id', 'employees.id')
-                ->where('is_active', true)
                 ->where('saas_company_id', $companyId)
+                ->whereDate('start_date', '<=', $today)
+                ->where(function ($q) use ($today) {
+                    $q->whereNull('end_date')
+                        ->orWhereDate('end_date', '>=', $today);
+                })
+                ->orderByDesc('start_date')
+                ->orderByDesc('id')
                 ->limit(1),
 
             'is_schedule_disabled' => WorkSchedule::selectRaw('NOT work_schedules.is_active')
                 ->join('employee_work_schedules', 'work_schedules.id', '=', 'employee_work_schedules.work_schedule_id')
                 ->whereColumn('employee_work_schedules.employee_id', 'employees.id')
-                ->where('employee_work_schedules.is_active', true)
                 ->where('employee_work_schedules.saas_company_id', $companyId)
+                ->where('work_schedules.saas_company_id', $companyId)
+                ->whereDate('employee_work_schedules.start_date', '<=', $today)
+                ->where(function ($q) use ($today) {
+                    $q->whereNull('employee_work_schedules.end_date')
+                        ->orWhereDate('employee_work_schedules.end_date', '>=', $today);
+                })
+                ->orderByDesc('employee_work_schedules.start_date')
+                ->orderByDesc('employee_work_schedules.id')
                 ->limit(1),
 
             'next_schedule_name' => WorkSchedule::select('name')

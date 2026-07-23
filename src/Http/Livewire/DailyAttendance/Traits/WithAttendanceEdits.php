@@ -265,20 +265,21 @@ trait WithAttendanceEdits
         // Recalculate based on new totals
         $log->actual_hours = round($totalActualMinutes / 60, 2);
 
-        $log->calculateCompliance();
-        $log->save();
-
-        // Ã¢Å“â€¦ Sync with AttendanceDailyDetail table for consistency (Mobile App uses this)
+        // Sync details before saving the parent log so model calculations use
+        // the edited periods, especially when all periods are removed.
         $log->details()->delete();
         foreach ($validPeriods as $p) {
             $log->details()->create([
-                'check_in_time' => $p['check_in_time'],
-                'check_out_time' => $p['check_out_time'],
+                'check_in_time' => $p['check_in_time'] ?: null,
+                'check_out_time' => $p['check_out_time'] ?: null,
                 'attendance_status' => $log->attendance_status, // or match individual period status if we had it
                 'meta_data' => ['source' => 'web_edit', 'edited_by' => auth()->id()],
             ]);
         }
 
+        $log->unsetRelation('details');
+        $log->save();
+        $log->details()->update(['attendance_status' => $log->attendance_status]);
         // Log the change
         $this->auditLog(
             'attendance.edited',
@@ -543,8 +544,8 @@ trait WithAttendanceEdits
              $log->details()->delete();
              foreach ($validPeriodsData as $p) {
                  $log->details()->create([
-                     'check_in_time' => $p['check_in'],
-                     'check_out_time' => $p['check_out'],
+                     'check_in_time' => $p['check_in'] ?: null,
+                     'check_out_time' => $p['check_out'] ?: null,
                      'attendance_status' => $log->attendance_status,
                      'meta_data' => ['source' => 'monthly_edit', 'edited_by' => auth()->id()]
                  ]);
@@ -633,5 +634,3 @@ trait WithAttendanceEdits
         return null;
     }
 }
-
-

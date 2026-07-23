@@ -292,7 +292,7 @@ class Index extends Component
             'branches' => $this->branches,
             'workSchedules' => $this->workSchedules,
             'jobTitles' => $this->jobTitles,
-            'employees' => $this->employees,
+            'employees' => $this->showCreateModal ? $this->employees : collect(),
             'modalTrigger' => $this->modalTrigger,
         ])->layout('layouts.company-admin');
     }

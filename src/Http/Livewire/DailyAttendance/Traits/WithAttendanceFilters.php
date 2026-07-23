@@ -354,10 +354,6 @@ trait WithAttendanceFilters
             ->with([
                 'employee' => fn ($q) => $q->withoutGlobalScope('active_only')->with('branch'),
                 'workSchedule',
-                'editor',
-                'approver',
-                'rejector',
-                'revoker',
                 'details',
                 'scheduleException',
             ])
@@ -443,17 +439,26 @@ trait WithAttendanceFilters
 
     public function getDepartmentsProperty()
     {
-        return Department::where('saas_company_id', auth()->user()->saas_company_id)->get();
+        return Department::where('saas_company_id', auth()->user()->saas_company_id)
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
     }
 
     public function getWorkSchedulesProperty()
     {
-        return WorkSchedule::where('saas_company_id', auth()->user()->saas_company_id)->get();
+        return WorkSchedule::where('saas_company_id', auth()->user()->saas_company_id)
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
     }
 
     public function getJobTitlesProperty()
     {
-        return JobTitle::where('saas_company_id', auth()->user()->saas_company_id)->get();
+        return JobTitle::where('saas_company_id', auth()->user()->saas_company_id)
+            ->select('id', 'name')
+            ->orderBy('name')
+            ->get();
     }
 
     public function getBranchesProperty()
@@ -466,7 +471,7 @@ trait WithAttendanceFilters
             $q->whereIn('id', $allowed);
         }
 
-        return $q->orderBy('name')->get();
+        return $q->select('id', 'name')->orderBy('name')->get();
     }
 
     public function getEmployeesProperty()
