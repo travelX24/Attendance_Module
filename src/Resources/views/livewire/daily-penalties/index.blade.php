@@ -494,10 +494,6 @@
                                             <i class="fas fa-check-circle me-2 text-[color:var(--success)]"></i>
                                             <span>{{ tr('Confirm for Payroll') }}</span>
                                         </x-ui.dropdown-item>
-                                        <x-ui.dropdown-item danger wire:click="deletePenalty({{ $penalty->id }})" :disabled="$penalty->status === 'confirmed'">
-                                            <i class="fas fa-trash me-2"></i>
-                                            <span>{{ tr('Delete') }}</span>
-                                        </x-ui.dropdown-item>
                                     @endif
                                 @else
                                     <span class="text-gray-400 p-2 italic whitespace-nowrap"><i class="fas fa-lock text-[10px] me-1"></i> {{ tr('Read Only') }}</span>
