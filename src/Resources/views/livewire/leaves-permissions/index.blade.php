@@ -1893,25 +1893,33 @@
 
                 {{-- Duration (from policy settings) --}}
                 @if($leave_policy_id > 0)
-                    <div class="bg-gray-50 border border-gray-100 rounded-xl p-3">
-                        <div class="text-[11px] text-gray-500 font-bold mb-1">{{ tr('Duration') }}</div>
+                    @if($create_leave_policy_duration_unit === 'half_day' && $create_leave_can_choose_duration)
+                        <div>
+                            <div class="text-xs text-gray-500 mb-1">{{ tr('Duration') }}</div>
+                            <x-ui.select wire:model.live="create_leave_duration_unit" class="w-full" :disabled="!$canManageLeaveRequests">
+                                <option value="full_day">{{ tr('Full day') }}</option>
+                                <option value="half_day">{{ tr('Half day') }}</option>
+                            </x-ui.select>
+                        </div>
+                    @else
+                        <div class="bg-gray-50 border border-gray-100 rounded-xl p-3">
+                            <div class="text-[11px] text-gray-500 font-bold mb-1">{{ tr('Duration') }}</div>
 
-                        <div class="text-sm font-black text-gray-900">
-                            @if($create_leave_duration_unit === 'full_day')
-                                {{ tr('Full day') }}
-                            @elseif($create_leave_duration_unit === 'half_day')
-                                {{ tr('Half day') }}
-                            @else
-                                {{ tr('Hours') }}
+                            <div class="text-sm font-black text-gray-900">
+                                @if($create_leave_policy_duration_unit === 'hours')
+                                    {{ tr('Hours') }}
+                                @else
+                                    {{ tr('Full day') }}
+                                @endif
+                            </div>
+
+                            @if($create_leave_duration_unit === 'hours' && $leave_minutes > 0)
+                                <div class="text-[11px] text-gray-600 mt-1">
+                                    {{ tr('Total minutes') }}: <span class="font-bold">{{ (int) $leave_minutes }}</span>
+                                </div>
                             @endif
                         </div>
-
-                        @if($create_leave_duration_unit === 'hours' && $leave_minutes > 0)
-                            <div class="text-[11px] text-gray-600 mt-1">
-                                {{ tr('Total minutes') }}: <span class="font-bold">{{ (int) $leave_minutes }}</span>
-                            </div>
-                        @endif
-                    </div>
+                    @endif
                 @endif
 
                 {{-- Date/Time fields based on duration unit --}}
