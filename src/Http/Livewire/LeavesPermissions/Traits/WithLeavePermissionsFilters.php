@@ -197,7 +197,7 @@ trait WithLeavePermissionsFilters
             });
         }
 
-        return $q->orderByDesc('id')->limit(25)->get();
+        return $q->orderByDesc('id')->limit(1000)->get();
     }
 
     protected function resolveCompanyId(): int

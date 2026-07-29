@@ -28,6 +28,7 @@ trait WithLeaveRequests
     public string $create_leave_policy_duration_unit = 'full_day';
     public string $create_leave_duration_unit = 'full_day';
     public bool $create_leave_can_choose_duration = false;
+    public array $create_leave_work_period_options_cache = [];
     public bool $create_leave_attachment_required = false;
     public array $create_leave_attachment_types = [];
 
@@ -220,16 +221,19 @@ trait WithLeaveRequests
     {
         $this->leave_policy_id = 0;
         $this->replacement_employee_id = null;
+        $this->create_leave_work_period_options_cache = [];
         $this->resetCreateLeavePolicyMeta();
     }
 
     public function updatedLeavePolicyId($value): void
     {
+        $this->create_leave_work_period_options_cache = [];
         $this->hydrateCreateLeavePolicyMeta(true); // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Ãƒâ„¢Ã¢â‚¬Â¡Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â§ Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â·
     }
 
     public function updatedStartDate($value): void
     {
+        $this->create_leave_work_period_options_cache = [];
         $this->syncCreateLeaveDurationAvailability();
 
         // Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã‹â€  Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚ÂµÃƒâ„¢Ã‚Â Ãƒâ„¢Ã…Â Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Â¦ ÃƒËœÃ‚Â£Ãƒâ„¢Ã‹â€  ÃƒËœÃ‚Â³ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â®Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã…Â  end_date = start_date ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¦Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¹
@@ -621,6 +625,7 @@ trait WithLeaveRequests
         $this->create_leave_policy_duration_unit = 'full_day';
         $this->create_leave_duration_unit = 'full_day';
         $this->create_leave_can_choose_duration = false;
+        $this->create_leave_work_period_options_cache = [];
 
         $this->create_leave_attachment_required = false;
         $this->create_leave_attachment_types = ['pdf', 'jpg', 'jpeg', 'png'];
@@ -1039,9 +1044,72 @@ trait WithLeaveRequests
         }
     }
 
+    protected function getCreateLeaveBaseWorkPeriodOptionsForEmployee(?Carbon $date = null): array
+    {
+        if ((int) $this->employee_id <= 0 || !Schema::hasTable('employee_work_schedules') || !Schema::hasTable('work_schedule_periods')) {
+            return [];
+        }
+
+        $date = $date ?: Carbon::today();
+        $cacheKey = implode(':', [(int) $this->companyId, (int) $this->employee_id, $date->toDateString()]);
+        if (isset($this->create_leave_work_period_options_cache[$cacheKey])) {
+            return $this->create_leave_work_period_options_cache[$cacheKey];
+        }
+
+        try {
+            $assignmentTable = 'employee_work_schedules';
+            $periodTable = 'work_schedule_periods';
+            $assignmentCompanyColumn = $this->detectCompanyColumn($assignmentTable);
+            $dateStr = $date->toDateString();
+
+            $assignment = DB::table($assignmentTable)
+                ->where('employee_id', (int) $this->employee_id)
+                ->when($assignmentCompanyColumn, fn ($q) => $q->where($assignmentCompanyColumn, $this->companyId))
+                ->when(Schema::hasColumn($assignmentTable, 'is_active'), fn ($q) => $q->where('is_active', 1))
+                ->whereDate('start_date', '<=', $dateStr)
+                ->where(function ($q) use ($dateStr) {
+                    $q->whereNull('end_date')->orWhereDate('end_date', '>=', $dateStr);
+                })
+                ->orderByDesc('start_date')
+                ->orderByDesc('id')
+                ->first();
+
+            $scheduleId = (int) ($assignment->work_schedule_id ?? 0);
+            if ($scheduleId <= 0) {
+                return $this->create_leave_work_period_options_cache[$cacheKey] = [];
+            }
+
+            $rows = DB::table($periodTable)
+                ->where('work_schedule_id', $scheduleId)
+                ->orderBy(Schema::hasColumn($periodTable, 'sort_order') ? 'sort_order' : 'id')
+                ->get();
+
+            return $this->create_leave_work_period_options_cache[$cacheKey] = $rows
+                ->map(function ($period) {
+                    $start = substr((string) ($period->start_time ?? $period->from_time ?? $period->starts_at ?? $period->shift_start ?? ''), 0, 5);
+                    $end = substr((string) ($period->end_time ?? $period->to_time ?? $period->ends_at ?? $period->shift_end ?? ''), 0, 5);
+                    $id = (int) ($period->id ?? 0);
+
+                    return [
+                        'id' => $id,
+                        'start_time' => $start,
+                        'end_time' => $end,
+                        'is_night_shift' => (bool) ($period->is_night_shift ?? $period->is_night ?? false),
+                        'label' => trim(($start ?: '--:--') . ' - ' . ($end ?: '--:--')),
+                    ];
+                })
+                ->filter(fn ($period) => (int) $period['id'] > 0 && $period['start_time'] !== '' && $period['end_time'] !== '')
+                ->values()
+                ->all();
+        } catch (\Throwable $e) {
+            return $this->create_leave_work_period_options_cache[$cacheKey] = [];
+        }
+    }
+
     protected function getCreateLeaveWorkPeriodOptionsForCurrentSelection(): array
     {
         try {
+            $date = Carbon::parse($this->start_date);
             $employee = Employee::query()
                 ->when($this->employeeCompanyColumn, fn ($q) => $q->where($this->employeeCompanyColumn, $this->companyId))
                 ->find((int) $this->employee_id);
@@ -1050,7 +1118,8 @@ trait WithLeaveRequests
                 return [];
             }
 
-            return $this->getEmployeeWorkSchedulePeriodsForDate($employee, Carbon::parse($this->start_date));
+            $periods = $this->getEmployeeWorkSchedulePeriodsForDate($employee, $date);
+            return !empty($periods) ? $periods : $this->getCreateLeaveBaseWorkPeriodOptionsForEmployee($date);
         } catch (\Throwable $e) {
             return [];
         }
@@ -1058,13 +1127,19 @@ trait WithLeaveRequests
 
     protected function getEmployeeWorkSchedulePeriodsForDate(Employee $employee, Carbon $date): array
     {
+        $dateStr = $date->toDateString();
+        $cacheKey = implode(':', ['effective-periods', (int) $this->companyId, (int) $employee->id, $dateStr]);
+
+        if (isset($this->create_leave_work_period_options_cache[$cacheKey])) {
+            return $this->create_leave_work_period_options_cache[$cacheKey];
+        }
+
         if (!class_exists(WorkScheduleService::class)) {
-            return [];
+            return $this->create_leave_work_period_options_cache[$cacheKey] = [];
         }
 
         try {
             $service = app(WorkScheduleService::class);
-            $dateStr = $date->toDateString();
             $schedule = $service->getEffectiveSchedule((int) $this->companyId, $employee, $dateStr);
             $holidays = $service->getHolidays((int) $this->companyId, $dateStr, $dateStr);
             $metrics = $service->getMetricsForDate($dateStr, $schedule, $holidays, $employee, [
@@ -1073,7 +1148,7 @@ trait WithLeaveRequests
                 'permissions' => collect(),
             ]);
 
-            return collect($metrics['periods'] ?? [])
+            return $this->create_leave_work_period_options_cache[$cacheKey] = collect($metrics['periods'] ?? [])
                 ->map(function ($period) {
                     $start = substr((string) ($period['start_time'] ?? $period['start'] ?? ''), 0, 5);
                     $end = substr((string) ($period['end_time'] ?? $period['end'] ?? ''), 0, 5);
@@ -1091,7 +1166,7 @@ trait WithLeaveRequests
                 ->values()
                 ->all();
         } catch (\Throwable $e) {
-            return [];
+            return $this->create_leave_work_period_options_cache[$cacheKey] = [];
         }
     }
 
