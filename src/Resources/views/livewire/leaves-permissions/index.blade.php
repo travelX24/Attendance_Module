@@ -1917,9 +1917,19 @@
 
                         <div>
                             <div class="text-xs text-gray-500 mb-1">{{ tr('Work period') }}</div>
-                            @php($leaveWorkPeriodOptions = $this->leaveWorkPeriodOptions)
+                            @php
+                                $leaveWorkPeriodOptions = $this->leaveWorkPeriodOptions;
+                                $hasLeaveWorkPeriodContext = (int) $employee_id > 0 && trim((string) $start_date) !== '';
+                                $leaveWorkPeriodSelectOptions = collect($leaveWorkPeriodOptions)
+                                    ->map(fn ($period) => [
+                                        'value' => (string) (int) ($period['id'] ?? 0),
+                                        'label' => (string) ($period['label'] ?? ''),
+                                    ])
+                                    ->values()
+                                    ->all();
+                            @endphp
 
-                            @if((int) $employee_id <= 0 || trim($start_date) === '')
+                            @if(!$hasLeaveWorkPeriodContext)
                                 <div class="text-xs text-gray-500 bg-gray-50 border border-gray-100 rounded-lg px-3 py-2">
                                     {{ tr('Please select employee and date first.') }}
                                 </div>
@@ -1928,12 +1938,66 @@
                                     {{ tr('Half-day leave is only available when the employee schedule has more than one work period.') }}
                                 </div>
                             @else
-                                <x-ui.select wire:model="leave_work_schedule_period_id" class="w-full" :disabled="!$canManageLeaveRequests">
-                                    <option value="0">{{ tr('Select work period') }}</option>
-                                    @foreach($leaveWorkPeriodOptions as $period)
-                                        <option value="{{ (int) $period['id'] }}">{{ $period['label'] }}</option>
-                                    @endforeach
-                                </x-ui.select>
+                                <div
+                                    wire:key="leave-work-period-{{ (int) $employee_id }}-{{ $start_date }}"
+                                    x-data="{
+                                        open: false,
+                                        selected: @entangle('leave_work_schedule_period_id').live,
+                                        options: @js($leaveWorkPeriodSelectOptions),
+                                        placeholder: @js(tr('Select work period')),
+                                        get selectedLabel() {
+                                            const selectedValue = String(this.selected || '0');
+                                            const option = this.options.find((item) => String(item.value) === selectedValue);
+
+                                            return option ? option.label : this.placeholder;
+                                        },
+                                        choose(value) {
+                                            this.selected = String(value);
+                                            this.open = false;
+                                        },
+                                    }"
+                                    class="relative"
+                                    @mousedown.window="if (open && !$el.contains($event.target)) open = false"
+                                >
+                                    <button
+                                        type="button"
+                                        class="w-full rounded-xl border bg-white px-4 py-2.5 text-sm shadow-sm border-gray-200 focus:outline-none focus:ring-2 focus:ring-[color:var(--accent-orange)]/20 focus:border-[color:var(--accent-orange)] transition disabled:bg-gray-50 cursor-pointer flex items-center justify-between text-start"
+                                        @click="open = !open"
+                                        @disabled(!$canManageLeaveRequests)
+                                    >
+                                        <span x-text="selectedLabel" :class="String(selected || '0') === '0' ? 'text-gray-400' : 'text-gray-900'"></span>
+                                        <i class="fas fa-chevron-down text-gray-400 text-xs transition-transform" :class="open ? 'rotate-180' : ''"></i>
+                                    </button>
+
+                                    <div
+                                        x-cloak
+                                        x-show="open"
+                                        x-transition
+                                        class="absolute z-[9999] w-full mt-1 bg-white border border-gray-200 rounded-xl shadow-xl overflow-hidden max-h-64 overflow-y-auto"
+                                    >
+                                        <button
+                                            type="button"
+                                            class="w-full text-start px-4 py-2 text-sm hover:bg-gray-50 flex items-center justify-between"
+                                            :class="String(selected || '0') === '0' ? 'text-[color:var(--accent-orange)] font-bold bg-[color:var(--accent-orange)]/5' : 'text-gray-700'"
+                                            @click="choose('0')"
+                                        >
+                                            <span>{{ tr('Select work period') }}</span>
+                                            <i x-show="String(selected || '0') === '0'" class="fas fa-check text-xs"></i>
+                                        </button>
+
+                                        @foreach($leaveWorkPeriodOptions as $period)
+                                            <button
+                                                type="button"
+                                                class="w-full text-start px-4 py-2 text-sm hover:bg-gray-50 flex items-center justify-between"
+                                                :class="String(selected || '0') === @js((string) (int) $period['id']) ? 'text-[color:var(--accent-orange)] font-bold bg-[color:var(--accent-orange)]/5' : 'text-gray-700'"
+                                                @click="choose(@js((string) (int) $period['id']))"
+                                            >
+                                                <span>{{ $period['label'] }}</span>
+                                                <i x-show="String(selected || '0') === @js((string) (int) $period['id'])" class="fas fa-check text-xs"></i>
+                                            </button>
+                                        @endforeach
+                                    </div>
+                                </div>
                             @endif
 
                             @error('leave_work_schedule_period_id') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
@@ -3028,5 +3092,3 @@
         type="danger"
     />
 </div>
-
-
