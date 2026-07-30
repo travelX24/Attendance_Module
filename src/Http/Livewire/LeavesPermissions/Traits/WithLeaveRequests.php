@@ -2262,12 +2262,40 @@ trait WithLeaveRequests
             $this->group_leave_minutes = 0;
         }
     }
-    protected function validateHoursWithinWorkWindowGeneric(Carbon $date, string $from, string $to, string $fromKey, string $toKey): bool
+protected function validateHoursWithinWorkWindowGeneric(Carbon $date, string $from, string $to, string $fromKey, string $toKey): bool
     {
+        $arabicDayNames = [0=>tr('Sunday'),1=>tr('Monday'),2=>tr('Tuesday'),3=>tr('Wednesday'),4=>tr('Thursday'),5=>tr('Friday'),6=>tr('Saturday')];
         $workingDays = $this->companyWorkingDays();
-        if (! in_array((int) $date->dayOfWeek, $workingDays, true)) {
-            $this->addError('group_start_date', tr('Selected date is not a working day.'));
-            return false;
+        $dayOfWeek   = (int) $date->dayOfWeek;
+        $dayLabel    = $arabicDayNames[$dayOfWeek] ?? $date->englishDayOfWeek;
+        $dateLabel   = $date->format('Y/m/d');
+
+        if (! in_array($dayOfWeek, $workingDays, true)) {
+            $employeeIds = array_values(array_unique(array_map('intval', (array) ($this->groupEmployeeIds ?? []))));
+            $employeeIds = array_filter($employeeIds, fn ($v) => $v > 0);
+            $isWorkdayForEmployees = false;
+            $noScheduleEmpName = null; $offDayEmpName = null;
+            if (!empty($employeeIds) && class_exists(\Athka\SystemSettings\Services\WorkScheduleService::class)) {
+                $wsService = app(\Athka\SystemSettings\Services\WorkScheduleService::class);
+                $dateString = $date->toDateString(); $dayNameLower = strtolower($date->englishDayOfWeek);
+                $allWorkday = true;
+                foreach ($employeeIds as $empId) {
+                    $emp = \Athka\Employees\Models\Employee::find($empId);
+                    if (!$emp) { $allWorkday = false; break; }
+                    $schedule = $wsService->getEffectiveSchedule((int)$this->companyId, $emp, $dateString);
+                    if (!$schedule) { $allWorkday = false; $noScheduleEmpName = $emp->name_ar ?? $emp->name_en ?? $emp->name ?? ('#'.$empId); break; }
+                    $raw = $schedule->work_days ?? []; $workDaysArr = is_string($raw) ? json_decode($raw,true) : $raw;
+                    $workDaysArr = is_array($workDaysArr) ? array_map('strtolower', $workDaysArr) : [];
+                    if (!in_array($dayNameLower, $workDaysArr, true)) { $allWorkday = false; $offDayEmpName = $emp->name_ar ?? $emp->name_en ?? $emp->name ?? ('#'.$empId); break; }
+                }
+                $isWorkdayForEmployees = $allWorkday;
+            }
+            if (!$isWorkdayForEmployees) {
+                if ($noScheduleEmpName) { $msg = tr('The employee') . ' "' . $noScheduleEmpName . '" ' . tr('does not have an assigned work schedule. Please assign a work schedule before submitting a leave request.'); }
+                elseif ($offDayEmpName) { $msg = tr('The date') . ' ' . $dateLabel . ' (' . $dayLabel . ') ' . tr('is a day off for employee') . ' "' . $offDayEmpName . '" ' . tr('according to their work schedule. Please choose a working day.'); }
+                else { $msg = tr('The date') . ' ' . $dateLabel . ' (' . $dayLabel . ') ' . tr('is not a working day as per the company calendar. Please choose a working day.'); }
+                $this->addError('group_start_date', $msg); return false;
+            }
         }
 
         $fromT = $this->parseTimeSafe($from);

@@ -635,17 +635,106 @@ trait WithPermissionRequests
         $this->resetPage('permPage');
     }
 
-    // Ã¢Å“â€¦ Group Work Window validation (same logic but fields for group)
+    // ✅ Group Work Window validation (same logic but fields for group)
     protected function validateGroupPermissionWithinWorkWindow(Carbon $date, string $from, string $to): bool
     {
         if (!method_exists($this, 'companyWorkingDays') || !method_exists($this, 'parseTimeSafe')) {
             return true;
         }
 
+        // Map Carbon dayOfWeek (0=Sunday ... 6=Saturday) to Arabic day names
+        $arabicDayNames = [
+            0 => tr('Sunday'),
+            1 => tr('Monday'),
+            2 => tr('Tuesday'),
+            3 => tr('Wednesday'),
+            4 => tr('Thursday'),
+            5 => tr('Friday'),
+            6 => tr('Saturday'),
+        ];
+
         $workingDays = (array) $this->companyWorkingDays();
-        if (!in_array((int) $date->dayOfWeek, $workingDays, true)) {
-            $this->addError('group_permission_date', tr('Selected date is not a working day.'));
-            return false;
+        $dayOfWeek   = (int) $date->dayOfWeek;
+        $dayLabel    = $arabicDayNames[$dayOfWeek] ?? $date->englishDayOfWeek;
+        $dateLabel   = $date->format('Y/m/d');
+
+        if (!in_array($dayOfWeek, $workingDays, true)) {
+            // ✅ Before rejecting, check each selected employee's own work schedule.
+            // If WorkScheduleService is available and ALL selected employees have
+            // this date as a working day in their personal schedule, allow it.
+            $employeeIds = array_values(array_unique(array_map('intval',
+                (array) ($this->groupPermissionEmployeeIds ?? [])
+            )));
+            $employeeIds = array_filter($employeeIds, fn ($v) => $v > 0);
+
+            $isWorkdayForEmployees = false;
+
+            if (!empty($employeeIds) && class_exists(\Athka\SystemSettings\Services\WorkScheduleService::class)) {
+                $wsService    = app(\Athka\SystemSettings\Services\WorkScheduleService::class);
+                $dateString   = $date->toDateString();
+                $dayNameLower = strtolower($date->englishDayOfWeek); // e.g. "wednesday"
+
+                $allWorkday        = true;
+                $noScheduleEmpName = null;
+                $offDayEmpName     = null;
+
+                foreach ($employeeIds as $empId) {
+                    $employee = \Athka\Employees\Models\Employee::find($empId);
+                    if (!$employee) {
+                        $allWorkday = false;
+                        break;
+                    }
+
+                    $schedule = $wsService->getEffectiveSchedule(
+                        (int) $this->companyId,
+                        $employee,
+                        $dateString
+                    );
+
+                    if (!$schedule) {
+                        $allWorkday        = false;
+                        $noScheduleEmpName = $employee->name_ar ?? $employee->name_en ?? $employee->name ?? ('#' . $empId);
+                        break;
+                    }
+
+                    $raw         = $schedule->work_days ?? [];
+                    $workDaysArr = is_string($raw) ? json_decode($raw, true) : $raw;
+                    $workDaysArr = is_array($workDaysArr)
+                        ? array_map('strtolower', $workDaysArr)
+                        : [];
+
+                    if (!in_array($dayNameLower, $workDaysArr, true)) {
+                        $allWorkday    = false;
+                        $offDayEmpName = $employee->name_ar ?? $employee->name_en ?? $employee->name ?? ('#' . $empId);
+                        break;
+                    }
+                }
+
+                $isWorkdayForEmployees = $allWorkday;
+
+                if (!$isWorkdayForEmployees) {
+                    if ($noScheduleEmpName) {
+                        $msg = tr('The employee') . ' "' . $noScheduleEmpName . '" '
+                             . tr('does not have an assigned work schedule. Please assign a work schedule before submitting a permission request.');
+                    } elseif ($offDayEmpName) {
+                        $msg = tr('The date') . ' ' . $dateLabel . ' (' . $dayLabel . ') '
+                             . tr('is a day off for employee') . ' "' . $offDayEmpName . '" '
+                             . tr('according to their work schedule. Please choose a working day.');
+                    } else {
+                        $msg = tr('The date') . ' ' . $dateLabel . ' (' . $dayLabel . ') '
+                             . tr('is not a working day. Please choose a working day.');
+                    }
+
+                    $this->addError('group_permission_date', $msg);
+                    return false;
+                }
+            } else {
+                // WorkScheduleService not available — fallback to generic message with day info
+                $msg = tr('The date') . ' ' . $dateLabel . ' (' . $dayLabel . ') '
+                     . tr('is not a working day as per the company calendar. Please choose a working day.');
+                $this->addError('group_permission_date', $msg);
+                return false;
+            }
         }
 
         $fromT = $this->parseTimeSafe($from);
