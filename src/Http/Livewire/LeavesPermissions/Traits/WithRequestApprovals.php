@@ -62,7 +62,8 @@ trait WithRequestApprovals
         // Ã¢Å“â€¦ NEW: Integrate with ApprovalInbox sequence
         try {
             $controller = app(\Athka\SystemSettings\Http\Controllers\Api\Employee\ApprovalInboxController::class);
-            $resp = $controller->approve(new \Illuminate\Http\Request(), 'leaves', $id);
+            $approvalType = (bool) ($row->is_exception ?? false) ? 'leave_exceptions' : 'leaves';
+            $resp = $controller->approve(new \Illuminate\Http\Request(), $approvalType, $id);
             $content = json_decode($resp->getContent(), true);
             
             if (!($content['ok'] ?? false)) {
@@ -283,7 +284,11 @@ trait WithRequestApprovals
             // Ã¢Å“â€¦ NEW: Integrate with ApprovalInbox sequence
             try {
                 $controller = app(\Athka\SystemSettings\Http\Controllers\Api\Employee\ApprovalInboxController::class);
-                $type = $this->rejectType === 'cut_leave' ? 'leaves' : $this->rejectType . 's';
+                if ($this->rejectType === 'leave' && (bool) ($row->is_exception ?? false)) {
+                    $type = 'leave_exceptions';
+                } else {
+                    $type = $this->rejectType === 'cut_leave' ? 'leaves' : $this->rejectType . 's';
+                }
                 
                 $rejectReq = new \Illuminate\Http\Request();
                 $rejectReq->merge(['comment' => $this->rejectReason]);

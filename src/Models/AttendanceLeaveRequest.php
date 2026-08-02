@@ -74,7 +74,7 @@ class AttendanceLeaveRequest extends Model
     public function approvalTasks()
     {
         return $this->hasMany(\Athka\SystemSettings\Models\ApprovalTask::class, 'approvable_id')
-            ->where('approvable_type', 'leaves')
+            ->whereIn('approvable_type', ['leaves', 'leave_exceptions'])
             ->orderBy('position');
     }
 }

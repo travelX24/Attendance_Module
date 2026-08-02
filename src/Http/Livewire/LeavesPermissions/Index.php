@@ -199,6 +199,10 @@ class Index extends Component
             default => 'leaves'
         };
 
+        if ($type === 'leave' && (bool) ($this->currentRequest->is_exception ?? false)) {
+            $approvableType = 'leave_exceptions';
+        }
+
         // Fetch approval tasks logic
         $this->currentWorkflowTasks = \Athka\SystemSettings\Models\ApprovalTask::query()
             ->with('approver')
@@ -968,18 +972,30 @@ private function allowedBranchIds(): array
     $bid = (int) ($user->branch_id ?? 0);
     return $bid > 0 ? [$bid] : [];
 }
+    protected function approvalTaskTypesForFilter(string $type, ?string $table = null): array
+    {
+        $leaveRequestTable = (new AttendanceLeaveRequest())->getTable();
+        if ($type === 'leaves' && $table === $leaveRequestTable) {
+            return ['leaves', 'leave_exceptions'];
+        }
+
+        return [$type];
+    }
     protected function applyApprovalTaskFilter($q, $type)
     {
         $user = auth()->user();
+        $taskTypes = $this->approvalTaskTypesForFilter((string) $type, $q->getModel()->getTable());
 
         // âœ… HR / Admins should see ALL pending requests, not just their tasks
         if ($this->canAttendanceAny(['attendance.leaves.view', 'attendance.leaves.view-subordinates', 'requests.leaves.view', 'requests.leaves.approve', 'requests.permissions.view', 'requests.permissions.manage', 'attendance.leaves.manage', 'attendance.missions.manage'])) {
             // But we still want to ensure tasks exist for them to see in the list (workflow info)
             try {
                 $approvalService = app(\Athka\SystemSettings\Services\Approvals\ApprovalService::class);
-                $src = $approvalService->getRequestSource($type);
-                if ($src) {
-                    $approvalService->ensureTasksForPendingRequests($src, $this->companyId);
+                foreach ($taskTypes as $taskType) {
+                    $src = $approvalService->getRequestSource($taskType);
+                    if ($src) {
+                        $approvalService->ensureTasksForPendingRequests($src, $this->companyId);
+                    }
                 }
             } catch (\Throwable $e) {}
 
@@ -992,24 +1008,26 @@ private function allowedBranchIds(): array
         // âœ… Ensure tasks exist for the current manager's pending items
         try {
             $approvalService = app(\Athka\SystemSettings\Services\Approvals\ApprovalService::class);
-            $src = $approvalService->getRequestSource($type);
-            if ($src) {
-                $approvalService->ensureTasksForPendingRequests($src, $this->companyId);
+            foreach ($taskTypes as $taskType) {
+                $src = $approvalService->getRequestSource($taskType);
+                if ($src) {
+                    $approvalService->ensureTasksForPendingRequests($src, $this->companyId);
+                }
             }
         } catch (\Throwable $e) {}
 
-        $q->where(function ($query) use ($employeeId, $type) {
+        $q->where(function ($query) use ($employeeId, $type, $taskTypes) {
             $table = $query->getModel()->getTable();
             $hasReplacementCols = Schema::hasColumn($table, 'replacement_employee_id');
 
             // 1) Show to Managers ONLY IF replacement is null or approved
-            $query->where(function ($subManager) use ($employeeId, $type, $hasReplacementCols) {
-                $subManager->whereExists(function ($sub) use ($employeeId, $type, $subManager) {
+            $query->where(function ($subManager) use ($employeeId, $type, $taskTypes, $hasReplacementCols) {
+                $subManager->whereExists(function ($sub) use ($employeeId, $type, $taskTypes, $subManager) {
                     $table = $subManager->getModel()->getTable();
                     $sub->select(DB::raw(1))
                         ->from('approval_tasks')
                         ->whereColumn('approvable_id', $table . '.id')
-                        ->where('approvable_type', $type)
+                        ->whereIn('approvable_type', $taskTypes)
                         ->where('approver_employee_id', $employeeId)
                         ->where('status', 'pending');
                 });
