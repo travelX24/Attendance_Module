@@ -124,30 +124,55 @@ class PenaltyService
             return false;
         }
 
-        $created = false;
-
         $status = $this->resolvePenaltyStatus($log);
 
-        if ($status === 'late') {
-            $created = $this->processViolation($log, $policyId, 'delay') || $created;
-        }
+        $targetViolationType = match ($status) {
+            'late' => 'delay',
+            'early_departure' => 'early_departure',
+            'absent' => 'absent',
+            'auto_checkout' => 'auto_checkout',
+            default => null,
+        };
 
-        if ($status === 'early_departure') {
-            $created = $this->processViolation($log, $policyId, 'early_departure') || $created;
-        }
+        if ($targetViolationType === 'delay') {
+            $lateMinutes = $this->getLateMinutes($log);
+            $lateAbsencePolicy = UnexcusedAbsencePolicy::query()
+                ->where('saas_company_id', $log->saas_company_id)
+                ->where('policy_id', $policyId)
+                ->where('absence_reason_type', 'late_early')
+                ->where('is_active', true)
+                ->where(function ($q) {
+                    $q->where('is_enabled', true)->orWhereNull('is_enabled');
+                })
+                ->where('late_minutes', '>', 0)
+                ->where('late_minutes', '<=', $lateMinutes)
+                ->first();
 
-        if ($status === 'absent') {
-            $created = $this->processViolation($log, $policyId, 'absent') || $created;
-        }
-
-        if ($status === 'auto_checkout') {
-            $grace = \Athka\SystemSettings\Models\AttendanceGraceSetting::where('saas_company_id', $log->saas_company_id)->first();
-            if ($grace && (bool)$grace->auto_checkout_penalty_enabled) {
-                $created = $this->processViolation($log, $policyId, 'auto_checkout') || $created;
+            if ($lateAbsencePolicy) {
+                $targetViolationType = 'absent';
             }
         }
 
-        return $created;
+        // Delete any existing pending penalties for this employee on this date that do not match the target violation type
+        AttendanceDailyPenalty::where('saas_company_id', $log->saas_company_id)
+            ->where('employee_id', $log->employee_id)
+            ->where('attendance_date', $log->attendance_date)
+            ->where('status', '!=', 'confirmed')
+            ->when($targetViolationType, fn ($q) => $q->where('violation_type', '!=', $targetViolationType))
+            ->delete();
+
+        if (! $targetViolationType) {
+            return false;
+        }
+
+        if ($targetViolationType === 'auto_checkout') {
+            $grace = \Athka\SystemSettings\Models\AttendanceGraceSetting::where('saas_company_id', $log->saas_company_id)->first();
+            if (! ($grace && (bool) $grace->auto_checkout_penalty_enabled)) {
+                return false;
+            }
+        }
+
+        return $this->processViolation($log, $policyId, $targetViolationType);
     }
 
     /**
@@ -165,12 +190,6 @@ class PenaltyService
         if ($existing && $existing->status === 'confirmed') {
             return false;
         }
-
-        /* 
-        if (Carbon::parse($log->attendance_date)->diffInDays(now()) > 7) {
-            return false;
-        }
-        */
 
         $hasPermission = \Athka\Attendance\Models\AttendancePermissionRequest::where('employee_id', $log->employee_id)
             ->where('permission_date', $log->attendance_date)
