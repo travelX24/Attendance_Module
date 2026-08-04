@@ -8,13 +8,22 @@ use Athka\Attendance\Models\OfflineAttendanceQueue;
 use Athka\Employees\Models\Employee;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
-use Illuminate\Support\Facades\Schema;
+use Athka\SystemSettings\Models\AttendanceGpsLocation;
+use Athka\SystemSettings\Models\AttendanceMethod;
+use Athka\SystemSettings\Models\EmployeeGroup;
+use Athka\SystemSettings\Services\AttendanceLocationGateService;
 
 class OfflineAttendanceController extends Controller
 {
+    public function __construct(
+        private readonly AttendanceLocationGateService $locationGateService
+    ) {
+    }
+
     /**
      * Submit offline attendance records (batch sync).
      * Called by the client when internet is restored.
@@ -25,14 +34,17 @@ class OfflineAttendanceController extends Controller
             'records'                          => ['required', 'array', 'min:1', 'max:50'],
             'records.*.employee_id'            => ['required', 'integer'],
             'records.*.action_type'            => ['required', 'in:check_in,check_out,check_in_out,full_day'],
+            'records.*.attendance_method'      => ['nullable', 'in:gps,fingerprint,nfc'],
             'records.*.attendance_date'        => ['required', 'date'],
             'records.*.check_in_time'          => ['nullable', 'date_format:H:i'],
             'records.*.check_out_time'         => ['nullable', 'date_format:H:i'],
             'records.*.device_captured_at'     => ['nullable', 'date'],
             'records.*.device_timezone'        => ['nullable', 'string', 'max:64'],
-            'records.*.latitude'               => ['nullable', 'numeric'],
-            'records.*.longitude'              => ['nullable', 'numeric'],
-            'records.*.gps_accuracy'           => ['nullable', 'string'],
+            'records.*.latitude'               => ['nullable', 'numeric', 'between:-90,90'],
+            'records.*.longitude'              => ['nullable', 'numeric', 'between:-180,180'],
+            'records.*.gps_accuracy'           => ['nullable', 'numeric', 'min:0'],
+            'records.*.is_mocked'              => ['nullable', 'boolean'],
+            'records.*.local_id'               => ['nullable'],
             'records.*.device_id'              => ['nullable', 'string', 'max:128'],
             'records.*.device_platform'        => ['nullable', 'string', 'max:32'],
             'records.*.integrity_hash'         => ['nullable', 'string', 'max:64'],
@@ -61,8 +73,10 @@ class OfflineAttendanceController extends Controller
                     'ok'           => false,
                     'employee_id'  => $rec['employee_id'] ?? null,
                     'date'         => $rec['attendance_date'] ?? null,
+                    'code'         => 'offline_sync_processing_error',
                     'message'      => tr('An error occurred while processing this record.'),
                     'queue_id'     => null,
+                    'local_id'     => $rec['local_id'] ?? null,
                 ];
             }
         }
@@ -146,14 +160,27 @@ class OfflineAttendanceController extends Controller
             ];
         }
 
-        // 2. Get Allowed Locations (if any)
-        $locations = [];
-        if (Schema::hasTable('branches')) {
-            $locations = DB::table('branches')
-                ->where('id', $employee->branch_id)
-                ->select('id', 'name_ar', 'name_en', 'latitude', 'longitude', 'radius')
-                ->get();
-        }
+        // 2. Get the same effective Circle/Polygon locations used by
+        // the online attendance endpoints.
+        $locations = $this->locationGateService
+            ->allowedLocationsForEmployee((int) $companyId, $employee)
+            ->map(fn (AttendanceGpsLocation $location) => [
+                'id' => (int) $location->id,
+                'name' => (string) $location->name,
+                'lat' => (float) $location->lat,
+                'lng' => (float) $location->lng,
+                'radius_meters' => (int) $location->radius_meters,
+                'geofence_type' => (string) (
+                    $location->geofence_type
+                    ?: AttendanceGpsLocation::GEOFENCE_TYPE_CIRCLE
+                ),
+                'boundary_geojson' => $location->boundary_geojson,
+                'address_text' => (string) ($location->address_text ?? ''),
+                'country' => (string) ($location->country ?? ''),
+                'city' => (string) ($location->city ?? ''),
+                'region' => (string) ($location->region ?? ''),
+            ])
+            ->values();
 
         return response()->json([
             'ok' => true,
@@ -168,6 +195,7 @@ class OfflineAttendanceController extends Controller
                     'gps_required' => config('attendance.gps_required', true),
                     'gps_radius' => (int) config('attendance.default_radius', 100),
                     'allow_offline' => true,
+                    'location_gate' => $this->locationGateService->settings(),
                 ]
             ]
         ]);
@@ -286,8 +314,10 @@ class OfflineAttendanceController extends Controller
                 'ok'          => false,
                 'employee_id' => $employeeId,
                 'date'        => $rec['attendance_date'] ?? null,
+                'code'        => 'employee_not_found',
                 'message'     => tr('Employee not found or does not belong to your company.'),
                 'queue_id'    => null,
+                'local_id'    => $rec['local_id'] ?? null,
             ];
         }
 
@@ -297,9 +327,84 @@ class OfflineAttendanceController extends Controller
                 'ok'          => false,
                 'employee_id' => $employeeId,
                 'date'        => $rec['attendance_date'] ?? null,
+                'code'        => 'offline_employee_not_allowed',
                 'message'     => tr('You are not allowed to sync attendance for this employee.'),
                 'queue_id'    => null,
+                'local_id'    => $rec['local_id'] ?? null,
             ];
+        }
+
+        $rawClientReference = $rec['local_id'] ?? null;
+        $clientReference = is_scalar($rawClientReference)
+            ? mb_substr(trim((string) $rawClientReference), 0, 128)
+            : '';
+
+        if ($clientReference !== '') {
+            $existingQueueItem = OfflineAttendanceQueue::query()
+                ->where('saas_company_id', $companyId)
+                ->where('submitted_by_user_id', (int) $user->id)
+                ->where('client_reference', $clientReference)
+                ->first();
+
+            if ($existingQueueItem) {
+                return $this->responseForExistingQueueItem(
+                    $existingQueueItem,
+                    $companyId,
+                    $employeeId,
+                    $clientReference
+                );
+            }
+        }
+
+        $attendanceMethod = (string) (
+            $rec['attendance_method']
+            ?? 'gps'
+        );
+
+        if (! $this->attendanceMethodAllowed(
+            $companyId,
+            $employee,
+            $attendanceMethod
+        )) {
+            return [
+                'ok' => false,
+                'code' => 'method_unavailable',
+                'employee_id' => $employeeId,
+                'date' => $rec['attendance_date'] ?? null,
+                'message' => tr('This attendance method is not available.'),
+                'queue_id' => null,
+                'local_id' => $clientReference !== ''
+                    ? $clientReference
+                    : null,
+            ];
+        }
+
+        $locationDecision = null;
+
+        if ($attendanceMethod === 'gps') {
+            $locationDecision = $this->locationGateService->evaluateOffline(
+                companyId: $companyId,
+                employee: $employee,
+                payload: [
+                    'lat' => $rec['latitude'] ?? null,
+                    'lng' => $rec['longitude'] ?? null,
+                    'gps_accuracy' => $rec['gps_accuracy'] ?? null,
+                    'is_mocked' => $rec['is_mocked'] ?? false,
+                    'location_captured_at' => $rec['device_captured_at'] ?? null,
+                ],
+            );
+
+            if (! $locationDecision->allowed) {
+                return array_merge(
+                    $locationDecision->toResponseArray(),
+                    [
+                        'employee_id' => $employeeId,
+                        'date' => $rec['attendance_date'] ?? null,
+                        'queue_id' => null,
+                        'local_id' => $rec['local_id'] ?? null,
+                    ]
+                );
+            }
         }
 
         // Build payload for queue
@@ -308,6 +413,7 @@ class OfflineAttendanceController extends Controller
             'saas_company_id'    => $companyId,
             'submitted_by_user_id' => $user->id,
             'action_type'        => $rec['action_type'],
+            'attendance_method'  => $attendanceMethod,
             'attendance_date'    => $rec['attendance_date'],
             'check_in_time'      => $rec['check_in_time'] ?? null,
             'check_out_time'     => $rec['check_out_time'] ?? null,
@@ -316,6 +422,11 @@ class OfflineAttendanceController extends Controller
             'latitude'           => $rec['latitude'] ?? null,
             'longitude'          => $rec['longitude'] ?? null,
             'gps_accuracy'       => $rec['gps_accuracy'] ?? null,
+            'is_mocked'          => (bool) ($rec['is_mocked'] ?? false),
+            'location_gate_result' => $locationDecision?->toArray(),
+            'client_reference'   => $clientReference !== ''
+                ? $clientReference
+                : null,
             'device_id'          => $rec['device_id'] ?? null,
             'device_platform'    => $rec['device_platform'] ?? 'web',
             'user_agent'         => request()->userAgent(),
@@ -324,7 +435,30 @@ class OfflineAttendanceController extends Controller
             'sync_status'        => 'pending',
         ];
 
-        $queueItem = OfflineAttendanceQueue::create($payload);
+        try {
+            $queueItem = OfflineAttendanceQueue::create($payload);
+        } catch (QueryException $error) {
+            if ($clientReference === '') {
+                throw $error;
+            }
+
+            $existingQueueItem = OfflineAttendanceQueue::query()
+                ->where('saas_company_id', $companyId)
+                ->where('submitted_by_user_id', (int) $user->id)
+                ->where('client_reference', $clientReference)
+                ->first();
+
+            if (! $existingQueueItem) {
+                throw $error;
+            }
+
+            return $this->responseForExistingQueueItem(
+                $existingQueueItem,
+                $companyId,
+                $employeeId,
+                $clientReference
+            );
+        }
 
         // Run tamper detection
         $queueItem->detectTampering();
@@ -343,13 +477,174 @@ class OfflineAttendanceController extends Controller
         // Immediately try to apply to attendance log
         $applyResult = $this->applyToAttendanceLog($queueItem, $companyId);
 
-        return array_merge($applyResult, ['queue_id' => $queueItem->id]);
+        return array_merge(
+            $applyResult,
+            [
+                'queue_id' => $queueItem->id,
+                'local_id' => $clientReference !== ''
+                    ? $clientReference
+                    : null,
+            ]
+        );
+    }
+
+    private function attendanceMethodAllowed(
+        int $companyId,
+        Employee $employee,
+        string $method,
+    ): bool {
+        $globalEnabled = AttendanceMethod::query()
+            ->where('saas_company_id', $companyId)
+            ->where('method', $method)
+            ->where('is_enabled', true)
+            ->exists();
+
+        if (! $globalEnabled) {
+            return false;
+        }
+
+        $groupIds = EmployeeGroup::query()
+            ->where('saas_company_id', $companyId)
+            ->whereHas(
+                'employees',
+                fn ($query) => $query->where(
+                    'employees.id',
+                    (int) $employee->id
+                )
+            )
+            ->pluck('id');
+
+        if ($groupIds->isEmpty()) {
+            return true;
+        }
+
+        return EmployeeGroup::query()
+            ->whereIn('id', $groupIds)
+            ->whereHas(
+                'allowedMethods',
+                fn ($query) => $query
+                    ->where('method', $method)
+                    ->where('is_allowed', true)
+            )
+            ->exists();
+    }
+
+    private function responseForExistingQueueItem(
+        OfflineAttendanceQueue $item,
+        int $companyId,
+        int $employeeId,
+        string $clientReference,
+    ): array {
+        if ($item->sync_status === 'synced') {
+            return [
+                'ok' => true,
+                'code' => 'offline_record_already_synced',
+                'employee_id' => $employeeId,
+                'date' => $item->attendance_date?->toDateString(),
+                'message' => tr('Attendance was already synced.'),
+                'queue_id' => $item->id,
+                'local_id' => $clientReference,
+                'location_gate' => $item->location_gate_result,
+            ];
+        }
+
+        if ($item->sync_status === 'rejected') {
+            $gate = is_array($item->location_gate_result)
+                ? $item->location_gate_result
+                : [];
+
+            return [
+                'ok' => false,
+                'code' => (string) (
+                    $gate['code']
+                    ?? 'offline_record_rejected'
+                ),
+                'employee_id' => $employeeId,
+                'date' => $item->attendance_date?->toDateString(),
+                'message' => (string) (
+                    $item->sync_error
+                    ?: tr('The offline attendance record was rejected.')
+                ),
+                'queue_id' => $item->id,
+                'local_id' => $clientReference,
+                'location_gate' => $gate ?: null,
+            ];
+        }
+
+        $result = $this->applyToAttendanceLog($item, $companyId);
+
+        return array_merge(
+            $result,
+            [
+                'queue_id' => $item->id,
+                'local_id' => $clientReference,
+            ]
+        );
     }
 
     private function applyToAttendanceLog(OfflineAttendanceQueue $item, int $companyId): array
     {
+        $employee = Employee::query()
+            ->where('saas_company_id', $companyId)
+            ->find((int) $item->employee_id);
+
+        if (! $employee) {
+            $item->update([
+                'sync_status' => 'rejected',
+                'sync_error' => 'Employee not found.',
+            ]);
+
+            return [
+                'ok' => false,
+                'code' => 'employee_not_found',
+                'employee_id' => $item->employee_id,
+                'date' => $item->attendance_date?->toDateString(),
+                'message' => tr('Employee not found.'),
+            ];
+        }
+
+        $locationDecision = null;
+
+        if (($item->attendance_method ?: 'gps') === 'gps') {
+            $locationDecision = $this->locationGateService->evaluateOffline(
+                companyId: $companyId,
+                employee: $employee,
+                payload: [
+                    'lat' => $item->latitude,
+                    'lng' => $item->longitude,
+                    'gps_accuracy' => $item->gps_accuracy,
+                    'is_mocked' => $item->is_mocked,
+                    'location_captured_at' => $item->device_captured_at,
+                ],
+            );
+
+            if (! $locationDecision->allowed) {
+                $item->update([
+                    'sync_status' => 'rejected',
+                    'sync_error' => $locationDecision->message,
+                    'location_gate_result' => $locationDecision->toArray(),
+                ]);
+
+                return array_merge(
+                    $locationDecision->toResponseArray(),
+                    [
+                        'employee_id' => $item->employee_id,
+                        'date' => $item->attendance_date?->toDateString(),
+                    ]
+                );
+            }
+
+            $item->update([
+                'location_gate_result' => $locationDecision->toArray(),
+            ]);
+        }
+
         try {
-            return DB::transaction(function () use ($item, $companyId) {
+            return DB::transaction(function () use (
+                $item,
+                $companyId,
+                $locationDecision
+            ) {
 
                 $date       = $item->attendance_date->toDateString();
                 $employeeId = (int) $item->employee_id;
@@ -381,13 +676,36 @@ class OfflineAttendanceController extends Controller
                         'device_captured_at' => $item->device_captured_at?->toDateTimeString(),
                         'latitude'           => $item->latitude,
                         'longitude'          => $item->longitude,
-                        'is_suspicious'      => $item->is_suspicious,
+                        'gps_accuracy'        => $item->gps_accuracy,
+                        'attendance_method'   => $item->attendance_method,
+                        'location_gate'       => $locationDecision?->toArray(),
+                        'is_suspicious'       => $item->is_suspicious,
                         'synced_at'          => now()->toDateTimeString(),
                     ]);
 
                     $log->save();
 
                 } else {
+                    if ($actionType === 'check_out') {
+                        $item->update([
+                            'sync_status' => 'rejected',
+                            'sync_error' => tr(
+                                'No attendance record found for today. Please register check-in first.'
+                            ),
+                        ]);
+
+                        return [
+                            'ok' => false,
+                            'code' => 'no_check_in_record',
+                            'employee_id' => $employeeId,
+                            'date' => $date,
+                            'message' => tr(
+                                'No attendance record found for today. Please register check-in first.'
+                            ),
+                            'location_gate' => $locationDecision?->toArray(),
+                        ];
+                    }
+
                     // Create new log
                     $log = AttendanceDailyLog::create([
                         'saas_company_id'    => $companyId,
@@ -404,6 +722,9 @@ class OfflineAttendanceController extends Controller
                             'device_captured_at' => $item->device_captured_at?->toDateTimeString(),
                             'latitude'           => $item->latitude,
                             'longitude'          => $item->longitude,
+                            'gps_accuracy'        => $item->gps_accuracy,
+                            'attendance_method'   => $item->attendance_method,
+                            'location_gate'       => $locationDecision?->toArray(),
                             'device_platform'    => $item->device_platform,
                             'is_suspicious'      => $item->is_suspicious,
                             'synced_at'          => now()->toDateTimeString(),
@@ -424,6 +745,7 @@ class OfflineAttendanceController extends Controller
                     'date'        => $date,
                     'message'     => tr('Attendance synced successfully.'),
                     'log_id'      => $log->id,
+                    'location_gate' => $locationDecision?->toArray(),
                 ];
             });
         } catch (\Throwable $e) {
