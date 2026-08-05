@@ -2,6 +2,9 @@
     $locale = app()->getLocale();
     $isRtl  = in_array(substr($locale, 0, 2), ['ar','fa','ur','he']);
     $dir    = $isRtl ? 'rtl' : 'ltr';
+    $canGoToNextDay = filled($date_from)
+        && \Carbon\Carbon::parse($date_from)
+            ->lt(\Carbon\Carbon::parse($latestCompletedDate));
     $attendanceUser = auth()->user();
     $canManagePenalties = (bool) $attendanceUser?->can('attendance.penalties.manage');
     $canWaivePenalties = $canManagePenalties || (bool) $attendanceUser?->can('attendance.penalties.waive');
@@ -122,6 +125,7 @@
                                 <input
                                     type="date"
                                     wire:model.live="date_from"
+                                    max="{{ $latestCompletedDate }}"
                                     class="absolute inset-0 opacity-0 cursor-pointer z-10"
                                     @disabled(!$canFilterPenalties)
                                 >
@@ -137,8 +141,8 @@
                             <button
                                 type="button"
                                 wire:click="goToNextDay"
-                                class="h-11 w-11 shrink-0 inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 hover:text-[color:var(--accent-orange)] hover:border-[color:var(--accent-orange)]/30 transition"
-                                @disabled(!$canFilterPenalties)
+                                class="h-11 w-11 shrink-0 inline-flex items-center justify-center rounded-xl border border-gray-200 bg-white text-gray-600 hover:text-[color:var(--accent-orange)] hover:border-[color:var(--accent-orange)]/30 transition disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-gray-600 disabled:hover:border-gray-200"
+                                @disabled(!$canFilterPenalties || !$canGoToNextDay)
                                 title="{{ tr('Next day') }}"
                             >
                                 <i class="fas fa-chevron-{{ $isRtl ? 'left' : 'right' }}"></i>
@@ -277,12 +281,24 @@
                             <span class="text-xs font-bold text-[color:var(--accent-orange)]">{{ count($selectedPenalties) }} {{ tr('Selected') }}</span>
                             <div class="w-px h-4 bg-[color:var(--accent-orange)]/20 mx-1"></div>
                             @if($canManagePenalties)
-                                <button wire:click="bulkConfirm" class="text-xs font-bold text-[color:var(--success)] hover:brightness-90 flex items-center gap-1 transition-colors">
-                                    <i class="fas fa-check-double"></i>
+                                <button
+                                    wire:click="bulkConfirm"
+                                    wire:loading.attr="disabled"
+                                    wire:target="bulkConfirm"
+                                    class="text-xs font-bold text-[color:var(--success)] hover:brightness-90 flex items-center gap-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <i class="fas fa-check-double" wire:loading.remove wire:target="bulkConfirm"></i>
+                                    <i class="fas fa-circle-notch fa-spin" wire:loading wire:target="bulkConfirm"></i>
                                     {{ tr('Confirm All') }}
                                 </button>
-                                <button wire:click="bulkDelete" class="text-xs font-bold text-[color:var(--error)] hover:brightness-90 flex items-center gap-1 transition-colors">
-                                    <i class="fas fa-trash-alt"></i>
+                                <button
+                                    wire:click="bulkDelete"
+                                    wire:loading.attr="disabled"
+                                    wire:target="bulkDelete"
+                                    class="text-xs font-bold text-[color:var(--error)] hover:brightness-90 flex items-center gap-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                >
+                                    <i class="fas fa-trash-alt" wire:loading.remove wire:target="bulkDelete"></i>
+                                    <i class="fas fa-circle-notch fa-spin" wire:loading wire:target="bulkDelete"></i>
                                     {{ tr('Delete') }}
                                 </button>
                             @endif
@@ -329,9 +345,21 @@
 
                     @if($canManagePenalties)
                         <div class="w-full sm:w-auto mt-1 sm:mt-0">
-                            <x-ui.primary-button wire:click="runCalculation" size="sm" class="!rounded-xl !px-6 gap-2 shadow-sm w-full sm:w-auto justify-center">
-                                <i class="fas fa-play text-xs text-white"></i>
-                                <span class="font-bold">{{ tr('Run Calculation') }}</span>
+                            <x-ui.primary-button
+                                wire:click="runCalculation"
+                                wire:loading.attr="disabled"
+                                wire:target="runCalculation"
+                                size="sm"
+                                class="!rounded-xl !px-6 gap-2 shadow-sm w-full sm:w-auto justify-center disabled:opacity-60 disabled:cursor-not-allowed"
+                            >
+                                <span wire:loading.remove wire:target="runCalculation" class="inline-flex items-center gap-2">
+                                    <i class="fas fa-play text-xs text-white"></i>
+                                    <span class="font-bold">{{ tr('Run Calculation') }}</span>
+                                </span>
+                                <span wire:loading wire:target="runCalculation" class="inline-flex items-center gap-2">
+                                    <i class="fas fa-circle-notch fa-spin text-xs text-white"></i>
+                                    <span class="font-bold">{{ tr('Calculation in progress...') }}</span>
+                                </span>
                             </x-ui.primary-button>
                         </div>
                     @endif
@@ -388,6 +416,9 @@
                             'red' => '--error',
                             default => '--text-secondary',
                         };
+                        $outsideEditableWindow = \Carbon\Carbon::parse(
+                            $penalty->attendance_date
+                        )->startOfDay()->lt(now()->subDays(7)->startOfDay());
                     @endphp
 
                     @if($currentPenaltyDate !== $lastPenaltyDate)
@@ -484,7 +515,7 @@
                             <x-ui.actions-menu>
                                 @if($canManagePenalties || $canWaivePenalties)
                                     @if($canWaivePenalties)
-                                        <x-ui.dropdown-item wire:click="openExemptionModal({{ $penalty->id }})" :disabled="$penalty->status === 'confirmed'">
+                                        <x-ui.dropdown-item wire:click="openExemptionModal({{ $penalty->id }})" :disabled="$penalty->status === 'confirmed' || $outsideEditableWindow">
                                             <i class="fas fa-gift me-2 text-[color:var(--warning)]"></i>
                                             <span>{{ tr('Exempt/Waive') }}</span>
                                         </x-ui.dropdown-item>
@@ -527,6 +558,9 @@
                         <option value="full">{{ tr('Full Waiver (100%)') }}</option>
                         <option value="partial">{{ tr('Partial Exemption') }}</option>
                     </select>
+                    @error('exemptionForm.type')
+                        <p class="mt-1 text-xs font-semibold text-[color:var(--error)]">{{ $message }}</p>
+                    @enderror
                 </div>
 
                 <div>
@@ -540,18 +574,33 @@
                         <option value="medical_emergency">{{ tr('Medical Emergency') }}</option>
                         <option value="other">{{ tr('Other') }}</option>
                     </select>
+                    @error('exemptionForm.reason')
+                        <p class="mt-1 text-xs font-semibold text-[color:var(--error)]">{{ $message }}</p>
+                    @enderror
                 </div>
 
                 @if($exemptionForm['type'] === 'partial')
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-1">{{ tr('Exempt Amount') }}</label>
-                        <x-ui.input type="number" wire:model="exemptionForm.amount" :disabled="!$canWaivePenalties" />
+                        <x-ui.input
+                            type="number"
+                            min="0.01"
+                            step="0.01"
+                            wire:model="exemptionForm.amount"
+                            :disabled="!$canWaivePenalties"
+                        />
+                        @error('exemptionForm.amount')
+                            <p class="mt-1 text-xs font-semibold text-[color:var(--error)]">{{ $message }}</p>
+                        @enderror
                     </div>
                 @endif
 
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-1">{{ tr('Reason') }}</label>
-                    <textarea wire:model="exemptionForm.details" rows="3" class="w-full border-gray-300 rounded-lg shadow-sm" placeholder="{{ tr('Why is this penalty being waived?') }}" :disabled="!$canWaivePenalties"></textarea>
+                    <textarea wire:model="exemptionForm.details" rows="3" maxlength="1000" class="w-full border-gray-300 rounded-lg shadow-sm" placeholder="{{ tr('Why is this penalty being waived?') }}" :disabled="!$canWaivePenalties"></textarea>
+                    @error('exemptionForm.details')
+                        <p class="mt-1 text-xs font-semibold text-[color:var(--error)]">{{ $message }}</p>
+                    @enderror
                 </div>
 
                 <div>
@@ -562,11 +611,22 @@
                             <div class="flex text-sm text-gray-600">
                                 <label for="file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-[color:var(--accent-orange)] hover:brightness-90">
                                     <span>{{ tr('Upload a file') }}</span>
-                                    <input id="file-upload" type="file" wire:model="exemptionForm.attachment" class="sr-only" @if(!$canWaivePenalties) disabled @endif>
+                                    <input
+                                        id="file-upload"
+                                        type="file"
+                                        accept=".png,.jpg,.jpeg,.pdf"
+                                        wire:model="exemptionForm.attachment"
+                                        class="sr-only"
+                                        @if(!$canWaivePenalties) disabled @endif
+                                    >
                                 </label>
                             </div>
                             <p class="text-xs text-gray-500">PNG, JPG, PDF up to 10MB</p>
                         </div>
+                    </div>
+                    <div wire:loading wire:target="exemptionForm.attachment" class="mt-2 text-xs text-gray-500 font-semibold">
+                        <i class="fas fa-circle-notch fa-spin me-1"></i>
+                        {{ tr('Uploading...') }}
                     </div>
                     @if ($exemptionForm['attachment'])
                         <div class="mt-2 text-xs text-[color:var(--success)] font-bold flex items-center gap-1">
@@ -574,14 +634,34 @@
                             {{ $exemptionForm['attachment']->getClientOriginalName() }}
                         </div>
                     @endif
+                    @error('exemptionForm.attachment')
+                        <p class="mt-1 text-xs font-semibold text-[color:var(--error)]">{{ $message }}</p>
+                    @enderror
                 </div>
             </div>
         </x-slot>
 
         <x-slot name="footer">
-            <x-ui.secondary-button @click="showExemptionModal = false">{{ tr('Cancel') }}</x-ui.secondary-button>
+            <x-ui.secondary-button
+                wire:click="closeExemptionModal"
+                wire:loading.attr="disabled"
+                wire:target="saveExemption"
+            >
+                {{ tr('Cancel') }}
+            </x-ui.secondary-button>
             @if($canWaivePenalties)
-                <x-ui.primary-button wire:click="saveExemption">{{ tr('Apply Waiver') }}</x-ui.primary-button>
+                <x-ui.primary-button
+                    wire:click="saveExemption"
+                    wire:loading.attr="disabled"
+                    wire:target="saveExemption,exemptionForm.attachment"
+                    class="disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                    <span wire:loading.remove wire:target="saveExemption">{{ tr('Apply Waiver') }}</span>
+                    <span wire:loading wire:target="saveExemption" class="inline-flex items-center gap-2">
+                        <i class="fas fa-circle-notch fa-spin"></i>
+                        {{ tr('Saving...') }}
+                    </span>
+                </x-ui.primary-button>
             @endif
         </x-slot>
     </x-ui.modal>
@@ -597,22 +677,43 @@
                     {{ tr('This penalty will be sent to the payroll system as a deduction. Once confirmed, it can only be modified by administrators.') }}
                 </p>
 
-                @if($confirmPenaltyId)
-                    @php $p = \Athka\Attendance\Models\AttendanceDailyPenalty::find($confirmPenaltyId); @endphp
-                    @if($p)
-                        <div class="mt-4 p-3 bg-gray-50 rounded-xl w-full border border-gray-100">
-                            <p class="text-lg font-bold text-[color:var(--error)]">{{ number_format($p->net_amount, 2) }}</p>
-                            <p class="text-xs text-gray-500">{{ $p->employee->name_ar ?? $p->employee->name_en }} ({{ company_date($p->attendance_date) }})</p>
-                        </div>
-                    @endif
+                @if($confirmPenaltyPreview)
+                    <div class="mt-4 p-3 bg-gray-50 rounded-xl w-full border border-gray-100">
+                        <p class="text-lg font-bold text-[color:var(--error)]">
+                            {{ number_format($confirmPenaltyPreview['net_amount'], 2) }}
+                        </p>
+                        <p class="text-xs text-gray-500">
+                            {{ $confirmPenaltyPreview['employee_name'] }}
+                            ({{ company_date($confirmPenaltyPreview['attendance_date']) }})
+                        </p>
+                    </div>
                 @endif
             </div>
         </x-slot>
 
         <x-slot name="footer">
-            <x-ui.secondary-button @click="showConfirmModal = false">{{ tr('Cancel') }}</x-ui.secondary-button>
+            <x-ui.secondary-button
+                wire:click="closeConfirmModal"
+                wire:loading.attr="disabled"
+                wire:target="confirmPenalty"
+            >
+                {{ tr('Cancel') }}
+            </x-ui.secondary-button>
             @if($canManagePenalties)
-                <x-ui.primary-button wire:click="confirmPenalty">{{ tr('Confirm & Send to Payroll') }}</x-ui.primary-button>
+                <x-ui.primary-button
+                    wire:click="confirmPenalty"
+                    wire:loading.attr="disabled"
+                    wire:target="confirmPenalty"
+                    class="disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                    <span wire:loading.remove wire:target="confirmPenalty">
+                        {{ tr('Confirm & Send to Payroll') }}
+                    </span>
+                    <span wire:loading wire:target="confirmPenalty" class="inline-flex items-center gap-2">
+                        <i class="fas fa-circle-notch fa-spin"></i>
+                        {{ tr('Confirming...') }}
+                    </span>
+                </x-ui.primary-button>
             @endif
         </x-slot>
     </x-ui.modal>

@@ -31,9 +31,23 @@ class PenaltyService
      */
     public function calculateForRange($dateFrom, $dateTo, $companyId, array $employeeIds = []): array
     {
+        DB::disableQueryLog();
+
+        if (function_exists('set_time_limit')) {
+            @set_time_limit(300);
+        }
+
+        $dateFrom = Carbon::parse($dateFrom)->toDateString();
+        $dateTo = Carbon::parse($dateTo)->toDateString();
+
+        if (Carbon::parse($dateFrom)->gt(Carbon::parse($dateTo))) {
+            [$dateFrom, $dateTo] = [$dateTo, $dateFrom];
+        }
+
         $this->prepareAbsentLogs($dateFrom, $dateTo, $companyId, $employeeIds);
 
         $logs = AttendanceDailyLog::forCompany($companyId)
+            ->with('employee')
             ->whereBetween('attendance_date', [$dateFrom, $dateTo])
             ->whereIn('attendance_status', ['present', 'late', 'early_departure', 'absent', 'auto_checkout'])
             ->when(!empty($employeeIds), fn ($q) => $q->whereIn('employee_id', $employeeIds))
@@ -44,6 +58,7 @@ class PenaltyService
 
         foreach ($logs as $log) {
             $processed++;
+
             if ($this->calculatePenaltyForLog($log)) {
                 $createdOrUpdated++;
             }
@@ -62,25 +77,39 @@ class PenaltyService
         $cursor = $start->copy();
         $scheduleService = app(WorkScheduleService::class);
 
+        $activeEmployees = Employee::forCompany($companyId)
+            ->when(!empty($employeeIds), fn ($q) => $q->whereIn('id', $employeeIds))
+            ->get();
+
+        if ($activeEmployees->isEmpty()) {
+            return;
+        }
+
+        $activeEmployeeIds = $activeEmployees
+            ->pluck('id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
         while ($cursor->lte($end)) {
             $dateStr = $cursor->toDateString();
 
-            $activeEmployees = Employee::forCompany($companyId)
-                ->when(!empty($employeeIds), fn ($q) => $q->whereIn('id', $employeeIds))
-                ->get();
+            $existingEmployeeIds = AttendanceDailyLog::forCompany($companyId)
+                ->where('attendance_date', $dateStr)
+                ->whereIn('employee_id', $activeEmployeeIds)
+                ->pluck('employee_id')
+                ->map(fn ($id) => (int) $id)
+                ->flip();
 
             foreach ($activeEmployees as $employee) {
-                $exists = AttendanceDailyLog::where([
-                    'saas_company_id' => $companyId,
-                    'employee_id' => $employee->id,
-                    'attendance_date' => $dateStr,
-                ])->exists();
-
-                if ($exists) {
+                if ($existingEmployeeIds->has((int) $employee->id)) {
                     continue;
                 }
 
-                $schedule = $scheduleService->getEffectiveSchedule($companyId, $employee, $dateStr);
+                $schedule = $scheduleService->getEffectiveSchedule(
+                    $companyId,
+                    $employee,
+                    $dateStr
+                );
 
                 if (! $schedule) {
                     continue;
@@ -94,6 +123,8 @@ class PenaltyService
                     'approval_status' => 'pending',
                     'work_schedule_id' => $schedule->id,
                 ]);
+
+                $existingEmployeeIds->put((int) $employee->id, true);
             }
 
             $cursor->addDay();

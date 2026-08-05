@@ -68,6 +68,7 @@ class Index extends Component
 
     public $showConfirmModal = false;
     public $confirmPenaltyId = null;
+    public $confirmPenaltyPreview = null;
 
     protected $queryString = [
         'search' => ['except' => ''],
@@ -82,12 +83,57 @@ class Index extends Component
         'branch_id' => ['except' => 'all'],
     ];
 
+    private function latestCompletedDate(): string
+    {
+        return now()->subDay()->toDateString();
+    }
+
+    private function resetBulkSelection(): void
+    {
+        $this->selectedPenalties = [];
+        $this->selectAll = false;
+    }
+
+    private function resetExemptionForm(): void
+    {
+        $this->exemptionForm = [
+            'type' => 'full',
+            'amount' => 0,
+            'reason' => '',
+            'details' => '',
+            'attachment' => null,
+        ];
+    }
+
+    private function isOutsideEditableWindow($date): bool
+    {
+        return Carbon::parse($date)
+            ->startOfDay()
+            ->lt(now()->subDays(7)->startOfDay());
+    }
+
+    private function clampToLatestCompletedDate($date): string
+    {
+        $latest = Carbon::parse($this->latestCompletedDate());
+
+        try {
+            $candidate = Carbon::parse($date ?: $latest->toDateString());
+        } catch (\Throwable $exception) {
+            return $latest->toDateString();
+        }
+
+        return $candidate->gt($latest)
+            ? $latest->toDateString()
+            : $candidate->toDateString();
+    }
+
     public function mount()
     {
         $this->requireAttendanceAny(['attendance.penalties.view', 'attendance.penalties.view-subordinates', 'attendance.penalties.manage', 'attendance.penalties.waive']);
         $this->calculation_mode = $this->calculation_mode ?: 'single_day';
-        $this->date_from = now()->format('Y-m-d');
-        $this->date_to = now()->format('Y-m-d');
+        $latestCompletedDate = $this->latestCompletedDate();
+        $this->date_from = $latestCompletedDate;
+        $this->date_to = $latestCompletedDate;
 
         $userBranchId = (int) (auth()->user()->branch_id ?? 0);
         $allowed = $this->allowedBranchIds();
@@ -103,6 +149,7 @@ class Index extends Component
 
     public function refreshData()
     {
+        $this->resetBulkSelection();
         $this->resetPage();
         $this->loadStats();
     }
@@ -111,8 +158,9 @@ class Index extends Component
     {
         $this->search = '';
         $this->calculation_mode = 'single_day';
-        $this->date_from = now()->format('Y-m-d');
-        $this->date_to = now()->format('Y-m-d');
+        $latestCompletedDate = $this->latestCompletedDate();
+        $this->date_from = $latestCompletedDate;
+        $this->date_to = $latestCompletedDate;
         $this->violation_type_filter = 'all';
         $this->status_filter = 'all';
         $this->status_emp_filter = 'ACTIVE';
@@ -133,13 +181,18 @@ class Index extends Component
 
     public function updatedCalculationMode()
     {
+        $latestCompletedDate = Carbon::parse($this->latestCompletedDate());
+
         if ($this->calculation_mode === 'single_day') {
-            $date = $this->date_from ?: now()->format('Y-m-d');
+            $date = $this->clampToLatestCompletedDate($this->date_from);
             $this->date_from = $date;
             $this->date_to = $date;
         } else {
-            $this->date_from = now()->startOfMonth()->format('Y-m-d');
-            $this->date_to = now()->format('Y-m-d');
+            $this->date_from = $latestCompletedDate
+                ->copy()
+                ->startOfMonth()
+                ->toDateString();
+            $this->date_to = $latestCompletedDate->toDateString();
         }
 
         $this->refreshData();
@@ -147,7 +200,14 @@ class Index extends Component
 
     public function updatedDateFrom()
     {
+        $this->date_from = $this->clampToLatestCompletedDate($this->date_from);
+
         if ($this->calculation_mode === 'single_day') {
+            $this->date_to = $this->date_from;
+        } elseif (
+            filled($this->date_to)
+            && Carbon::parse($this->date_from)->gt(Carbon::parse($this->date_to))
+        ) {
             $this->date_to = $this->date_from;
         }
 
@@ -156,8 +216,15 @@ class Index extends Component
 
     public function updatedDateTo()
     {
+        $this->date_to = $this->clampToLatestCompletedDate($this->date_to);
+
         if ($this->calculation_mode === 'single_day') {
-            $this->date_to = $this->date_from;
+            $this->date_from = $this->date_to;
+        } elseif (
+            filled($this->date_from)
+            && Carbon::parse($this->date_to)->lt(Carbon::parse($this->date_from))
+        ) {
+            $this->date_from = $this->date_to;
         }
 
         $this->refreshData();
@@ -166,7 +233,16 @@ class Index extends Component
     public function updatedViolationTypeFilter() { $this->refreshData(); }
     public function updatedStatusFilter() { $this->refreshData(); }
     public function updatedStatusEmpFilter() { $this->refreshData(); }
-    public function updatingSearch() { $this->resetPage(); }
+    public function updatingSearch()
+    {
+        $this->resetBulkSelection();
+        $this->resetPage();
+    }
+
+    public function updatingPage()
+    {
+        $this->resetBulkSelection();
+    }
     public function updatedDepartmentId() { $this->refreshData(); }
     public function updatedJobTitleId() { $this->refreshData(); }
 
@@ -201,8 +277,23 @@ class Index extends Component
 
     public function goToNextDay()
     {
-        $date = Carbon::parse($this->date_from ?: now()->toDateString())
+        $currentDate = Carbon::parse(
+            $this->date_from ?: $this->latestCompletedDate()
+        );
+
+        $latestCompletedDate = Carbon::parse($this->latestCompletedDate());
+
+        if ($currentDate->gte($latestCompletedDate)) {
+            $this->date_from = $latestCompletedDate->toDateString();
+            $this->date_to = $latestCompletedDate->toDateString();
+            $this->refreshData();
+
+            return;
+        }
+
+        $date = $currentDate
             ->addDay()
+            ->min($latestCompletedDate)
             ->toDateString();
 
         $this->date_from = $date;
@@ -213,17 +304,28 @@ class Index extends Component
 
     private function getEffectiveDateRange(): array
     {
-        $today = now()->format('Y-m-d');
+        $latestCompletedDate = $this->latestCompletedDate();
 
         if ($this->calculation_mode === 'single_day') {
-            $date = $this->date_from ?: $today;
+            $date = $this->clampToLatestCompletedDate(
+                $this->date_from ?: $latestCompletedDate
+            );
+
             return [$date, $date];
         }
 
-        $dateFrom = $this->date_from ?: '';
-        $dateTo = $this->date_to ?: '';
+        $dateFrom = filled($this->date_from)
+            ? $this->clampToLatestCompletedDate($this->date_from)
+            : '';
+        $dateTo = filled($this->date_to)
+            ? $this->clampToLatestCompletedDate($this->date_to)
+            : '';
 
-        if ($dateFrom && $dateTo && Carbon::parse($dateFrom)->gt(Carbon::parse($dateTo))) {
+        if (
+            $dateFrom
+            && $dateTo
+            && Carbon::parse($dateFrom)->gt(Carbon::parse($dateTo))
+        ) {
             [$dateFrom, $dateTo] = [$dateTo, $dateFrom];
         }
 
@@ -266,10 +368,10 @@ class Index extends Component
     {
         $this->requireAttendanceAny('attendance.penalties.manage');
 
-        $companyId = auth()->user()->saas_company_id;
+        $companyId = (int) auth()->user()->saas_company_id;
         [$dateFrom, $dateTo] = $this->getEffectiveDateRange();
 
-        if (!$dateFrom || !$dateTo) {
+        if (! $dateFrom || ! $dateTo) {
             $this->dispatch('toast', [
                 'type' => 'error',
                 'message' => tr('Please select a valid date before running calculation.')
@@ -277,7 +379,15 @@ class Index extends Component
             return;
         }
 
-        $employeeIds = $this->getCalculationEmployeeIds((int) $companyId);
+        if (Carbon::parse($dateTo)->gte(now()->startOfDay())) {
+            $this->dispatch('toast', [
+                'type' => 'error',
+                'message' => tr('Daily penalties can only be calculated for completed previous days.')
+            ]);
+            return;
+        }
+
+        $employeeIds = $this->getCalculationEmployeeIds($companyId);
 
         if (empty($employeeIds)) {
             $this->dispatch('toast', [
@@ -287,25 +397,59 @@ class Index extends Component
             return;
         }
 
-        $res = $this->calculation_mode === 'single_day'
-            ? $service->calculateForDate($dateFrom, $companyId, $employeeIds)
-            : $service->calculateForRange($dateFrom, $dateTo, $companyId, $employeeIds);
-
-        $this->resetPage();
-        $this->loadStats();
-        $this->dispatch('$refresh');
-
-        $message = $this->calculation_mode === 'single_day'
-            ? tr('Single day calculation completed for') . ' ' . $dateFrom
-            : tr('Range calculation completed from') . ' ' . $dateFrom . ' ' . tr('to') . ' ' . $dateTo;
-
-        $this->dispatch('toast', [
-            'type' => 'success',
-            'message' => $message
-                . ' | ' . tr('Processed logs:') . ' ' . ($res['processed'] ?? 0)
-                . ' | ' . tr('Penalties created:') . ' ' . ($res['created'] ?? 0)
-                . ' | ' . tr('Employees:') . ' ' . count($employeeIds),
+        $lockKey = implode(':', [
+            'attendance',
+            'daily-penalties',
+            $companyId,
+            $dateFrom,
+            $dateTo,
         ]);
+
+        $lock = \Illuminate\Support\Facades\Cache::lock($lockKey, 360);
+
+        if (! $lock->get()) {
+            $this->dispatch('toast', [
+                'type' => 'warning',
+                'message' => tr('A penalty calculation is already running for the selected date.')
+            ]);
+            return;
+        }
+
+        try {
+            DB::disableQueryLog();
+
+            if (function_exists('set_time_limit')) {
+                @set_time_limit(300);
+            }
+
+            $res = $this->calculation_mode === 'single_day'
+                ? $service->calculateForDate($dateFrom, $companyId, $employeeIds)
+                : $service->calculateForRange($dateFrom, $dateTo, $companyId, $employeeIds);
+
+            $this->refreshData();
+            $this->dispatch('$refresh');
+
+            $message = $this->calculation_mode === 'single_day'
+                ? tr('Single day calculation completed for') . ' ' . $dateFrom
+                : tr('Range calculation completed from') . ' ' . $dateFrom . ' ' . tr('to') . ' ' . $dateTo;
+
+            $this->dispatch('toast', [
+                'type' => 'success',
+                'message' => $message
+                    . ' | ' . tr('Processed logs:') . ' ' . ($res['processed'] ?? 0)
+                    . ' | ' . tr('Penalties created:') . ' ' . ($res['created'] ?? 0)
+                    . ' | ' . tr('Employees:') . ' ' . count($employeeIds),
+            ]);
+        } catch (\Throwable $exception) {
+            report($exception);
+
+            $this->dispatch('toast', [
+                'type' => 'error',
+                'message' => tr('Penalty calculation failed. Please review the application log.')
+            ]);
+        } finally {
+            optional($lock)->release();
+        }
     }
 
     private function getCalculationEmployeeIds(int $companyId): array
@@ -350,88 +494,236 @@ class Index extends Component
         $this->requireAttendanceAny('attendance.penalties.waive');
         $penalty = $this->findPenaltyOrFail((int) $id);
 
-        /*
-        if (Carbon::parse($penalty->attendance_date)->diffInDays(now()) > 7) {
-            $this->dispatch('toast', ['type' => 'error', 'message' => tr('Cannot modify penalties older than 7 days.')]);
+        if ($this->isOutsideEditableWindow($penalty->attendance_date)) {
+            $this->dispatch('toast', [
+                'type' => 'error',
+                'message' => tr('Cannot modify penalties older than 7 days.')
+            ]);
+
             return;
         }
-        */
 
         if ($penalty->status === 'confirmed') {
-            $this->dispatch('toast', ['type' => 'error', 'message' => tr('Confirmed penalties cannot be modified.')]);
+            $this->dispatch('toast', [
+                'type' => 'error',
+                'message' => tr('Confirmed penalties cannot be modified.')
+            ]);
+
             return;
         }
 
-        $this->selectedPenaltyId = $id;
-        $this->exemptionForm['amount'] = $penalty->calculated_amount;
+        $this->resetValidation();
+        $this->resetExemptionForm();
+
+        $this->selectedPenaltyId = (int) $penalty->id;
+        $this->exemptionForm['amount'] = (float) $penalty->calculated_amount;
         $this->showExemptionModal = true;
     }
 
     public function saveExemption()
     {
         $this->requireAttendanceAny('attendance.penalties.waive');
+
+        if (! $this->selectedPenaltyId) {
+            $this->dispatch('toast', [
+                'type' => 'error',
+                'message' => tr('The selected penalty is no longer available.')
+            ]);
+
+            return;
+        }
+
         $penalty = $this->findPenaltyOrFail((int) $this->selectedPenaltyId);
 
-        $exemptAmount = ($this->exemptionForm['type'] === 'full')
-            ? $penalty->calculated_amount
-            : min($this->exemptionForm['amount'], $penalty->calculated_amount);
+        if ($this->isOutsideEditableWindow($penalty->attendance_date)) {
+            $this->dispatch('toast', [
+                'type' => 'error',
+                'message' => tr('Cannot modify penalties older than 7 days.')
+            ]);
+
+            return;
+        }
+
+        if ($penalty->status === 'confirmed') {
+            $this->dispatch('toast', [
+                'type' => 'error',
+                'message' => tr('Confirmed penalties cannot be modified.')
+            ]);
+
+            return;
+        }
+
+        $maximumAmount = max(0, (float) $penalty->calculated_amount);
+
+        $rules = [
+            'exemptionForm.type' => ['required', 'in:full,partial'],
+            'exemptionForm.reason' => [
+                'required',
+                'in:business_mission,emergency_case,technical_issue,late_permission,medical_emergency,other',
+            ],
+            'exemptionForm.details' => ['nullable', 'string', 'max:1000'],
+            'exemptionForm.attachment' => [
+                'nullable',
+                'file',
+                'mimes:png,jpg,jpeg,pdf',
+                'max:10240',
+            ],
+        ];
+
+        if (($this->exemptionForm['type'] ?? null) === 'partial') {
+            $rules['exemptionForm.amount'] = [
+                'required',
+                'numeric',
+                'gt:0',
+                'max:' . $maximumAmount,
+            ];
+        } else {
+            $rules['exemptionForm.amount'] = [
+                'nullable',
+                'numeric',
+                'min:0',
+            ];
+        }
+
+        $this->validate($rules);
+
+        $exemptAmount = $this->exemptionForm['type'] === 'full'
+            ? $maximumAmount
+            : min(
+                (float) $this->exemptionForm['amount'],
+                $maximumAmount
+            );
+
+        $reason = trim(
+            (string) $this->exemptionForm['reason']
+            . (
+                filled($this->exemptionForm['details'] ?? '')
+                    ? ' - ' . trim((string) $this->exemptionForm['details'])
+                    : ''
+            )
+        );
 
         $updateData = [
             'exemption_type' => $this->exemptionForm['type'],
             'exemption_amount' => $exemptAmount,
-            'net_amount' => max(0, $penalty->calculated_amount - $exemptAmount),
+            'net_amount' => max(0, $maximumAmount - $exemptAmount),
             'exemption_status' => 'approved',
-            'exemption_reason' => trim(
-                ($this->exemptionForm['reason'] ?? '')
-                . (filled($this->exemptionForm['details'] ?? '') ? ' - ' . ($this->exemptionForm['details'] ?? '') : '')
-            ),
+            'exemption_reason' => $reason,
             'exempted_by' => auth()->id(),
             'exempted_at' => now(),
-            'status' => ($this->exemptionForm['type'] === 'full') ? 'waived' : 'pending',
+            'status' => $this->exemptionForm['type'] === 'full'
+                ? 'waived'
+                : 'pending',
+            'notes' => trim(
+                (string) $penalty->notes
+                . "\n[Audit] Exemption applied by "
+                . auth()->user()->name
+                . ' at '
+                . now()
+            ),
         ];
 
         if ($this->exemptionForm['attachment']) {
-            $path = $this->exemptionForm['attachment']->store('attendance/exemptions', 'public');
-            $updateData['exemption_attachment'] = $path;
+            $updateData['exemption_attachment'] =
+                $this->exemptionForm['attachment']->store(
+                    'attendance/exemptions',
+                    'public'
+                );
         }
 
         $penalty->update($updateData);
 
-        $penalty->update([
-            'notes' => $penalty->notes . "\n[Audit] Exemption applied by " . auth()->user()->name . " at " . now()
+        $this->closeExemptionModal();
+        $this->refreshData();
+
+        $this->dispatch('toast', [
+            'type' => 'success',
+            'message' => tr('Exemption applied.')
         ]);
+    }
 
-        $this->exemptionForm = ['type' => 'full', 'amount' => 0, 'reason' => '', 'details' => '', 'attachment' => null];
-
+    public function closeExemptionModal()
+    {
         $this->showExemptionModal = false;
-        $this->loadStats();
-        $this->dispatch('toast', ['type' => 'success', 'message' => tr('Exemption applied.')]);
+        $this->selectedPenaltyId = null;
+        $this->resetValidation();
+        $this->resetExemptionForm();
     }
 
     public function openConfirmModal($id)
     {
         $this->requireAttendanceAny('attendance.penalties.manage');
-        $this->confirmPenaltyId = $id;
+        $penalty = $this->findPenaltyOrFail((int) $id);
+
+        if ($penalty->status !== 'pending') {
+            $this->dispatch('toast', [
+                'type' => 'error',
+                'message' => tr('Only pending penalties can be confirmed.')
+            ]);
+
+            return;
+        }
+
+        $this->confirmPenaltyId = (int) $penalty->id;
+        $this->confirmPenaltyPreview = [
+            'net_amount' => (float) $penalty->net_amount,
+            'employee_name' => $penalty->employee->name_ar
+                ?? $penalty->employee->name_en
+                ?? '',
+            'attendance_date' => (string) $penalty->attendance_date,
+        ];
         $this->showConfirmModal = true;
     }
 
     public function confirmPenalty()
     {
         $this->requireAttendanceAny('attendance.penalties.manage');
+
+        if (! $this->confirmPenaltyId) {
+            $this->closeConfirmModal();
+
+            return;
+        }
+
         $penalty = $this->findPenaltyOrFail((int) $this->confirmPenaltyId);
+
+        if ($penalty->status !== 'pending') {
+            $this->closeConfirmModal();
+            $this->dispatch('toast', [
+                'type' => 'error',
+                'message' => tr('Only pending penalties can be confirmed.')
+            ]);
+
+            return;
+        }
+
         $penalty->update([
             'status' => 'confirmed',
             'confirmed_by' => auth()->id(),
             'confirmed_at' => now(),
+            'notes' => trim(
+                (string) $penalty->notes
+                . "\n[Audit] Penalty confirmed for payroll by "
+                . auth()->user()->name
+                . ' at '
+                . now()
+            ),
         ]);
 
-        $penalty->update([
-            'notes' => $penalty->notes . "\n[Audit] Penalty confirmed for payroll by " . auth()->user()->name . " at " . now()
-        ]);
+        $this->closeConfirmModal();
+        $this->refreshData();
 
+        $this->dispatch('toast', [
+            'type' => 'success',
+            'message' => tr('Penalty confirmed for payroll.')
+        ]);
+    }
+
+    public function closeConfirmModal()
+    {
         $this->showConfirmModal = false;
-        $this->loadStats();
-        $this->dispatch('toast', ['type' => 'success', 'message' => tr('Penalty confirmed for payroll.')]);
+        $this->confirmPenaltyId = null;
+        $this->confirmPenaltyPreview = null;
     }
 
     public function deletePenalty($id)
@@ -439,21 +731,31 @@ class Index extends Component
         $this->requireAttendanceAny('attendance.penalties.manage');
         $penalty = $this->findPenaltyOrFail((int) $id);
 
-        /*
-        if (Carbon::parse($penalty->attendance_date)->diffInDays(now()) > 7) {
-            $this->dispatch('toast', ['type' => 'error', 'message' => tr('Cannot remove penalties older than 7 days.')]);
+        if ($this->isOutsideEditableWindow($penalty->attendance_date)) {
+            $this->dispatch('toast', [
+                'type' => 'error',
+                'message' => tr('Cannot remove penalties older than 7 days.')
+            ]);
+
             return;
         }
-        */
 
         if ($penalty->status === 'confirmed') {
-            $this->dispatch('toast', ['type' => 'error', 'message' => tr('Confirmed penalties cannot be removed.')]);
+            $this->dispatch('toast', [
+                'type' => 'error',
+                'message' => tr('Confirmed penalties cannot be removed.')
+            ]);
+
             return;
         }
 
         $penalty->delete();
-        $this->loadStats();
-        $this->dispatch('toast', ['type' => 'info', 'message' => tr('Penalty removed.')]);
+        $this->refreshData();
+
+        $this->dispatch('toast', [
+            'type' => 'info',
+            'message' => tr('Penalty removed.')
+        ]);
     }
 
     public function updatedSelectAll($value)
@@ -468,50 +770,56 @@ class Index extends Component
     public function bulkConfirm()
     {
         $this->requireAttendanceAny('attendance.penalties.manage');
-        if (empty($this->selectedPenalties)) return;
 
-        $companyId = auth()->user()->saas_company_id;
+        if (empty($this->selectedPenalties)) {
+            return;
+        }
 
-        $q = AttendanceDailyPenalty::forCompany($companyId)
-            ->whereIn('id', $this->selectedPenalties)
-            ->where('status', 'pending');
+        $updated = $this->buildPenaltiesQuery(false)
+            ->whereIn('id', array_map('intval', $this->selectedPenalties))
+            ->where('status', 'pending')
+            ->update([
+                'status' => 'confirmed',
+                'confirmed_by' => auth()->id(),
+                'confirmed_at' => now(),
+            ]);
 
-        $q = $this->applyBranchScopeToPenaltiesQuery($q);
+        $this->refreshData();
 
-        $q->update([
-            'status' => 'confirmed',
-            'confirmed_by' => auth()->id(),
-            'confirmed_at' => now(),
+        $this->dispatch('toast', [
+            'type' => $updated > 0 ? 'success' : 'warning',
+            'message' => $updated > 0
+                ? tr('Selected penalties confirmed.')
+                : tr('No eligible pending penalties were found in the current view.'),
         ]);
-
-        $this->selectedPenalties = [];
-        $this->selectAll = false;
-        $this->loadStats();
-        $this->dispatch('toast', ['type' => 'success', 'message' => tr('Selected penalties confirmed.')]);
     }
 
     public function bulkDelete()
     {
         $this->requireAttendanceAny('attendance.penalties.manage');
-        if (empty($this->selectedPenalties)) return;
+
+        if (empty($this->selectedPenalties)) {
+            return;
+        }
 
         $sevenDaysAgo = now()->subDays(7)->toDateString();
 
-        $companyId = auth()->user()->saas_company_id;
+        $query = $this->buildPenaltiesQuery(false)
+            ->whereIn('id', array_map('intval', $this->selectedPenalties))
+            ->where('status', '!=', 'confirmed')
+            ->whereDate('attendance_date', '>=', $sevenDaysAgo);
 
-        $q = AttendanceDailyPenalty::forCompany($companyId)
-            ->whereIn('id', $this->selectedPenalties)
-            ->where('status', '!=', 'confirmed');
-            // ->where('attendance_date', '>=', $sevenDaysAgo);
+        $deleted = (clone $query)->count();
+        $query->delete();
 
-        $q = $this->applyBranchScopeToPenaltiesQuery($q);
+        $this->refreshData();
 
-        $q->delete();
-
-        $this->selectedPenalties = [];
-        $this->selectAll = false;
-        $this->loadStats();
-        $this->dispatch('toast', ['type' => 'info', 'message' => tr('Selected penalties removed (excluding confirmed or >7 days).')]);
+        $this->dispatch('toast', [
+            'type' => $deleted > 0 ? 'info' : 'warning',
+            'message' => $deleted > 0
+                ? tr('Selected penalties removed (excluding confirmed or >7 days).')
+                : tr('No eligible penalties were found in the current view.'),
+        ]);
     }
 
     public function render()
@@ -529,6 +837,7 @@ class Index extends Component
             'departments' => Department::forCompany(auth()->user()->saas_company_id)->get(),
             'jobTitles' => JobTitle::forCompany(auth()->user()->saas_company_id)->get(),
             'branches' => $branchesQ->orderBy('name')->get(),
+            'latestCompletedDate' => $this->latestCompletedDate(),
         ])->layout('layouts.company-admin');
     }
 
@@ -696,16 +1005,20 @@ class Index extends Component
     {
         $companyId = auth()->user()->saas_company_id;
 
-        $q = AttendanceDailyPenalty::forCompany($companyId)->with([
-            'employee' => fn ($query) => $query->withoutGlobalScope('active_only'),
+        $query = AttendanceDailyPenalty::forCompany($companyId)->with([
+            'employee' => fn ($employeeQuery) => $employeeQuery
+                ->withoutGlobalScope('active_only'),
         ]);
 
-        $allowed = $this->allowedBranchIds();
-        if (!empty($allowed)) {
-            $q->whereHas('employee', fn($qq) => $qq->withoutGlobalScope('active_only')->whereIn('branch_id', $allowed));
-        }
+        $query = $this->applyDataScoping(
+            $query,
+            'attendance.penalties.view',
+            'attendance.penalties.view-subordinates'
+        );
 
-        return $q->findOrFail($id);
+        $query = $this->applyBranchScopeToPenaltiesQuery($query);
+
+        return $query->findOrFail($id);
     }
 
     private function isAll($value): bool
