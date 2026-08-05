@@ -67,6 +67,9 @@ class Index extends Component
     public string $historySubTab = 'leaves';
     public array $expandedBalanceEmployees = [];
 
+    public int $groupEmployeeDisplayLimit = 12;
+    public int $groupEmployeeDisplayStep = 12;
+
 
     public ?string $employeeBranchColumn = null;
 
@@ -580,7 +583,45 @@ class Index extends Component
             $q->where('status', (string) $this->status);
         }
 
-        return $q->orderByDesc('id')->limit(50)->get();
+        return $q
+            ->orderByDesc('id')
+            ->limit($this->groupEmployeeDisplayLimit + 1)
+            ->get();
+    }
+
+    public function showMoreGroupEmployees(): void
+    {
+        $this->groupEmployeeDisplayLimit += $this->groupEmployeeDisplayStep;
+    }
+
+    protected function resetGroupEmployeeDisplayLimit(): void
+    {
+        $this->groupEmployeeDisplayLimit = 12;
+    }
+
+    public function updatedGroupEmployeeSearch(): void
+    {
+        $this->resetGroupEmployeeDisplayLimit();
+    }
+
+    public function updatedGroupBranchId(): void
+    {
+        $this->resetGroupEmployeeDisplayLimit();
+    }
+
+    public function updatedGroupDepartmentId(): void
+    {
+        $this->resetGroupEmployeeDisplayLimit();
+    }
+
+    public function updatedGroupJobTitleId(): void
+    {
+        $this->resetGroupEmployeeDisplayLimit();
+    }
+
+    public function updatedGroupContractType(): void
+    {
+        $this->resetGroupEmployeeDisplayLimit();
     }
 
     public function getApprovedLeavesForCutProperty()
@@ -727,16 +768,47 @@ class Index extends Component
 
     public function render()
     {
-        $pendingLeave = $this->tab === 'pending' ? $this->pendingLeaveRequests : $this->emptyPaginator('leavePage');
-        $pendingPerm  = $this->tab === 'pending' ? $this->pendingPermissionRequests : $this->emptyPaginator('permPage');
-        $pendingCut   = $this->tab === 'pending' ? $this->pendingCutLeaveRequests : $this->emptyPaginator('cutPage');
-        $pendingMission = $this->tab === 'pending' ? $this->pendingMissionRequests : $this->emptyPaginator('missionPage');
-        $balances     = $this->tab === 'balances' ? $this->balances : $this->emptyPaginator('balancePage');
-        $prevCut      = $this->tab === 'history' ? $this->previousCutLeaveRequests : $this->emptyPaginator('historyCutPage');
-        $history      = $this->tab === 'history' ? $this->history : $this->emptyPaginator('historyPage');
-        $prevLeave    = $this->tab === 'history' ? $this->previousLeaveRequests : $this->emptyPaginator('historyLeavePage');
-        $prevPerm     = $this->tab === 'history' ? $this->previousPermissionRequests : $this->emptyPaginator('historyPermPage');
-        $prevMission  = $this->tab === 'history' ? $this->previousMissionRequests : $this->emptyPaginator('historyMissionPage');
+        $groupModalOpen = $this->createGroupLeaveOpen || $this->createGroupPermissionOpen;
+
+        $pendingLeave = ! $groupModalOpen && $this->tab === 'pending'
+            ? $this->pendingLeaveRequests
+            : $this->emptyPaginator('leavePage');
+
+        $pendingPerm = ! $groupModalOpen && $this->tab === 'pending'
+            ? $this->pendingPermissionRequests
+            : $this->emptyPaginator('permPage');
+
+        $pendingCut = ! $groupModalOpen && $this->tab === 'pending'
+            ? $this->pendingCutLeaveRequests
+            : $this->emptyPaginator('cutPage');
+
+        $pendingMission = ! $groupModalOpen && $this->tab === 'pending'
+            ? $this->pendingMissionRequests
+            : $this->emptyPaginator('missionPage');
+
+        $balances = ! $groupModalOpen && $this->tab === 'balances'
+            ? $this->balances
+            : $this->emptyPaginator('balancePage');
+
+        $prevCut = ! $groupModalOpen && $this->tab === 'history'
+            ? $this->previousCutLeaveRequests
+            : $this->emptyPaginator('historyCutPage');
+
+        $history = ! $groupModalOpen && $this->tab === 'history'
+            ? $this->history
+            : $this->emptyPaginator('historyPage');
+
+        $prevLeave = ! $groupModalOpen && $this->tab === 'history'
+            ? $this->previousLeaveRequests
+            : $this->emptyPaginator('historyLeavePage');
+
+        $prevPerm = ! $groupModalOpen && $this->tab === 'history'
+            ? $this->previousPermissionRequests
+            : $this->emptyPaginator('historyPermPage');
+
+        $prevMission = ! $groupModalOpen && $this->tab === 'history'
+            ? $this->previousMissionRequests
+            : $this->emptyPaginator('historyMissionPage');
 
         if ($balances instanceof \Illuminate\Pagination\LengthAwarePaginator) {
             $balances->setCollection($balances->getCollection()->map(function ($row) {
@@ -757,14 +829,14 @@ class Index extends Component
             'policies' => $this->policies,
             'departments' => $this->departments,
             'jobTitles' => $this->jobTitles,
-            'employeesForSelect' => $this->employeesForSelect,
-            'createLeavePolicies' => $this->getCreateLeavePoliciesProperty(),
-            'replacementEmployees' => $this->replacementEmployees,
+            'employeesForSelect' => $groupModalOpen ? collect() : $this->employeesForSelect,
+            'createLeavePolicies' => $groupModalOpen ? collect() : $this->getCreateLeavePoliciesProperty(),
+            'replacementEmployees' => $groupModalOpen ? collect() : $this->replacementEmployees,
             'branches' => $this->branches,
             'pendingLeaveRequests' => $pendingLeave,
             'pendingPermissionRequests' => $pendingPerm,
             'balances' => $balances,
-            'approvedLeavesForCut' => $this->approvedLeavesForCut,
+            'approvedLeavesForCut' => $groupModalOpen ? collect() : $this->approvedLeavesForCut,
             'history' => $history,
             'previousLeaveRequests' => $prevLeave,
             'previousPermissionRequests' => $prevPerm,

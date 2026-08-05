@@ -41,7 +41,11 @@ trait WithLeaveRequests
     public bool $group_leave_deduct_from_balance = false;
 
 
+    public string $group_leave_policy_duration_unit = 'full_day';
     public string $group_leave_duration_unit = 'full_day';
+    public bool $group_leave_duration_ready = false;
+    public bool $group_leave_can_choose_duration = false;
+    public string $group_leave_schedule_state = 'awaiting_employees';
     public bool $group_leave_attachment_required = false;
     public array $group_leave_attachment_types = [];
 
@@ -185,6 +189,164 @@ trait WithLeaveRequests
         if ($this->employeeCompanyColumn) {
             $q->where($this->employeeCompanyColumn, $this->companyId);
         }
+
+        // --- Smart Filtering ---
+        $deptCol = $this->employeeDepartmentColumn;
+        $titleCol = $this->employeeJobTitleColumn;
+
+        $q->where(function ($sub) use ($employee, $deptCol, $titleCol) {
+            $hasCondition = false;
+            if ($deptCol && $deptValue = $employee->getAttribute($deptCol)) {
+                $sub->orWhere($deptCol, $deptValue);
+                $hasCondition = true;
+            }
+            if ($titleCol && $titleValue = $employee->getAttribute($titleCol)) {
+                $sub->orWhere($titleCol, $titleValue);
+                $hasCondition = true;
+            }
+
+            // If no department or title is set for the employee, we don't restrict (to keep it flexible)
+            if (!$hasCondition) {
+                $sub->whereRaw('1=1');
+            }
+        });
+
+        // Apply same branch restriction if exists
+        $allowed = $this->lpAllowedBranchIdsSafe();
+        $branchCol = $this->employeeBranchColumn;
+        if ($branchCol && !empty($allowed)) {
+            $q->whereIn($branchCol, $allowed);
+        }
+
+        return $q->orderBy('id', 'desc')->limit(50)->get();
+    }
+
+    public function updatedEmployeeId($value): void
+    {
+        $this->leave_policy_id = 0;
+        $this->replacement_employee_id = null;
+        $this->create_leave_work_period_options_cache = [];
+        $this->resetCreateLeavePolicyMeta();
+    }
+
+    public function updatedLeavePolicyId($value): void
+    {
+        $this->create_leave_work_period_options_cache = [];
+        $this->hydrateCreateLeavePolicyMeta(true); // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Ãƒâ„¢Ã¢â‚¬Â¡Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â§ Ãƒâ„¢Ã‚ÂÃƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â·
+    }
+
+    public function updatedStartDate($value): void
+    {
+        $this->create_leave_work_period_options_cache = [];
+        $this->syncCreateLeaveDurationAvailability();
+
+        // Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã‹â€  Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚ÂµÃƒâ„¢Ã‚Â Ãƒâ„¢Ã…Â Ãƒâ„¢Ã‹â€ Ãƒâ„¢Ã¢â‚¬Â¦ ÃƒËœÃ‚Â£Ãƒâ„¢Ã‹â€  ÃƒËœÃ‚Â³ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¹ÃƒËœÃ‚Â§ÃƒËœÃ‚Âª Ãƒâ„¢Ã¢â‚¬Â ÃƒËœÃ‚Â®Ãƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã…Â  end_date = start_date ÃƒËœÃ‚ÂªÃƒâ„¢Ã¢â‚¬Å¾Ãƒâ„¢Ã¢â‚¬Å¡ÃƒËœÃ‚Â§ÃƒËœÃ‚Â¦Ãƒâ„¢Ã…Â ÃƒËœÃ‚Â§Ãƒâ„¢Ã¢â‚¬Â¹
+        if ($this->create_leave_duration_unit !== 'full_day') {
+            $this->end_date = (string) $value;
+        }
+
+        $this->leave_work_schedule_period_id = 0;
+    }
+
+    public function updatedCreateLeaveDurationUnit($value): void
+    {
+        $unit = in_array((string) $value, ['full_day', 'half_day', 'hours'], true)
+            ? (string) $value
+            : 'full_day';
+
+        if ($this->create_leave_policy_duration_unit === 'half_day') {
+            $this->syncCreateLeaveDurationAvailability();
+
+            if (!$this->create_leave_can_choose_duration) {
+                $this->create_leave_duration_unit = 'full_day';
+                $this->end_date = '';
+                $this->leave_work_schedule_period_id = 0;
+                return;
+            }
+
+            $this->create_leave_duration_unit = in_array($unit, ['full_day', 'half_day'], true) ? $unit : 'full_day';
+        } else {
+            $this->create_leave_duration_unit = $this->create_leave_policy_duration_unit;
+        }
+
+        if ($this->create_leave_duration_unit !== 'full_day' && $this->start_date !== '') {
+            $this->end_date = $this->start_date;
+        }
+
+        if ($this->create_leave_duration_unit !== 'half_day') {
+            $this->leave_work_schedule_period_id = 0;
+        }
+
+        $this->syncLeaveMinutes();
+    }
+    public function updatedLeaveFromTime(): void { $this->syncLeaveMinutes(); }
+    public function updatedLeaveToTime(): void { $this->syncLeaveMinutes(); }
+
+    protected function syncLeaveMinutes(): void
+    {
+        if ($this->create_leave_duration_unit !== 'hours') {
+            $this->leave_minutes = 0;
+            return;
+        }
+        $this->leave_minutes = $this->computeMinutesSafe($this->leave_from_time, $this->leave_to_time);
+    }
+
+    // =========================================================
+    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Open/Close
+    // =========================================================
+    public function openCreateLeave(): void
+    {
+        $this->requireAttendanceAny('requests.leaves.create');
+        $this->resetValidation();
+        $this->employeeSearch = '';
+        $this->employee_id = 0;
+        $this->leave_policy_id = 0;
+        $this->start_date = '';
+        $this->end_date = '';
+        $this->reason = '';
+        $this->replacement_employee_id = null;
+
+        $this->resetCreateLeavePolicyMeta();
+
+        $this->createLeaveOpen = true;
+    }
+
+    public function closeCreateLeave(): void { $this->createLeaveOpen = false; }
+
+    // =========================================================
+    // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Save Leave (policy-driven)
+    // =========================================================
+    public function saveLeave(): void
+    {
+        $this->requireAttendanceAny('requests.leaves.create');
+        $this->ensureCanManage();
+
+        // 0) Early validation to avoid 404/500 before policy-specific rules
+        $this->validate([
+            'employee_id' => 'required|integer|min:1',
+            'leave_policy_id' => 'required|integer|min:1',
+        ]);
+
+        // 1) Validate employee exists (same company)
+        $allowed = $this->lpAllowedBranchIdsSafe();
+        $branchCol = $this->employeeBranchColumn ?: $this->detectEmployeeBranchColumn();
+
+        $employee = Employee::query()
+            ->when($this->employeeCompanyColumn, fn ($q) => $q->where($this->employeeCompanyColumn, $this->companyId))
+            ->when($branchCol && !empty($allowed), fn ($q) => $q->whereIn($branchCol, $allowed))
+            ->findOrFail((int) $this->employee_id);
+
+        // 2) Validate policy is allowed for this employee
+        $policy = $this->findAllowedPolicyForEmployee($employee, (int) $this->leave_policy_id);
+
+        // 3) Build + validate rules based on policy settings
+        $rules = $this->buildCreateLeaveRulesFromPolicy($policy);
+        $data = $this->validate(
+            $rules,
+            $this->leaveRequestsValidationMessages(),
+            $this->leaveRequestsValidationAttributes()
+        );
+
         // 4) Normalize dates based on duration unit
         $start = Carbon::parse($data['start_date'])->startOfDay();
         $end = $this->create_leave_duration_unit === 'full_day'
@@ -1211,15 +1373,20 @@ trait WithLeaveRequests
         $this->groupBranchId = null;
         $this->groupContractType = '';
 
-        // ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¨ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾: $this->resetGroupLeavePolicyMeta();
-        // ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¨ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¯: ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¬ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¨ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â±ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ Full Day (ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¨ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¯ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã¢â‚¬Â¹ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â  ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©)
+        if (property_exists($this, 'groupEmployeeDisplayLimit')) {
+            $this->groupEmployeeDisplayLimit = 12;
+        }
+
+        $this->group_leave_policy_duration_unit = 'full_day';
         $this->group_leave_duration_unit = 'full_day';
+        $this->group_leave_duration_ready = false;
+        $this->group_leave_can_choose_duration = false;
+        $this->group_leave_schedule_state = 'awaiting_employees';
         $this->group_leave_half_day_part = 'first_half';
         $this->group_leave_from_time = '';
         $this->group_leave_to_time = '';
         $this->group_leave_minutes = 0;
     }
-
 
     public function closeCreateGroupLeave(): void { $this->createGroupLeaveOpen = false; }
 
@@ -1625,18 +1792,36 @@ trait WithLeaveRequests
 
     public function updatedGroupLeaveDurationUnit($value): void
     {
-        if (in_array($value, ['half_day', 'hours'], true)) {
+        $value = (string) $value;
+
+        if ($this->group_leave_policy_duration_unit === 'half_day') {
+            $value = $this->group_leave_can_choose_duration && in_array($value, ['full_day', 'half_day'], true)
+                ? $value
+                : 'full_day';
+        } else {
+            $value = $this->group_leave_duration_ready
+                ? $this->group_leave_policy_duration_unit
+                : 'full_day';
+        }
+
+        $this->group_leave_duration_unit = $value;
+
+        if ($value !== 'full_day') {
             $this->group_end_date = $this->normalizeDate($this->group_start_date);
         }
 
         if ($value !== 'hours') {
             $this->group_leave_hours = null;
+            $this->group_leave_from_time = '';
+            $this->group_leave_to_time = '';
+            $this->group_leave_minutes = 0;
         }
+
         if ($value !== 'half_day') {
             $this->group_leave_half_day_period = 'am';
+            $this->group_leave_half_day_part = 'first_half';
         }
     }
-
 
     private function normalizeDate(?string $date): string
     {
@@ -1728,11 +1913,7 @@ trait WithLeaveRequests
 
         if (! $this->group_leave_deduct_from_balance) {
             $this->group_leave_policy_id = 0;
-            $this->group_leave_duration_unit = 'full_day';
-            $this->group_leave_half_day_part = 'first_half';
-            $this->group_leave_from_time = '';
-            $this->group_leave_to_time = '';
-            $this->group_leave_minutes = 0;
+            $this->resetGroupLeavePolicyMeta();
         } else {
             $companyCol = $this->leavePoliciesCompanyColumn();
 
@@ -1755,6 +1936,8 @@ trait WithLeaveRequests
 
             $this->hydrateGroupLeavePolicyMeta(false);
         }
+
+        $this->syncGroupLeaveDurationAvailability();
 
         $rules = [
             'group_leave_policy_id' => $this->group_leave_deduct_from_balance
@@ -1818,6 +2001,21 @@ trait WithLeaveRequests
         $fromTime = null;
         $toTime = null;
         $minutes = null;
+        $groupHalfDayPeriods = [];
+
+        if (
+            $this->group_leave_deduct_from_balance &&
+            $policy &&
+            $this->group_leave_duration_unit === 'half_day'
+        ) {
+            $resolvedPeriods = $this->resolveGroupLeaveHalfDayPeriods($start);
+
+            if ($resolvedPeriods === null) {
+                return;
+            }
+
+            $groupHalfDayPeriods = $resolvedPeriods;
+        }
 
         if ($this->group_leave_deduct_from_balance && $policy) {
             if (! $this->validatePolicyNoticeWindow($policy, $start)) {
@@ -1906,7 +2104,7 @@ trait WithLeaveRequests
 
         $yearId = $this->selectedYearId ? (int) $this->selectedYearId : null;
 
-        DB::transaction(function () use ($start, $end, $requestedDays, $data, $yearId, $policy, $halfPart, $fromTime, $toTime, $minutes) {
+        DB::transaction(function () use ($start, $end, $requestedDays, $data, $yearId, $policy, $halfPart, $fromTime, $toTime, $minutes, $groupHalfDayPeriods) {
             foreach ($this->groupEmployeeIds as $empId) {
                 $allowed = $this->lpAllowedBranchIdsSafe();
                 $branchCol = $this->employeeBranchColumn ?: $this->detectEmployeeBranchColumn();
@@ -1915,6 +2113,28 @@ trait WithLeaveRequests
                     ->when($this->employeeCompanyColumn, fn ($q) => $q->where($this->employeeCompanyColumn, $this->companyId))
                     ->when($branchCol && !empty($allowed), fn ($q) => $q->whereIn($branchCol, $allowed))
                     ->findOrFail((int) $empId);
+
+                $rowHalfPart = $halfPart;
+                $rowFromTime = $fromTime;
+                $rowToTime = $toTime;
+                $rowMinutes = $minutes;
+                $rowWorkSchedulePeriodId = null;
+
+                if ($this->group_leave_duration_unit === 'half_day') {
+                    $selectedPeriod = $groupHalfDayPeriods[(int) $employee->id] ?? null;
+
+                    if (!$selectedPeriod) {
+                        throw \Illuminate\Validation\ValidationException::withMessages([
+                            'group_leave_half_day_part' => tr('The selected work period is not available for one or more employees.'),
+                        ]);
+                    }
+
+                    $rowHalfPart = 'work_period';
+                    $rowFromTime = substr((string) ($selectedPeriod['start_time'] ?? ''), 0, 5);
+                    $rowToTime = substr((string) ($selectedPeriod['end_time'] ?? ''), 0, 5);
+                    $rowMinutes = $this->computePeriodMinutes($start, $selectedPeriod);
+                    $rowWorkSchedulePeriodId = (int) ($selectedPeriod['id'] ?? 0);
+                }
 
                 $isException = false;
                 $exceptionStatus = null;
@@ -1962,10 +2182,11 @@ trait WithLeaveRequests
                         ? $this->group_leave_duration_unit
                         : 'full_day',
 
-                    'half_day_part' => $halfPart,
-                    'from_time' => $fromTime,
-                    'to_time' => $toTime,
-                    'minutes' => $minutes,
+                    'half_day_part' => $rowHalfPart,
+                    'from_time' => $rowFromTime,
+                    'to_time' => $rowToTime,
+                    'minutes' => $rowMinutes,
+                    'work_schedule_period_id' => $rowWorkSchedulePeriodId,
 
                     'source' => 'hr',
                     'status' => 'pending',
@@ -1981,6 +2202,10 @@ trait WithLeaveRequests
                     'mode' => $this->group_leave_deduct_from_balance
                         ? 'group_leave_with_policy'
                         : 'group_absence_no_policy',
+                    'half_day_selector' => $this->group_leave_duration_unit === 'half_day'
+                        ? $this->group_leave_half_day_part
+                        : null,
+                    'work_schedule_period_id' => $rowWorkSchedulePeriodId,
                 ], (int) $row->employee_id);
             }
         });
@@ -2037,7 +2262,12 @@ trait WithLeaveRequests
         $this->group_reason = '';
         $this->group_attachment = null;
 
+        $this->group_leave_policy_duration_unit = 'full_day';
         $this->group_leave_duration_unit = 'full_day';
+        $this->group_leave_duration_ready = false;
+        $this->group_leave_can_choose_duration = false;
+        $this->group_leave_schedule_state = 'awaiting_employees';
+        $this->group_leave_half_day_part = 'first_half';
         $this->group_leave_attachment_required = false;
         $this->group_leave_attachment_types = [];
     }
@@ -2049,6 +2279,9 @@ trait WithLeaveRequests
 
     public function updatedGroupStartDate($value): void
     {
+        $this->create_leave_work_period_options_cache = [];
+        $this->syncGroupLeaveDurationAvailability();
+
         if ($this->group_leave_duration_unit !== 'full_day') {
             $this->group_end_date = (string) $value;
         }
@@ -2072,7 +2305,23 @@ trait WithLeaveRequests
 
     protected function resetGroupLeavePolicyMeta(): void
     {
+        $this->group_leave_policy_duration_unit = 'full_day';
         $this->group_leave_duration_unit = 'full_day';
+
+        $hasEmployees = ! empty($this->selectedGroupEmployeeIds());
+        $hasStartDate = trim((string) $this->group_start_date) !== '';
+
+        $this->group_leave_duration_ready = $hasEmployees && $hasStartDate;
+        $this->group_leave_can_choose_duration = false;
+
+        if (! $hasEmployees) {
+            $this->group_leave_schedule_state = 'awaiting_employees';
+        } elseif (! $hasStartDate) {
+            $this->group_leave_schedule_state = 'awaiting_date';
+        } else {
+            $this->group_leave_schedule_state = 'policy_full_day';
+        }
+
         $this->group_leave_half_day_part = 'first_half';
         $this->group_leave_from_time = '';
         $this->group_leave_to_time = '';
@@ -2102,21 +2351,250 @@ trait WithLeaveRequests
         $unit = (string) data_get($settings, 'duration_unit', 'full_day');
         $unit = in_array($unit, ['full_day', 'half_day', 'hours'], true) ? $unit : 'full_day';
 
-        $this->group_leave_duration_unit = $unit;
-
-        // ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã¢â‚¬Â¹ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â  ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚ÂµÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã¢â‚¬Â¹ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã¢â‚¬Â¹ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â  ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â³ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¹ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Âª: ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â© = ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¨ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¯ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©
-        if ($this->group_leave_duration_unit !== 'full_day' && $this->group_start_date !== '') {
-            $this->group_end_date = $this->group_start_date;
-        }
+        $this->group_leave_policy_duration_unit = $unit;
 
         if ($resetInputs) {
+            $this->group_leave_duration_unit = 'full_day';
             $this->group_leave_half_day_part = 'first_half';
             $this->group_leave_from_time = '';
             $this->group_leave_to_time = '';
             $this->group_leave_minutes = 0;
         }
+
+        $this->syncGroupLeaveDurationAvailability();
     }
-protected function validateHoursWithinWorkWindowGeneric(Carbon $date, string $from, string $to, string $fromKey, string $toKey): bool
+
+    protected function selectedGroupEmployeeIds(): array
+    {
+        return array_values(array_filter(
+            array_unique(array_map('intval', (array) $this->groupEmployeeIds)),
+            fn (int $employeeId): bool => $employeeId > 0
+        ));
+    }
+
+    protected function groupLeaveScheduleDate(): Carbon
+    {
+        try {
+            return trim($this->group_start_date) !== ''
+                ? Carbon::parse($this->group_start_date)->startOfDay()
+                : Carbon::today();
+        } catch (\Throwable $e) {
+            return Carbon::today();
+        }
+    }
+
+    public function updatedGroupEmployeeIds($value = null, $key = null): void
+    {
+        $this->create_leave_work_period_options_cache = [];
+        $this->resetValidation([
+            'groupEmployeeIds',
+            'group_leave_duration_unit',
+            'group_leave_half_day_part',
+        ]);
+        $this->syncGroupLeaveDurationAvailability();
+    }
+
+    protected function syncGroupLeaveDurationAvailability(): void
+    {
+        $employeeIds = $this->selectedGroupEmployeeIds();
+        $hasEmployees = ! empty($employeeIds);
+        $hasStartDate = trim((string) $this->group_start_date) !== '';
+        $hasRequiredPolicy = ! $this->group_leave_deduct_from_balance
+            || (int) $this->group_leave_policy_id > 0;
+
+        $this->group_leave_duration_ready = $hasEmployees
+            && $hasStartDate
+            && $hasRequiredPolicy;
+
+        $this->group_leave_can_choose_duration = false;
+
+        if (! $hasEmployees) {
+            $this->group_leave_schedule_state = 'awaiting_employees';
+            $this->forceGroupLeaveFullDay();
+            return;
+        }
+
+        if (! $hasStartDate) {
+            $this->group_leave_schedule_state = 'awaiting_date';
+            $this->forceGroupLeaveFullDay();
+            return;
+        }
+
+        if (! $hasRequiredPolicy) {
+            $this->group_leave_schedule_state = 'awaiting_policy';
+            $this->forceGroupLeaveFullDay();
+            return;
+        }
+
+        if (! $this->group_leave_deduct_from_balance) {
+            $this->group_leave_schedule_state = 'group_absence_full_day';
+            $this->forceGroupLeaveFullDay();
+            $this->group_leave_duration_ready = true;
+            return;
+        }
+
+        $policyUnit = in_array(
+            $this->group_leave_policy_duration_unit,
+            ['full_day', 'half_day', 'hours'],
+            true
+        )
+            ? $this->group_leave_policy_duration_unit
+            : 'full_day';
+
+        if ($policyUnit !== 'half_day') {
+            $this->group_leave_duration_unit = $policyUnit;
+            $this->group_leave_schedule_state = $policyUnit === 'full_day'
+                ? 'policy_full_day'
+                : 'policy_fixed_duration';
+
+            $this->group_leave_half_day_part = 'first_half';
+
+            if ($policyUnit !== 'hours') {
+                $this->group_leave_from_time = '';
+                $this->group_leave_to_time = '';
+                $this->group_leave_minutes = 0;
+            }
+
+            return;
+        }
+
+        $date = Carbon::parse($this->group_start_date)->startOfDay();
+        $allowed = $this->lpAllowedBranchIdsSafe();
+        $branchCol = $this->employeeBranchColumn ?: $this->detectEmployeeBranchColumn();
+
+        $employees = Employee::query()
+            ->when(
+                $this->employeeCompanyColumn,
+                fn ($q) => $q->where($this->employeeCompanyColumn, $this->companyId)
+            )
+            ->when(
+                $branchCol && ! empty($allowed),
+                fn ($q) => $q->whereIn($branchCol, $allowed)
+            )
+            ->whereIn('id', $employeeIds)
+            ->get()
+            ->keyBy('id');
+
+        $multiPeriodEmployees = 0;
+        $fullDayOnlyEmployees = 0;
+        $missingEmployees = 0;
+
+        foreach ($employeeIds as $employeeId) {
+            $employee = $employees->get($employeeId);
+
+            if (! $employee) {
+                $missingEmployees++;
+                continue;
+            }
+
+            $periods = $this->getEmployeeWorkSchedulePeriodsForDate($employee, $date);
+
+            if (count($periods) > 1) {
+                $multiPeriodEmployees++;
+            } else {
+                $fullDayOnlyEmployees++;
+            }
+        }
+
+        if (
+            $missingEmployees === 0
+            && $fullDayOnlyEmployees === 0
+            && $multiPeriodEmployees === count($employeeIds)
+        ) {
+            $this->group_leave_can_choose_duration = true;
+            $this->group_leave_schedule_state = 'all_multi_period';
+
+            if (! in_array($this->group_leave_duration_unit, ['full_day', 'half_day'], true)) {
+                $this->group_leave_duration_unit = 'full_day';
+            }
+
+            return;
+        }
+
+        if ($missingEmployees > 0) {
+            $this->group_leave_schedule_state = 'unavailable_schedule';
+        } elseif ($multiPeriodEmployees > 0 && $fullDayOnlyEmployees > 0) {
+            $this->group_leave_schedule_state = 'mixed_periods';
+        } else {
+            $this->group_leave_schedule_state = 'single_period_only';
+        }
+
+        $this->forceGroupLeaveFullDay();
+        $this->group_leave_duration_ready = true;
+    }
+
+    protected function forceGroupLeaveFullDay(): void
+    {
+        $this->group_leave_duration_unit = 'full_day';
+        $this->group_leave_can_choose_duration = false;
+        $this->group_leave_half_day_part = 'first_half';
+        $this->group_leave_from_time = '';
+        $this->group_leave_to_time = '';
+        $this->group_leave_minutes = 0;
+
+        if (trim($this->group_start_date) !== '') {
+            $this->group_end_date = $this->normalizeDate($this->group_start_date);
+        }
+    }
+
+    protected function resolveGroupLeaveHalfDayPeriods(Carbon $date): ?array
+    {
+        if (
+            $this->group_leave_duration_unit !== 'half_day'
+            || ! $this->group_leave_can_choose_duration
+        ) {
+            return [];
+        }
+
+        $employeeIds = $this->selectedGroupEmployeeIds();
+        $periodIndex = $this->group_leave_half_day_part === 'second_half' ? 1 : 0;
+        $resolved = [];
+
+        $allowed = $this->lpAllowedBranchIdsSafe();
+        $branchCol = $this->employeeBranchColumn ?: $this->detectEmployeeBranchColumn();
+
+        $employees = Employee::query()
+            ->when(
+                $this->employeeCompanyColumn,
+                fn ($q) => $q->where($this->employeeCompanyColumn, $this->companyId)
+            )
+            ->when(
+                $branchCol && ! empty($allowed),
+                fn ($q) => $q->whereIn($branchCol, $allowed)
+            )
+            ->whereIn('id', $employeeIds)
+            ->get()
+            ->keyBy('id');
+
+        foreach ($employeeIds as $employeeId) {
+            $employee = $employees->get($employeeId);
+
+            if (! $employee) {
+                $this->addError(
+                    'groupEmployeeIds',
+                    tr('One or more selected employees are not available.')
+                );
+                return null;
+            }
+
+            $periods = $this->getEmployeeWorkSchedulePeriodsForDate($employee, $date);
+            $period = $periods[$periodIndex] ?? null;
+
+            if (count($periods) <= 1 || ! $period) {
+                $this->addError(
+                    'group_leave_half_day_part',
+                    tr('Half-day group leave is available only when all selected employees have more than one work period.')
+                );
+                return null;
+            }
+
+            $resolved[(int) $employee->id] = $period;
+        }
+
+        return $resolved;
+    }
+
+    protected function validateHoursWithinWorkWindowGeneric(Carbon $date, string $from, string $to, string $fromKey, string $toKey): bool
     {
         $arabicDayNames = [0=>tr('Sunday'),1=>tr('Monday'),2=>tr('Tuesday'),3=>tr('Wednesday'),4=>tr('Thursday'),5=>tr('Friday'),6=>tr('Saturday')];
         $workingDays = $this->companyWorkingDays();
@@ -2250,12 +2728,11 @@ protected function validateHoursWithinWorkWindowGeneric(Carbon $date, string $fr
     {
         if (! (bool) $value) {
             $this->group_leave_policy_id = 0;
-            $this->group_leave_duration_unit = 'full_day';
-            $this->group_leave_half_day_part = 'first_half';
-            $this->group_leave_from_time = '';
-            $this->group_leave_to_time = '';
-            $this->group_leave_minutes = 0;
+            $this->resetGroupLeavePolicyMeta();
+            return;
         }
+
+        $this->hydrateGroupLeavePolicyMeta(true);
     }
 
     protected function isEmployeeLeavePeriodAvailable(int $employeeId, Carbon $start, Carbon $end, ?int $ignoreId = null): array

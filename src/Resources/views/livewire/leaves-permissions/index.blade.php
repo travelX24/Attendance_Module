@@ -2314,7 +2314,7 @@
     {{-- Create Group Leave Modal --}}
     <x-ui.modal wire:model="createGroupLeaveOpen" max-width="4xl">
         <x-slot name="title">
-             <div class="flex items-center gap-3">
+            <div class="flex items-center gap-3">
                 <div class="p-2 bg-[color:var(--accent-orange)]/10 text-[color:var(--accent-orange)] rounded-lg">
                     <i class="fas fa-users text-lg"></i>
                 </div>
@@ -2326,183 +2326,155 @@
         </x-slot>
 
         <x-slot name="content">
-         <div class="space-y-4">
-
-            <div class="text-xs text-gray-500 mb-1 font-bold">{{ tr('Reason') }}</div>
-            <x-ui.textarea
-                wire:model.defer="group_reason"
-                rows="3"
-                class="w-full"
-                placeholder="{{ tr('Type the reason for the leave...') }}"
-                :disabled="!$canManageLeaveRequests"
-            />
+            <div
+                class="space-y-4"
+                x-data="{ deduct: $wire.entangle('group_leave_deduct_from_balance').live }"
+            >
+                <div>
+                    <div class="text-xs text-gray-500 mb-1 font-bold">{{ tr('Reason') }}</div>
+                    <x-ui.textarea
+                        wire:model.defer="group_reason"
+                        rows="3"
+                        class="w-full"
+                        placeholder="{{ tr('Type the reason for the leave...') }}"
+                        :disabled="!$canManageLeaveRequests"
+                    />
+                </div>
 
                 <label class="flex items-center gap-2 text-sm text-gray-700">
                     <input
                         type="checkbox"
-                        wire:model.live="group_leave_deduct_from_balance"
+                        x-model="deduct"
                         class="rounded border-gray-300 text-[color:var(--accent-orange)] focus:ring-[color:var(--accent-orange)]"
                         @if(!$canManageLeaveRequests) disabled @endif
                     />
                     <span class="font-semibold">{{ tr('Deduct from leave balance') }}</span>
                 </label>
 
-                @if($group_leave_deduct_from_balance)
-                    <div>
-                        <div class="text-xs text-gray-500 mb-1">{{ tr('Leave Type') }}</div>
-                        <x-ui.select wire:model.live="group_leave_policy_id" class="w-full">
-                            <option value="0">--</option>
-                            @foreach(($policies ?? []) as $p)
-                                @if($p)
-                                    <option value="{{ $p->id }}">{{ $p->name ?? $p->label ?? ('#'.$p->id) }}</option>
-                                @endif
-                            @endforeach
-                        </x-ui.select>
-                        @error('group_leave_policy_id') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
-                    </div>
-                @endif
-
-                @if($group_leave_deduct_from_balance && $group_leave_policy_id > 0)
-                    <div class="bg-gray-50 border border-gray-100 rounded-xl p-3">
-                        <div class="text-[11px] text-gray-500 font-bold mb-1">{{ tr('Duration') }}</div>
-
-                        <div class="text-sm font-black text-gray-900">
-                            @if($group_leave_duration_unit === 'full_day')
-                                {{ tr('Full day') }}
-                            @elseif($group_leave_duration_unit === 'half_day')
-                                {{ tr('Half day') }}
-                            @else
-                                {{ tr('Hours') }}
+                <div x-cloak x-show="deduct" x-transition.opacity>
+                    <div class="text-xs text-gray-500 mb-1">{{ tr('Leave Type') }}</div>
+                    <x-ui.select
+                        wire:model.change="group_leave_policy_id"
+                        wire:loading.attr="disabled"
+                        wire:target="group_leave_deduct_from_balance,group_leave_policy_id"
+                        class="w-full"
+                    >
+                        <option value="0">--</option>
+                        @foreach(($policies ?? []) as $p)
+                            @if($p)
+                                <option value="{{ $p->id }}">{{ $p->name ?? $p->label ?? ('#'.$p->id) }}</option>
                             @endif
-                        </div>
+                        @endforeach
+                    </x-ui.select>
 
-                        @if($group_leave_duration_unit === 'hours' && $group_leave_minutes > 0)
-                            <div class="text-[11px] text-gray-600 mt-1">
-                                {{ tr('Total minutes') }}: <span class="font-bold">{{ (int) $group_leave_minutes }}</span>
-                            </div>
-                        @endif
-                    </div>
-                @endif
-
-                {{-- Date/Time fields based on duration unit --}}
-                @if($group_leave_duration_unit === 'full_day')
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                            <div class="text-xs text-gray-500 mb-1">{{ tr('Start Date') }}</div>
-                            <x-ui.company-date-picker model="group_start_date" />
-                            @error('group_start_date') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
-                        </div>
-
-                        <div>
-                            <div class="text-xs text-gray-500 mb-1">{{ tr('End Date') }}</div>
-                            <x-ui.company-date-picker model="group_end_date" />
-                            @error('group_end_date') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
-                        </div>
+                    <div
+                        wire:loading.flex
+                        wire:target="group_leave_deduct_from_balance,group_leave_policy_id"
+                        class="mt-2 items-center gap-2 text-[11px] font-semibold text-gray-500"
+                    >
+                        <i class="fas fa-circle-notch fa-spin"></i>
+                        <span>{{ tr('Loading') }}...</span>
                     </div>
 
-                @elseif($group_leave_duration_unit === 'half_day')
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                            <div class="text-xs text-gray-500 mb-1">{{ tr('Date') }}</div>
-                            <x-ui.company-date-picker model="group_start_date" />
-                            @error('group_start_date') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
-                        </div>
-
-                        <div>
-                            <div class="text-xs text-gray-500 mb-1">{{ tr('Half day') }}</div>
-                            <x-ui.select wire:model="group_leave_half_day_part" class="w-full">
-                                <option value="first_half">{{ tr('First half') }}</option>
-                                <option value="second_half">{{ tr('Second half') }}</option>
-                            </x-ui.select>
-                            @error('group_leave_half_day_part') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
-                        </div>
-                    </div>
-
-                @else
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                        <div>
-                            <div class="text-xs text-gray-500 mb-1">{{ tr('Date') }}</div>
-                            <x-ui.company-date-picker model="group_start_date" />
-                            @error('group_start_date') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
-                        </div>
-
-                        <div>
-                            <div class="text-xs text-gray-500 mb-1">{{ tr('From') }}</div>
-                            <x-ui.input type="time" wire:model.defer="group_leave_from_time" class="w-full"
-                                        min="{{ $workStart }}" max="{{ $workEnd }}" step="60" />
-                            @error('group_leave_from_time') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
-                        </div>
-
-                        <div>
-                            <div class="text-xs text-gray-500 mb-1">{{ tr('To') }}</div>
-                            <x-ui.input type="time" wire:model.defer="group_leave_to_time" class="w-full"
-                                        min="{{ $workStart }}" max="{{ $workEnd }}" step="60" />
-                            @error('group_leave_to_time') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
-                        </div>
-                    </div>
-                @endif
-
+                    @error('group_leave_policy_id')
+                        <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div>
+                    @enderror
+                </div>
 
                 <x-ui.card class="p-3 border border-gray-200 rounded-2xl bg-gray-50">
-                    <div class="font-bold text-gray-900 mb-2">{{ tr('Select Employees') }}</div>
+                    <div class="flex items-center justify-between gap-3 mb-2">
+                        <div class="font-bold text-gray-900">{{ tr('Select Employees') }}</div>
+                        <div class="text-[11px] text-gray-500">
+                            {{ tr('Selected') }}:
+                            <span class="font-bold text-gray-800">{{ count($groupEmployeeIds) }}</span>
+                        </div>
+                    </div>
 
-                   <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3 mb-3">
-    <div>
-        <div class="text-xs text-gray-500 mb-1">{{ tr('Search') }}</div>
-        <x-ui.input type="text" wire:model.live="groupEmployeeSearch" class="w-full" :disabled="!$canManageLeaveRequests" />
-    </div>
+                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3 mb-3">
+                        <div>
+                            <div class="text-xs text-gray-500 mb-1">{{ tr('Search') }}</div>
+                            <x-ui.input
+                                type="text"
+                                wire:model.live.debounce.400ms="groupEmployeeSearch"
+                                class="w-full"
+                                :disabled="!$canManageLeaveRequests"
+                            />
+                        </div>
 
-    <div>
-        <div class="text-xs text-gray-500 mb-1">{{ tr('Branch') }}</div>
-        <x-ui.select wire:model.live="groupBranchId" class="w-full" :disabled="!$canManageLeaveRequests">
-            <option value="">{{ tr('All Branches') }}</option>
-            @foreach(($branches ?? []) as $br)
-                <option value="{{ $br->id }}">
-                    {{ ($br->name ?? ('#'.$br->id)) }}{{ !empty($br->code) ? ' - '.$br->code : '' }}
-                </option>
-            @endforeach
-        </x-ui.select>
-    </div>
+                        <div>
+                            <div class="text-xs text-gray-500 mb-1">{{ tr('Branch') }}</div>
+                            <x-ui.select wire:model.change="groupBranchId" class="w-full" :disabled="!$canManageLeaveRequests">
+                                <option value="">{{ tr('All Branches') }}</option>
+                                @foreach(($branches ?? []) as $br)
+                                    <option value="{{ $br->id }}">
+                                        {{ ($br->name ?? ('#'.$br->id)) }}{{ !empty($br->code) ? ' - '.$br->code : '' }}
+                                    </option>
+                                @endforeach
+                            </x-ui.select>
+                        </div>
 
-    <div>
-        <div class="text-xs text-gray-500 mb-1">{{ tr('Department') }}</div>
-        <x-ui.select wire:model.live="groupDepartmentId" class="w-full" :disabled="!$canManageLeaveRequests">
-            <option value="">{{ tr('All Departments') }}</option>
-            @foreach(($departments ?? []) as $d)
-                <option value="{{ $d->id }}">{{ $d->label ?? $d->name ?? ('#'.$d->id) }}</option>
-            @endforeach
-        </x-ui.select>
-    </div>
+                        <div>
+                            <div class="text-xs text-gray-500 mb-1">{{ tr('Department') }}</div>
+                            <x-ui.select wire:model.change="groupDepartmentId" class="w-full" :disabled="!$canManageLeaveRequests">
+                                <option value="">{{ tr('All Departments') }}</option>
+                                @foreach(($departments ?? []) as $d)
+                                    <option value="{{ $d->id }}">{{ $d->label ?? $d->name ?? ('#'.$d->id) }}</option>
+                                @endforeach
+                            </x-ui.select>
+                        </div>
 
-    <div>
-        <div class="text-xs text-gray-500 mb-1">{{ tr('Job Title') }}</div>
-        <x-ui.select wire:model.live="groupJobTitleId" class="w-full" :disabled="!$canManageLeaveRequests">
-            <option value="">{{ tr('All Job Titles') }}</option>
-            @foreach(($jobTitles ?? []) as $jt)
-                <option value="{{ $jt->id }}">{{ $jt->label ?? $jt->name ?? ('#'.$jt->id) }}</option>
-            @endforeach
-        </x-ui.select>
-    </div>
+                        <div>
+                            <div class="text-xs text-gray-500 mb-1">{{ tr('Job Title') }}</div>
+                            <x-ui.select wire:model.change="groupJobTitleId" class="w-full" :disabled="!$canManageLeaveRequests">
+                                <option value="">{{ tr('All Job Titles') }}</option>
+                                @foreach(($jobTitles ?? []) as $jt)
+                                    <option value="{{ $jt->id }}">{{ $jt->label ?? $jt->name ?? ('#'.$jt->id) }}</option>
+                                @endforeach
+                            </x-ui.select>
+                        </div>
 
- <div>
-    <div class="text-xs text-gray-500 mb-1">{{ tr('Contract Type') }}</div>
-    <x-ui.select wire:model.live="groupContractType" class="w-full" :disabled="!$canManageLeaveRequests">
-        <option value="">{{ tr('All Contract Types') }}</option>
-        <option value="permanent">{{ tr('Permanent') }}</option>
-        <option value="temporary">{{ tr('Temporary') }}</option>
-        <option value="probation">{{ tr('Probation') }}</option>
-        <option value="contractor">{{ tr('Contractor') }}</option>
-    </x-ui.select>
-</div>
-</div>
+                        <div>
+                            <div class="text-xs text-gray-500 mb-1">{{ tr('Contract Type') }}</div>
+                            <x-ui.select wire:model.change="groupContractType" class="w-full" :disabled="!$canManageLeaveRequests">
+                                <option value="">{{ tr('All Contract Types') }}</option>
+                                <option value="permanent">{{ tr('Permanent') }}</option>
+                                <option value="temporary">{{ tr('Temporary') }}</option>
+                                <option value="probation">{{ tr('Probation') }}</option>
+                                <option value="contractor">{{ tr('Contractor') }}</option>
+                            </x-ui.select>
+                        </div>
+                    </div>
 
-                    <div class="max-h-64 overflow-auto bg-white rounded-xl border border-gray-200 p-3">
+                    <div
+                        wire:loading.flex
+                        wire:target="groupEmployeeSearch,groupBranchId,groupDepartmentId,groupJobTitleId,groupContractType"
+                        class="mb-3 items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-[11px] font-semibold text-gray-500"
+                    >
+                        <i class="fas fa-circle-notch fa-spin"></i>
+                        <span>{{ tr('Loading') }}...</span>
+                    </div>
+
+                    @php
+                        $groupEmployeeRows = $groupEmployeesForSelect->take($groupEmployeeDisplayLimit);
+                        $groupEmployeesHasMore = $groupEmployeesForSelect->count() > $groupEmployeeDisplayLimit;
+                    @endphp
+
+                    <div class="bg-white rounded-xl border border-gray-200 p-3">
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                            @foreach($groupEmployeesForSelect as $e)
-                                <label class="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 border border-transparent hover:border-gray-100 transition-all cursor-pointer group">
-                                    <input type="checkbox" value="{{ $e->id }}" wire:model="groupEmployeeIds" 
+                            @forelse($groupEmployeeRows as $e)
+                                <label
+                                    wire:key="group-leave-employee-{{ $e->id }}"
+                                    class="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 border border-transparent hover:border-gray-100 transition-all cursor-pointer group"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        value="{{ $e->id }}"
+                                        wire:model.live="groupEmployeeIds"
+                                        wire:loading.attr="disabled"
+                                        wire:target="groupEmployeeIds"
                                         class="w-4 h-4 rounded border-gray-300 text-[color:var(--accent-orange)] focus:ring-[color:var(--accent-orange)]"
-                                        @if(!$canManageLeaveRequests) disabled @endif />
+                                        @if(!$canManageLeaveRequests) disabled @endif
+                                    />
                                     <div class="flex flex-col">
                                         <span class="text-xs font-bold text-gray-800 group-hover:text-[color:var(--accent-orange)] transition-colors">
                                             {{ $e->name_ar ?? $e->name_en ?? $e->name ?? $e->full_name ?? ('#'.$e->id) }}
@@ -2510,27 +2482,186 @@
                                         <span class="text-[10px] text-gray-400">#{{ $e->id }}</span>
                                     </div>
                                 </label>
-                            @endforeach
+                            @empty
+                                <div class="col-span-full py-5 text-center text-xs font-semibold text-gray-500">
+                                    {{ tr('No employees found') }}
+                                </div>
+                            @endforelse
                         </div>
+
+                        @if($groupEmployeesHasMore)
+                            <div class="mt-3 flex justify-center border-t border-gray-100 pt-3">
+                                <button
+                                    type="button"
+                                    wire:click="showMoreGroupEmployees"
+                                    wire:loading.attr="disabled"
+                                    wire:target="showMoreGroupEmployees"
+                                    class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-5 py-2 text-xs font-bold text-gray-700 shadow-sm transition hover:border-[color:var(--accent-orange)] hover:text-[color:var(--accent-orange)] disabled:cursor-wait disabled:opacity-60"
+                                >
+                                    <span wire:loading.remove wire:target="showMoreGroupEmployees">{{ tr('Show More') }}</span>
+                                    <span wire:loading wire:target="showMoreGroupEmployees">{{ tr('Loading') }}...</span>
+                                    <i class="fas fa-chevron-down text-[10px]"></i>
+                                </button>
+                            </div>
+                        @endif
                     </div>
 
-                    @error('groupEmployeeIds') <div class="text-xs text-red-600 mt-2">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
+                    <div
+                        wire:loading.flex
+                        wire:target="groupEmployeeIds"
+                        class="mt-2 items-center gap-2 text-[11px] font-semibold text-gray-500"
+                    >
+                        <i class="fas fa-circle-notch fa-spin"></i>
+                        <span>{{ tr('Checking employee schedules') }}...</span>
+                    </div>
+
+                    @error('groupEmployeeIds')
+                        <div class="text-xs text-red-600 mt-2">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div>
+                    @enderror
                 </x-ui.card>
+
+                @if(empty($groupEmployeeIds))
+                    <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800">
+                        <i class="fas fa-circle-info me-1.5"></i>
+                        {{ tr('Select employees first to continue.') }}
+                    </div>
+                @else
+                    <div>
+                        <div class="text-xs text-gray-500 mb-1">{{ tr('Start Date') }}</div>
+                        <x-ui.company-date-picker model="group_start_date" />
+                        @error('group_start_date')
+                            <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div>
+                        @enderror
+                    </div>
+
+                    @if(empty($group_start_date))
+                        <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800">
+                            <i class="fas fa-circle-info me-1.5"></i>
+                            {{ tr('Select the start date to determine available duration options.') }}
+                        </div>
+                    @elseif($group_leave_deduct_from_balance && $group_leave_policy_id <= 0)
+                        <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-xs font-semibold text-amber-800">
+                            <i class="fas fa-circle-info me-1.5"></i>
+                            {{ tr('Select the leave type to determine available duration options.') }}
+                        </div>
+                    @elseif($group_leave_duration_ready)
+                        <div
+                            wire:loading.flex
+                            wire:target="group_start_date,group_leave_policy_id,groupEmployeeIds"
+                            class="items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs font-semibold text-gray-600"
+                        >
+                            <i class="fas fa-circle-notch fa-spin"></i>
+                            <span>{{ tr('Checking employee schedules') }}...</span>
+                        </div>
+
+                        <div wire:loading.remove wire:target="group_start_date,group_leave_policy_id,groupEmployeeIds" class="space-y-4">
+                            @if(
+                                $group_leave_deduct_from_balance
+                                && $group_leave_policy_duration_unit === 'half_day'
+                                && $group_leave_can_choose_duration
+                            )
+                                <div>
+                                    <div class="text-xs text-gray-500 mb-1">{{ tr('Duration') }}</div>
+                                    <x-ui.select wire:model.change="group_leave_duration_unit" class="w-full">
+                                        <option value="full_day">{{ tr('Full day') }}</option>
+                                        <option value="half_day">{{ tr('Half day') }}</option>
+                                    </x-ui.select>
+                                    @error('group_leave_duration_unit')
+                                        <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div>
+                                    @enderror
+                                </div>
+                            @elseif(
+                                $group_leave_deduct_from_balance
+                                && $group_leave_policy_duration_unit === 'half_day'
+                            )
+                                <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-3 text-xs font-semibold text-gray-700">
+                                    <i class="fas fa-calendar-day me-1.5 text-[color:var(--accent-orange)]"></i>
+                                    {{ tr('Full day is applied because at least one selected employee has a single-period or unavailable schedule.') }}
+                                </div>
+                            @endif
+
+                            @if($group_leave_duration_unit === 'full_day')
+                                <div>
+                                    <div class="text-xs text-gray-500 mb-1">{{ tr('End Date') }}</div>
+                                    <x-ui.company-date-picker model="group_end_date" />
+                                    @error('group_end_date')
+                                        <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div>
+                                    @enderror
+                                </div>
+                            @elseif($group_leave_duration_unit === 'half_day')
+                                <div>
+                                    <div class="text-xs text-gray-500 mb-1">{{ tr('Half day') }}</div>
+                                    <x-ui.select wire:model.change="group_leave_half_day_part" class="w-full">
+                                        <option value="first_half">{{ tr('First half') }}</option>
+                                        <option value="second_half">{{ tr('Second half') }}</option>
+                                    </x-ui.select>
+                                    @error('group_leave_half_day_part')
+                                        <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div>
+                                    @enderror
+                                </div>
+                            @else
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div>
+                                        <div class="text-xs text-gray-500 mb-1">{{ tr('From') }}</div>
+                                        <x-ui.input
+                                            type="time"
+                                            wire:model.defer="group_leave_from_time"
+                                            class="w-full"
+                                            min="{{ $workStart }}"
+                                            max="{{ $workEnd }}"
+                                            step="60"
+                                        />
+                                        @error('group_leave_from_time')
+                                            <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div>
+                                        @enderror
+                                    </div>
+
+                                    <div>
+                                        <div class="text-xs text-gray-500 mb-1">{{ tr('To') }}</div>
+                                        <x-ui.input
+                                            type="time"
+                                            wire:model.defer="group_leave_to_time"
+                                            class="w-full"
+                                            min="{{ $workStart }}"
+                                            max="{{ $workEnd }}"
+                                            step="60"
+                                        />
+                                        @error('group_leave_to_time')
+                                            <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div>
+                                        @enderror
+                                    </div>
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+                @endif
 
                 <x-slot name="footer">
                     <div class="flex items-center justify-end gap-3">
-                        <x-ui.secondary-button type="button" wire:click="closeCreateGroupLeave">{{ tr('Cancel') }}</x-ui.secondary-button>
+                        <x-ui.secondary-button type="button" wire:click="closeCreateGroupLeave">
+                            {{ tr('Cancel') }}
+                        </x-ui.secondary-button>
+
                         @if($canManageLeaveRequests)
-                        <x-ui.primary-button type="button" wire:click="saveGroupLeave" class="!px-8">{{ tr('Save') }}</x-ui.primary-button>
+                            <x-ui.primary-button
+                                type="button"
+                                wire:click="saveGroupLeave"
+                                wire:loading.attr="disabled"
+                                wire:target="saveGroupLeave"
+                                class="!px-8"
+                            >
+                                <span wire:loading.remove wire:target="saveGroupLeave">{{ tr('Save') }}</span>
+                                <span wire:loading wire:target="saveGroupLeave">{{ tr('Saving') }}...</span>
+                            </x-ui.primary-button>
                         @endif
                     </div>
                 </x-slot>
             </div>
-
         </x-slot>
     </x-ui.modal>
-    @endif
-    @if($cutLeaveOpen)
+@endif
+
+        @if($cutLeaveOpen)
 
     {{-- Cut Leave Modal --}}
     <x-ui.modal wire:model="cutLeaveOpen" max-width="lg">
