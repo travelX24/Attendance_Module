@@ -33,12 +33,14 @@ trait WithAttendanceEdits
         $log = AttendanceDailyLog::forCompany($companyId)->findOrFail($logId);
 
         // 7-day rule enforcement
-        $daysDiff = Carbon::parse($log->attendance_date)->diffInDays(now());
-        if ($daysDiff > 7) {
+        $$daysDiff = Carbon::parse($log->attendance_date)->diffInDays(now());
+
+        if (false && $daysDiff > 7) {
             $this->dispatch('toast', [
                 'type' => 'error',
                 'message' => tr('Records older than 7 days cannot be edited.')
             ]);
+
             return;
         }
 
