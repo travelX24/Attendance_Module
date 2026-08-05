@@ -7,6 +7,7 @@ use Athka\Attendance\Models\AttendanceDailyPenalty;
 use Athka\Employees\Models\Employee;
 use Athka\SystemSettings\Models\AttendancePolicy;
 use Athka\SystemSettings\Models\AttendancePenaltyPolicy;
+use Athka\SystemSettings\Models\AttendanceGraceSetting;
 use Athka\SystemSettings\Models\UnexcusedAbsencePolicy;
 use Athka\SystemSettings\Services\WorkScheduleService;
 use Illuminate\Support\Facades\DB;
@@ -144,7 +145,11 @@ class PenaltyService
         $group = DB::table('employee_group_members')
             ->join('employee_groups', 'employee_group_members.group_id', '=', 'employee_groups.id')
             ->where('employee_group_members.employee_id', $employee->id)
-            ->select('employee_groups.applied_policy_id')
+            ->select(
+                'employee_groups.applied_policy_id',
+                'employee_groups.grace_source',
+                'employee_groups.grace_setting_id'
+            )
             ->first();
 
         $policyId = $group
@@ -203,13 +208,13 @@ class PenaltyService
             }
         }
 
-        return $this->processViolation($log, $policyId, $targetViolationType);
+        return $this->processViolation($log, $policyId, $targetViolationType, $group);
     }
 
     /**
      * @return bool true if penalty saved/updated
      */
-    private function processViolation(AttendanceDailyLog $log, int $policyId, string $violationType): bool
+    private function processViolation(AttendanceDailyLog $log, int $policyId, string $violationType, ?object $group = null): bool
     {
         $existing = AttendanceDailyPenalty::where([
             'saas_company_id' => $log->saas_company_id,
@@ -271,39 +276,13 @@ class PenaltyService
             return $this->processAbsenceViolation($log, $recurrenceCount, $existing);
         }
 
-        $penaltyPolicy = AttendancePenaltyPolicy::findApplicablePenalty(
+        $penaltyPolicy = $this->findPenaltyPolicy(
+            $log,
             $policyId,
-            $policyType,
+            $violationType,
             $minutes,
             $recurrenceCount
         );
-
-        if (! $penaltyPolicy && $policyType !== $violationType) {
-            $penaltyPolicy = AttendancePenaltyPolicy::findApplicablePenalty(
-                $policyId,
-                $violationType,
-                $minutes,
-                $recurrenceCount
-            );
-        }
-
-        if (! $penaltyPolicy) {
-            $penaltyPolicy = AttendancePenaltyPolicy::query()
-                ->where('saas_company_id', $log->saas_company_id)
-                ->where('policy_id', $policyId)
-                ->where('violation_type', $policyType)
-                ->where('is_active', true)
-                ->where(function ($q) {
-                    $q->where('is_enabled', true)->orWhereNull('is_enabled');
-                })
-                ->where('minutes_from', 0)
-                ->where('minutes_to', 0)
-                ->where('recurrence_from', '<=', $recurrenceCount)
-                ->where(function ($q) use ($recurrenceCount) {
-                    $q->whereNull('recurrence_to')->orWhere('recurrence_to', '>=', $recurrenceCount);
-                })
-                ->first();
-        }
 
         if (! $penaltyPolicy) {
             return false;
@@ -314,15 +293,33 @@ class PenaltyService
             return false;
         }
 
-        $threshold = (int) ($penaltyPolicy->threshold_minutes ?? 0);
-        $interval = (int) ($penaltyPolicy->interval_minutes ?? 0);
+        $threshold = max(0, (int) ($penaltyPolicy->threshold_minutes ?? 0));
+        $interval = max(0, (int) ($penaltyPolicy->interval_minutes ?? 0));
 
-        $billableMinutes = max(0, $minutes - $threshold);
+        $dailyExcessMinutes = max(0, $minutes - $threshold);
+        $monthlyGraceMinutes = $this->resolveMonthlyGraceMinutes($log, $group);
+        $monthlyGraceUsedBefore = $this->calculateMonthlyGraceUsedBefore(
+            $log,
+            $policyId,
+            $monthlyGraceMinutes,
+            $group
+        );
+        $monthlyGraceRemaining = max(0, $monthlyGraceMinutes - $monthlyGraceUsedBefore);
+        $monthlyGraceApplied = min($dailyExcessMinutes, $monthlyGraceRemaining);
+        $billableMinutes = max(0, $dailyExcessMinutes - $monthlyGraceApplied);
+
+        if ($billableMinutes === 0) {
+            if ($existing && $existing->status !== 'confirmed') {
+                $existing->delete();
+            }
+
+            return false;
+        }
+
         $units = 1;
 
         if (in_array($violationType, ['delay', 'early_departure'], true) && $interval > 0) {
             $units = (int) ceil($billableMinutes / $interval);
-            $units = max(1, $units);
         }
 
         $amount = 0.0;
@@ -349,11 +346,275 @@ class PenaltyService
                 'calculated_amount' => $amount,
                 'net_amount' => $amount,
                 'status' => 'pending',
-                'notes' => ($existing ? $existing->notes : '') . "\n[System] Calculated/Recalculated at " . now(),
+                'notes' => ($existing ? $existing->notes : '')
+                    . "\n[System] Calculated/Recalculated at " . now()
+                    . sprintf(
+                        ' | grace daily=%d, monthly_before=%d, monthly_applied=%d, billable=%d',
+                        $threshold,
+                        $monthlyGraceUsedBefore,
+                        $monthlyGraceApplied,
+                        $billableMinutes
+                    ),
             ]
         );
 
         return true;
+    }
+
+    /**
+     * Resolve the penalty policy that supplies the daily grace threshold and
+     * the interval/deduction configuration for one attendance violation.
+     */
+    private function findPenaltyPolicy(
+        AttendanceDailyLog $log,
+        int $policyId,
+        string $violationType,
+        int $minutes,
+        int $recurrenceCount
+    ): ?AttendancePenaltyPolicy {
+        $policyType = match ($violationType) {
+            'delay' => 'late_arrival',
+            'early_departure' => 'early_departure',
+            'auto_checkout' => 'auto_checkout',
+            default => $violationType,
+        };
+
+        $penaltyPolicy = AttendancePenaltyPolicy::findApplicablePenalty(
+            $policyId,
+            $policyType,
+            $minutes,
+            $recurrenceCount
+        );
+
+        if (! $penaltyPolicy && $policyType !== $violationType) {
+            $penaltyPolicy = AttendancePenaltyPolicy::findApplicablePenalty(
+                $policyId,
+                $violationType,
+                $minutes,
+                $recurrenceCount
+            );
+        }
+
+        if ($penaltyPolicy) {
+            return $penaltyPolicy;
+        }
+
+        return AttendancePenaltyPolicy::query()
+            ->where('saas_company_id', $log->saas_company_id)
+            ->where('policy_id', $policyId)
+            ->where('violation_type', $policyType)
+            ->where('is_active', true)
+            ->where(function ($query) {
+                $query->where('is_enabled', true)->orWhereNull('is_enabled');
+            })
+            ->where('minutes_from', 0)
+            ->where('minutes_to', 0)
+            ->where('recurrence_from', '<=', $recurrenceCount)
+            ->where(function ($query) use ($recurrenceCount) {
+                $query->whereNull('recurrence_to')
+                    ->orWhere('recurrence_to', '>=', $recurrenceCount);
+            })
+            ->first();
+    }
+
+    /**
+     * The Basic Settings screen stores the shared monthly allowance for late
+     * arrival and early departure in late_grace_minutes. A group may override
+     * it through its own attendance grace record.
+     */
+    private function resolveMonthlyGraceMinutes(AttendanceDailyLog $log, ?object $group = null): int
+    {
+        $graceSetting = null;
+
+        if (
+            $group
+            && ($group->grace_source ?? 'use_global') === 'custom'
+            && ! empty($group->grace_setting_id)
+        ) {
+            $graceSetting = AttendanceGraceSetting::query()
+                ->where('saas_company_id', $log->saas_company_id)
+                ->whereKey((int) $group->grace_setting_id)
+                ->first();
+        }
+
+        if (! $graceSetting) {
+            $graceSetting = AttendanceGraceSetting::query()
+                ->where('saas_company_id', $log->saas_company_id)
+                ->orderBy('id')
+                ->first();
+        }
+
+        if (! $graceSetting) {
+            $graceSetting = AttendanceGraceSetting::globalDefault()->first();
+        }
+
+        return max(0, (int) ($graceSetting->late_grace_minutes ?? 0));
+    }
+
+    /**
+     * Rebuild the amount of shared monthly grace already consumed before this
+     * attendance date. Only the portion above each day's own threshold consumes
+     * the monthly allowance. The computation is chronological and idempotent,
+     * so recalculation does not require a separate balance table.
+     */
+    private function calculateMonthlyGraceUsedBefore(
+        AttendanceDailyLog $currentLog,
+        int $policyId,
+        int $monthlyGraceMinutes,
+        ?object $group = null
+    ): int {
+        if ($monthlyGraceMinutes <= 0) {
+            return 0;
+        }
+
+        $currentDate = Carbon::parse($currentLog->attendance_date);
+        $monthStart = $currentDate->copy()->startOfMonth()->toDateString();
+        $dateBeforeCurrent = $currentDate->copy()->subDay()->toDateString();
+
+        if ($dateBeforeCurrent < $monthStart) {
+            return 0;
+        }
+
+        $priorLogs = AttendanceDailyLog::forCompany($currentLog->saas_company_id)
+            ->with('employee')
+            ->where('employee_id', $currentLog->employee_id)
+            ->whereBetween('attendance_date', [$monthStart, $dateBeforeCurrent])
+            ->orderBy('attendance_date')
+            ->orderBy('id')
+            ->get();
+
+        if ($priorLogs->isEmpty()) {
+            return 0;
+        }
+
+        $approvedPermissionDates = \Athka\Attendance\Models\AttendancePermissionRequest::query()
+            ->where('employee_id', $currentLog->employee_id)
+            ->where('status', 'approved')
+            ->whereBetween('permission_date', [$monthStart, $dateBeforeCurrent])
+            ->pluck('permission_date')
+            ->map(fn ($date) => Carbon::parse($date)->toDateString())
+            ->flip();
+
+        $used = 0;
+
+        foreach ($priorLogs as $priorLog) {
+            if ($used >= $monthlyGraceMinutes) {
+                break;
+            }
+
+            $priorDate = Carbon::parse($priorLog->attendance_date)->toDateString();
+
+            if ($approvedPermissionDates->has($priorDate)) {
+                continue;
+            }
+
+            $violationType = $this->resolveMonthlyGraceViolationType($priorLog, $policyId);
+
+            if (! $violationType) {
+                continue;
+            }
+
+            $minutes = $violationType === 'delay'
+                ? $this->getLateMinutes($priorLog)
+                : $this->getEarlyDepartureMinutes($priorLog);
+
+            if ($minutes <= 0) {
+                continue;
+            }
+
+            $recurrenceCount = AttendanceDailyPenalty::query()
+                ->where('saas_company_id', $priorLog->saas_company_id)
+                ->where('employee_id', $priorLog->employee_id)
+                ->where('violation_type', $violationType)
+                ->where('attendance_date', '>=', $monthStart)
+                ->where('attendance_date', '<', $priorDate)
+                ->count() + 1;
+
+            $priorPolicy = $this->findPenaltyPolicy(
+                $priorLog,
+                $policyId,
+                $violationType,
+                $minutes,
+                $recurrenceCount
+            );
+
+            if (! $priorPolicy) {
+                continue;
+            }
+
+            $action = strtolower((string) $priorPolicy->penalty_action);
+
+            if (! in_array($action, ['deduction', 'deduct'], true)) {
+                continue;
+            }
+
+            $dailyThreshold = max(
+                0,
+                (int) ($priorPolicy->threshold_minutes ?? 0)
+            );
+            $consumableMinutes = max(0, $minutes - $dailyThreshold);
+
+            if ($consumableMinutes === 0) {
+                continue;
+            }
+
+            $used += min(
+                $monthlyGraceMinutes - $used,
+                $consumableMinutes
+            );
+        }
+
+        return min($monthlyGraceMinutes, $used);
+    }
+
+    /**
+     * Decide which monthly-grace category a previous log consumes. Late cases
+     * converted to absence are intentionally excluded from monthly grace.
+     */
+    private function resolveMonthlyGraceViolationType(
+        AttendanceDailyLog $log,
+        int $policyId
+    ): ?string {
+        $earlyMinutes = $this->getEarlyDepartureMinutes($log);
+        $lateMinutes = $this->getLateMinutes($log);
+
+        if (
+            $log->attendance_status === 'early_departure'
+            || (
+                ! in_array($log->attendance_status, ['absent', 'auto_checkout'], true)
+                && $earlyMinutes > 0
+            )
+        ) {
+            return $earlyMinutes > 0 ? 'early_departure' : null;
+        }
+
+        if (
+            $log->attendance_status === 'late'
+            || (
+                ! in_array($log->attendance_status, ['absent', 'auto_checkout'], true)
+                && $lateMinutes > 0
+            )
+        ) {
+            if ($lateMinutes <= 0) {
+                return null;
+            }
+
+            $convertedToAbsence = UnexcusedAbsencePolicy::query()
+                ->where('saas_company_id', $log->saas_company_id)
+                ->where('policy_id', $policyId)
+                ->where('absence_reason_type', 'late_early')
+                ->where('is_active', true)
+                ->where(function ($query) {
+                    $query->where('is_enabled', true)->orWhereNull('is_enabled');
+                })
+                ->where('late_minutes', '>', 0)
+                ->where('late_minutes', '<=', $lateMinutes)
+                ->exists();
+
+            return $convertedToAbsence ? null : 'delay';
+        }
+
+        return null;
     }
 
     private function processAbsenceViolation(AttendanceDailyLog $log, int $recurrenceCount, ?AttendanceDailyPenalty $existing): bool
@@ -475,19 +736,19 @@ class PenaltyService
 
     private function resolvePenaltyStatus(AttendanceDailyLog $log): string
     {
-        if (in_array($log->attendance_status, ['late', 'early_departure', 'absent', 'auto_checkout'], true)) {
+        if (in_array($log->attendance_status, ['absent', 'auto_checkout'], true)) {
             return (string) $log->attendance_status;
         }
 
-        $grace = \Athka\SystemSettings\Models\AttendanceGraceSetting::where('saas_company_id', $log->saas_company_id)->first();
-        $lateGrace = (int) ($grace->late_grace_minutes ?? 0);
-        $earlyGrace = (int) ($grace->early_leave_grace_minutes ?? 0);
-
-        if ($this->getEarlyDepartureMinutes($log) > $earlyGrace) {
+        // The attendance status is descriptive. Penalty eligibility must start
+        // from the raw deviation, then apply daily and monthly grace inside the
+        // penalty calculation. Otherwise a fixed status-level grace can hide a
+        // violation after the employee has already consumed the monthly pool.
+        if ($this->getEarlyDepartureMinutes($log) > 0) {
             return 'early_departure';
         }
 
-        if ($this->getLateMinutes($log) > $lateGrace) {
+        if ($this->getLateMinutes($log) > 0) {
             return 'late';
         }
 

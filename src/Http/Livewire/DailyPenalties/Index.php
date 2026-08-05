@@ -107,9 +107,7 @@ class Index extends Component
 
     private function isOutsideEditableWindow($date): bool
     {
-        return Carbon::parse($date)
-            ->startOfDay()
-            ->lt(now()->subDays(7)->startOfDay());
+        return false;
     }
 
     private function clampToLatestCompletedDate($date): string
@@ -127,13 +125,68 @@ class Index extends Component
             : $candidate->toDateString();
     }
 
+    private function initializeDateFiltersFromRequest(): void
+    {
+        $latestCompletedDate = $this->latestCompletedDate();
+
+        $requestedMode = request()->query('calculation_mode');
+        $requestedMode = is_string($requestedMode)
+            ? trim($requestedMode)
+            : '';
+
+        $this->calculation_mode = in_array(
+            $requestedMode,
+            ['single_day', 'range'],
+            true
+        )
+            ? $requestedMode
+            : ($this->calculation_mode ?: 'single_day');
+
+        $requestedFrom = request()->query('date_from');
+        $requestedTo = request()->query('date_to');
+
+        $requestedFrom = is_string($requestedFrom)
+            ? trim($requestedFrom)
+            : '';
+        $requestedTo = is_string($requestedTo)
+            ? trim($requestedTo)
+            : '';
+
+        if ($this->calculation_mode === 'single_day') {
+            $requestedDate = $requestedFrom
+                ?: ($requestedTo ?: $latestCompletedDate);
+
+            $date = $this->clampToLatestCompletedDate($requestedDate);
+
+            $this->date_from = $date;
+            $this->date_to = $date;
+
+            return;
+        }
+
+        $defaultFrom = Carbon::parse($latestCompletedDate)
+            ->startOfMonth()
+            ->toDateString();
+
+        $dateFrom = $this->clampToLatestCompletedDate(
+            $requestedFrom ?: $defaultFrom
+        );
+        $dateTo = $this->clampToLatestCompletedDate(
+            $requestedTo ?: $latestCompletedDate
+        );
+
+        if (Carbon::parse($dateFrom)->gt(Carbon::parse($dateTo))) {
+            [$dateFrom, $dateTo] = [$dateTo, $dateFrom];
+        }
+
+        $this->date_from = $dateFrom;
+        $this->date_to = $dateTo;
+    }
+
     public function mount()
     {
         $this->requireAttendanceAny(['attendance.penalties.view', 'attendance.penalties.view-subordinates', 'attendance.penalties.manage', 'attendance.penalties.waive']);
-        $this->calculation_mode = $this->calculation_mode ?: 'single_day';
-        $latestCompletedDate = $this->latestCompletedDate();
-        $this->date_from = $latestCompletedDate;
-        $this->date_to = $latestCompletedDate;
+        $this->initializeDateFiltersFromRequest();
 
         $userBranchId = (int) (auth()->user()->branch_id ?? 0);
         $allowed = $this->allowedBranchIds();
@@ -802,12 +855,9 @@ class Index extends Component
             return;
         }
 
-        $sevenDaysAgo = now()->subDays(7)->toDateString();
-
         $query = $this->buildPenaltiesQuery(false)
             ->whereIn('id', array_map('intval', $this->selectedPenalties))
-            ->where('status', '!=', 'confirmed')
-            ->whereDate('attendance_date', '>=', $sevenDaysAgo);
+            ->where('status', '!=', 'confirmed');
 
         $deleted = (clone $query)->count();
         $query->delete();
