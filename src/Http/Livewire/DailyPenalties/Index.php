@@ -177,10 +177,6 @@ class Index extends Component
             $requestedTo ?: $latestCompletedDate
         );
 
-        if (Carbon::parse($dateFrom)->gt(Carbon::parse($dateTo))) {
-            [$dateFrom, $dateTo] = [$dateTo, $dateFrom];
-        }
-
         $this->date_from = $dateFrom;
         $this->date_to = $dateTo;
     }
@@ -190,6 +186,11 @@ class Index extends Component
         $this->requireAttendanceAny(['attendance.penalties.view', 'attendance.penalties.view-subordinates', 'attendance.penalties.manage', 'attendance.penalties.waive']);
         $this->initializeDateFiltersFromRequest();
 
+
+
+        if ($this->hasInvalidDateRange()) {
+            $this->addDateRangeError();
+        }
         $userBranchId = (int) (auth()->user()->branch_id ?? 0);
         $allowed = $this->allowedBranchIds();
 
@@ -256,14 +257,12 @@ class Index extends Component
     public function updatedDateFrom()
     {
         $this->date_from = $this->clampToLatestCompletedDate($this->date_from);
+        $this->resetValidation('date_to');
 
         if ($this->calculation_mode === 'single_day') {
             $this->date_to = $this->date_from;
-        } elseif (
-            filled($this->date_to)
-            && Carbon::parse($this->date_from)->gt(Carbon::parse($this->date_to))
-        ) {
-            $this->date_to = $this->date_from;
+        } elseif ($this->hasInvalidDateRange()) {
+            $this->addDateRangeError();
         }
 
         $this->refreshData();
@@ -272,14 +271,12 @@ class Index extends Component
     public function updatedDateTo()
     {
         $this->date_to = $this->clampToLatestCompletedDate($this->date_to);
+        $this->resetValidation('date_to');
 
         if ($this->calculation_mode === 'single_day') {
             $this->date_from = $this->date_to;
-        } elseif (
-            filled($this->date_from)
-            && Carbon::parse($this->date_to)->lt(Carbon::parse($this->date_from))
-        ) {
-            $this->date_from = $this->date_to;
+        } elseif ($this->hasInvalidDateRange()) {
+            $this->addDateRangeError();
         }
 
         $this->refreshData();
@@ -357,6 +354,34 @@ class Index extends Component
         $this->refreshData();
     }
 
+    private function hasInvalidDateRange(
+        ?string $dateFrom = null,
+        ?string $dateTo = null
+    ): bool {
+        if ($this->calculation_mode === 'single_day') {
+            return false;
+        }
+
+        $dateFrom = $dateFrom ?? $this->date_from;
+        $dateTo = $dateTo ?? $this->date_to;
+
+        return filled($dateFrom)
+            && filled($dateTo)
+            && Carbon::parse($dateFrom)->gt(Carbon::parse($dateTo));
+    }
+
+    private function addDateRangeError(): void
+    {
+        $this->addError('date_to', $this->dateRangeValidationMessage());
+    }
+
+    private function dateRangeValidationMessage(): string
+    {
+        return substr(strtolower(app()->getLocale()), 0, 2) === 'ar'
+            ? "\u{0644}\u{0627} \u{064A}\u{0645}\u{0643}\u{0646} \u{0623}\u{0646} \u{064A}\u{0643}\u{0648}\u{0646} \u{062A}\u{0627}\u{0631}\u{064A}\u{062E} \u{0627}\u{0644}\u{0646}\u{0647}\u{0627}\u{064A}\u{0629} \u{0642}\u{0628}\u{0644} \u{062A}\u{0627}\u{0631}\u{064A}\u{062E} \u{0627}\u{0644}\u{0628}\u{062F}\u{0627}\u{064A}\u{0629}."
+            : tr('End date cannot be before start date.');
+    }
+
     private function getEffectiveDateRange(): array
     {
         $latestCompletedDate = $this->latestCompletedDate();
@@ -372,17 +397,10 @@ class Index extends Component
         $dateFrom = filled($this->date_from)
             ? $this->clampToLatestCompletedDate($this->date_from)
             : '';
+
         $dateTo = filled($this->date_to)
             ? $this->clampToLatestCompletedDate($this->date_to)
             : '';
-
-        if (
-            $dateFrom
-            && $dateTo
-            && Carbon::parse($dateFrom)->gt(Carbon::parse($dateTo))
-        ) {
-            [$dateFrom, $dateTo] = [$dateTo, $dateFrom];
-        }
 
         return [$dateFrom, $dateTo];
     }
@@ -391,7 +409,11 @@ class Index extends Component
     {
         [$dateFrom, $dateTo] = $this->getEffectiveDateRange();
 
-        if ($dateFrom) {
+
+        if ($this->hasInvalidDateRange($dateFrom, $dateTo)) {
+            return $query->whereRaw('1 = 0');
+        }
+if ($dateFrom) {
             $query->where('attendance_date', '>=', $dateFrom);
         }
 
@@ -426,7 +448,12 @@ class Index extends Component
         $companyId = (int) auth()->user()->saas_company_id;
         [$dateFrom, $dateTo] = $this->getEffectiveDateRange();
 
-        if (! $dateFrom || ! $dateTo) {
+
+        if ($this->hasInvalidDateRange($dateFrom, $dateTo)) {
+            $this->addDateRangeError();
+            return;
+        }
+if (! $dateFrom || ! $dateTo) {
             $this->dispatch('toast', [
                 'type' => 'error',
                 'message' => tr('Please select a valid date before running calculation.')

@@ -162,7 +162,8 @@
                         <x-ui.company-date-picker
                             model="date_to"
                             :label="tr('To Date')"
-                            :disabled="!$canFilterPenalties"
+                                                        :min-date="$date_from"
+:disabled="!$canFilterPenalties"
                         />
                     </div>
                 @endif
