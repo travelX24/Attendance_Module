@@ -1837,7 +1837,7 @@
     @if($createLeaveOpen)
 
     {{-- Create Leave Modal --}}
-    <x-ui.modal wire:model="createLeaveOpen" max-width="lg">
+    <x-ui.modal wire:model="createLeaveOpen" max-width="3xl" content-overflow="visible">
         <x-slot name="title">
             <div class="flex items-center gap-3">
                 <div class="p-2 bg-[color:var(--accent-orange)]/10 text-[color:var(--accent-orange)] rounded-lg">
@@ -1897,13 +1897,11 @@
                         <div>
                             <div class="text-xs text-gray-500 mb-1">{{ tr('Start Date') }}</div>
                             <x-ui.company-date-picker model="start_date" :disabled="!$canManageLeaveRequests" />
-                            @error('start_date') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                         </div>
 
                         <div>
                             <div class="text-xs text-gray-500 mb-1">{{ tr('End Date') }}</div>
-                            <x-ui.company-date-picker model="end_date" :disabled="!$canManageLeaveRequests" />
-                            @error('end_date') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
+                            <x-ui.company-date-picker model="end_date" :min-date="$start_date" :disabled="!$canManageLeaveRequests" />
                         </div>
                     </div>
 
@@ -1912,7 +1910,6 @@
                         <div>
                             <div class="text-xs text-gray-500 mb-1">{{ tr('Date') }}</div>
                             <x-ui.company-date-picker model="start_date" />
-                            @error('start_date') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                         </div>
 
                         <div>
@@ -2009,7 +2006,6 @@
                         <div>
                             <div class="text-xs text-gray-500 mb-1">{{ tr('Date') }}</div>
                             <x-ui.company-date-picker model="start_date" />
-                            @error('start_date') <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div> @enderror
                         </div>
                         @php
                         // Passed from the server after columns are known

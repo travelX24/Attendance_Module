@@ -237,6 +237,25 @@ trait WithLeaveRequests
 
     public function updatedStartDate($value): void
     {
+        $this->resetValidation(['end_date']);
+
+        if (
+            $this->create_leave_duration_unit === 'full_day'
+            && trim((string) $value) !== ''
+        ) {
+            try {
+                $selectedStartDate = Carbon::parse((string) $value)->startOfDay();
+                $currentEndDate = trim((string) $this->end_date);
+
+                if (
+                    $currentEndDate !== ''
+                    && Carbon::parse($currentEndDate)->startOfDay()->lt($selectedStartDate)
+                ) {
+                    $this->end_date = $selectedStartDate->toDateString();
+                }
+            } catch (\Throwable $e) {
+            }
+        }
         $this->create_leave_work_period_options_cache = [];
         $this->syncCreateLeaveDurationAvailability();
 
@@ -246,6 +265,12 @@ trait WithLeaveRequests
         }
 
         $this->leave_work_schedule_period_id = 0;
+        $this->syncIndividualLeaveEndDateWithStart();
+    }
+
+    public function updatedEndDate($value): void
+    {
+        $this->validateIndividualLeaveDateRangeImmediately();
     }
 
     public function updatedCreateLeaveDurationUnit($value): void
@@ -313,6 +338,82 @@ trait WithLeaveRequests
 
     public function closeCreateLeave(): void { $this->createLeaveOpen = false; }
 
+    protected function individualLeaveDateRangeMessage(): string
+    {
+        return substr(strtolower(app()->getLocale()), 0, 2) === 'ar'
+            ? "\u{0644}\u{0627} \u{064A}\u{0645}\u{0643}\u{0646} \u{0623}\u{0646} \u{064A}\u{0643}\u{0648}\u{0646} \u{062A}\u{0627}\u{0631}\u{064A}\u{062E} \u{0627}\u{0644}\u{0646}\u{0647}\u{0627}\u{064A}\u{0629} \u{0642}\u{0628}\u{0644} \u{062A}\u{0627}\u{0631}\u{064A}\u{062E} \u{0627}\u{0644}\u{0628}\u{062F}\u{0627}\u{064A}\u{0629}."
+            : tr('End date cannot be before start date.');
+    }
+
+    protected function syncIndividualLeaveEndDateWithStart(): void
+    {
+        $this->resetValidation(['end_date']);
+
+        if ($this->create_leave_duration_unit !== 'full_day') {
+            return;
+        }
+
+        $startDate = trim((string) $this->start_date);
+
+        if ($startDate === '') {
+            return;
+        }
+
+        try {
+            $start = Carbon::parse($startDate)->startOfDay();
+        } catch (\Throwable $e) {
+            return;
+        }
+
+        $endDate = trim((string) $this->end_date);
+
+        if ($endDate === '') {
+            $this->end_date = $start->toDateString();
+            return;
+        }
+
+        try {
+            $end = Carbon::parse($endDate)->startOfDay();
+        } catch (\Throwable $e) {
+            $this->end_date = $start->toDateString();
+            return;
+        }
+
+        if ($end->lt($start)) {
+            $this->end_date = $start->toDateString();
+        }
+    }
+
+    protected function validateIndividualLeaveDateRangeImmediately(): void
+    {
+        $this->resetValidation(['end_date']);
+
+        if ($this->create_leave_duration_unit !== 'full_day') {
+            return;
+        }
+
+        $startDate = trim((string) $this->start_date);
+        $endDate = trim((string) $this->end_date);
+
+        if ($startDate === '' || $endDate === '') {
+            return;
+        }
+
+        try {
+            $start = Carbon::parse($startDate)->startOfDay();
+            $end = Carbon::parse($endDate)->startOfDay();
+        } catch (\Throwable $e) {
+            return;
+        }
+
+        if ($end->lt($start)) {
+            $this->addError(
+                'end_date',
+                $this->individualLeaveDateRangeMessage()
+            );
+        }
+    }
+
     // =========================================================
     // ÃƒÂ¢Ã…â€œÃ¢â‚¬Â¦ Save Leave (policy-driven)
     // =========================================================
@@ -341,9 +442,13 @@ trait WithLeaveRequests
 
         // 3) Build + validate rules based on policy settings
         $rules = $this->buildCreateLeaveRulesFromPolicy($policy);
+
+        $messages = $this->leaveRequestsValidationMessages();
+        $messages['end_date.after_or_equal'] = $this->individualLeaveDateRangeMessage();
+
         $data = $this->validate(
             $rules,
-            $this->leaveRequestsValidationMessages(),
+            $messages,
             $this->leaveRequestsValidationAttributes()
         );
 
@@ -352,6 +457,14 @@ trait WithLeaveRequests
         $end = $this->create_leave_duration_unit === 'full_day'
             ? Carbon::parse($data['end_date'])->startOfDay()
             : $start->copy();
+
+        if ($end->lt($start)) {
+            $this->addError(
+                'end_date',
+                $this->individualLeaveDateRangeMessage()
+            );
+            return;
+        }
 
         // 5) Notice rules from settings
         if (!$this->validatePolicyNoticeWindow($policy, $start)) {
