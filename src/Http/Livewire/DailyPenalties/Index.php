@@ -107,7 +107,9 @@ class Index extends Component
 
     private function isOutsideEditableWindow($date): bool
     {
-        return false;
+        return Carbon::parse($date)
+            ->startOfDay()
+            ->lt(now()->subDays(7)->startOfDay());
     }
 
     private function clampToLatestCompletedDate($date): string
@@ -855,9 +857,12 @@ class Index extends Component
             return;
         }
 
+        $sevenDaysAgo = now()->subDays(7)->toDateString();
+
         $query = $this->buildPenaltiesQuery(false)
             ->whereIn('id', array_map('intval', $this->selectedPenalties))
-            ->where('status', '!=', 'confirmed');
+            ->where('status', '!=', 'confirmed')
+            ->whereDate('attendance_date', '>=', $sevenDaysAgo);
 
         $deleted = (clone $query)->count();
         $query->delete();
