@@ -40,7 +40,7 @@ class Index extends Component
     public $date_to = '';
     public $violation_type_filter = 'all'; // all/delay/early_departure/absent/auto_checkout
     public $status_filter = 'all'; // all/pending/confirmed/waived
-    public $status_emp_filter = 'ACTIVE'; // all/ACTIVE/SUSPENDED/ENDED/TERMINATED/RESIGNED/RETIRED
+    public $status_emp_filter = 'all'; // all/ACTIVE/SUSPENDED/ENDED/TERMINATED/RESIGNED/RETIRED
     public $department_id = 'all';
     public $job_title_id = 'all';
     public $branch_id = 'all';
@@ -77,7 +77,7 @@ class Index extends Component
         'date_to' => ['except' => ''],
         'violation_type_filter' => ['except' => 'all'],
         'status_filter' => ['except' => 'all'],
-        'status_emp_filter' => ['except' => 'ACTIVE'],
+        'status_emp_filter' => ['except' => 'all'],
         'department_id' => ['except' => 'all'],
         'job_title_id' => ['except' => 'all'],
         'branch_id' => ['except' => 'all'],
@@ -194,11 +194,9 @@ class Index extends Component
         $userBranchId = (int) (auth()->user()->branch_id ?? 0);
         $allowed = $this->allowedBranchIds();
 
-        if (!empty($allowed)) {
-            $this->branch_id = in_array($userBranchId, $allowed, true) ? $userBranchId : 'all';
-        } else {
-            $this->branch_id = $userBranchId ?: 'all';
-        }
+        $this->branch_id = !empty($allowed) && in_array($userBranchId, $allowed, true)
+            ? $userBranchId
+            : 'all';
 
         $this->loadStats();
     }
@@ -219,18 +217,16 @@ class Index extends Component
         $this->date_to = $latestCompletedDate;
         $this->violation_type_filter = 'all';
         $this->status_filter = 'all';
-        $this->status_emp_filter = 'ACTIVE';
+        $this->status_emp_filter = 'all';
         $this->department_id = 'all';
         $this->job_title_id = 'all';
 
         $userBranchId = (int) (auth()->user()->branch_id ?? 0);
         $allowed = $this->allowedBranchIds();
 
-        if (!empty($allowed)) {
-            $this->branch_id = in_array($userBranchId, $allowed, true) ? $userBranchId : 'all';
-        } else {
-            $this->branch_id = $userBranchId ?: 'all';
-        }
+        $this->branch_id = !empty($allowed) && in_array($userBranchId, $allowed, true)
+            ? $userBranchId
+            : 'all';
 
         $this->refreshData();
     }
@@ -515,12 +511,25 @@ if (! $dateFrom || ! $dateTo) {
                 ? tr('Single day calculation completed for') . ' ' . $dateFrom
                 : tr('Range calculation completed from') . ' ' . $dateFrom . ' ' . tr('to') . ' ' . $dateTo;
 
+            $createdCount = (int) ($res['created'] ?? 0);
+            $skippedReasons = $this->formatSkippedReasons($res['skipped'] ?? []);
+            $toastType = $createdCount > 0 ? 'success' : 'warning';
+            $toastMessage = $message
+                . ' | ' . tr('Processed logs:') . ' ' . ($res['processed'] ?? 0)
+                . ' | ' . tr('Penalties created:') . ' ' . $createdCount
+                . ' | ' . tr('Employees:') . ' ' . count($employeeIds);
+
+            if ($createdCount === 0) {
+                $toastMessage .= ' | ' . tr('No penalties were created for the selected scope.');
+            }
+
+            if ($skippedReasons !== '') {
+                $toastMessage .= ' | ' . tr('Skipped:') . ' ' . $skippedReasons;
+            }
+
             $this->dispatch('toast', [
-                'type' => 'success',
-                'message' => $message
-                    . ' | ' . tr('Processed logs:') . ' ' . ($res['processed'] ?? 0)
-                    . ' | ' . tr('Penalties created:') . ' ' . ($res['created'] ?? 0)
-                    . ' | ' . tr('Employees:') . ' ' . count($employeeIds),
+                'type' => $toastType,
+                'message' => $toastMessage,
             ]);
         } catch (\Throwable $exception) {
             report($exception);
@@ -571,6 +580,74 @@ if (! $dateFrom || ! $dateTo) {
         return $query->pluck('id')->map(fn ($id) => (int) $id)->all();
     }
 
+    public function formatExemptionReason(?string $reason): string
+    {
+        $reason = trim((string) $reason);
+
+        if ($reason === '') {
+            return '-';
+        }
+
+        [$rawKey, $details] = array_pad(explode(' - ', $reason, 2), 2, '');
+        $key = strtolower(str_replace(' ', '_', trim($rawKey)));
+        $label = $this->exemptionReasonLabel($key, trim($rawKey));
+
+        return trim((string) $details) !== ''
+            ? $label . ' - ' . trim((string) $details)
+            : $label;
+    }
+
+    private function exemptionReasonLabel(string $key, string $fallback = ''): string
+    {
+        $isArabic = str_starts_with((string) app()->getLocale(), 'ar');
+        $labels = [
+            'business_mission' => ['ar' => "\u{0645}\u{0647}\u{0645}\u{0629} \u{0639}\u{0645}\u{0644}", 'en' => 'Business mission'],
+            'emergency_case' => ['ar' => "\u{062D}\u{0627}\u{0644}\u{0629} \u{0637}\u{0627}\u{0631}\u{0626}\u{0629}", 'en' => 'Emergency case'],
+            'technical_issue' => ['ar' => "\u{0645}\u{0634}\u{0643}\u{0644}\u{0629} \u{0641}\u{0646}\u{064A}\u{0629} / \u{062C}\u{0647}\u{0627}\u{0632}", 'en' => 'Technical / device issue'],
+            'late_permission' => ['ar' => "\u{0625}\u{0630}\u{0646} \u{062A}\u{0623}\u{062E}\u{064A}\u{0631} / \u{0645}\u{063A}\u{0627}\u{062F}\u{0631}\u{0629}", 'en' => 'Late permission / leave'],
+            'medical_emergency' => ['ar' => "\u{062D}\u{0627}\u{0644}\u{0629} \u{0637}\u{0628}\u{064A}\u{0629} \u{0637}\u{0627}\u{0631}\u{0626}\u{0629}", 'en' => 'Medical emergency'],
+            'other' => ['ar' => "\u{0623}\u{062E}\u{0631}\u{0649}", 'en' => 'Other'],
+        ];
+
+        if (isset($labels[$key])) {
+            return $labels[$key][$isArabic ? 'ar' : 'en'];
+        }
+
+        return $fallback !== ''
+            ? tr(ucwords(str_replace('_', ' ', $fallback)))
+            : '-';
+    }
+    private function formatSkippedReasons(array $skipped): string
+    {
+        if (empty($skipped)) {
+            return '';
+        }
+
+        arsort($skipped);
+
+        $labels = [
+            'no_matching_absence_policy' => tr('No matching absence penalty policy'),
+            'no_matching_penalty_policy' => tr('No matching penalty policy'),
+            'covered_by_grace' => tr('Covered by grace allowance'),
+            'approved_permission' => tr('Approved permission exists'),
+            'no_effective_schedule' => tr('No effective work schedule'),
+            'no_active_employees' => tr('No active employees in scope'),
+            'employee_not_found_or_inactive' => tr('Employee is inactive or unavailable'),
+            'no_attendance_policy' => tr('No attendance policy'),
+            'no_billable_violation' => tr('No billable violation'),
+            'already_confirmed' => tr('Already confirmed'),
+            'zero_violation_minutes' => tr('Zero violation minutes'),
+            'policy_action_not_deduction' => tr('Policy action is not deduction'),
+            'absence_action_not_deduction' => tr('Absence action is not deduction'),
+            'zero_penalty_amount' => tr('Zero penalty amount'),
+            'zero_absence_amount' => tr('Zero absence amount'),
+        ];
+
+        return collect($skipped)
+            ->take(3)
+            ->map(fn ($count, $reason) => ($labels[$reason] ?? $reason) . ' (' . $count . ')')
+            ->implode(', ');
+    }
     public function openExemptionModal($id)
     {
         $this->requireAttendanceAny('attendance.penalties.waive');
@@ -685,6 +762,43 @@ if (! $dateFrom || ! $dateTo) {
             )
         );
 
+        $localizedReason = $this->formatExemptionReason($reason);
+
+        $notes = trim((string) $penalty->notes);
+
+        if (
+            (string) $penalty->exemption_status === 'approved'
+            || (float) $penalty->exemption_amount > 0
+        ) {
+            $notes = trim(
+                $notes
+                . "\n[Audit] Previous exemption archived before replacement at "
+                . now()
+                . sprintf(
+                    ' | type=%s, amount=%.2f, net=%.2f, reason=%s, exempted_at=%s',
+                    (string) ($penalty->exemption_type ?? '-'),
+                    (float) $penalty->exemption_amount,
+                    (float) $penalty->net_amount,
+                    $this->formatExemptionReason($penalty->exemption_reason),
+                    $penalty->exempted_at ? (string) $penalty->exempted_at : '-'
+                )
+            );
+        }
+
+        $notes = trim(
+            $notes
+            . "\n[Audit] Exemption applied by "
+            . auth()->user()->name
+            . ' at '
+            . now()
+            . sprintf(
+                ' | type=%s, amount=%.2f, net=%.2f, reason=%s',
+                (string) $this->exemptionForm['type'],
+                (float) $exemptAmount,
+                max(0, $maximumAmount - $exemptAmount),
+                $localizedReason
+            )
+        );
         $updateData = [
             'exemption_type' => $this->exemptionForm['type'],
             'exemption_amount' => $exemptAmount,
@@ -696,13 +810,7 @@ if (! $dateFrom || ! $dateTo) {
             'status' => $this->exemptionForm['type'] === 'full'
                 ? 'waived'
                 : 'pending',
-            'notes' => trim(
-                (string) $penalty->notes
-                . "\n[Audit] Exemption applied by "
-                . auth()->user()->name
-                . ' at '
-                . now()
-            ),
+            'notes' => $notes,
         ];
 
         if ($this->exemptionForm['attachment']) {
@@ -732,6 +840,73 @@ if (! $dateFrom || ! $dateTo) {
         $this->resetExemptionForm();
     }
 
+    public function cancelExemption($id)
+    {
+        $this->requireAttendanceAny('attendance.penalties.waive');
+        $penalty = $this->findPenaltyOrFail((int) $id);
+
+        if ($this->isOutsideEditableWindow($penalty->attendance_date)) {
+            $this->dispatch('toast', [
+                'type' => 'error',
+                'message' => tr('Cannot modify penalties older than 7 days.')
+            ]);
+
+            return;
+        }
+
+        if ($penalty->status === 'confirmed') {
+            $this->dispatch('toast', [
+                'type' => 'error',
+                'message' => tr('Confirmed penalties cannot be modified.')
+            ]);
+
+            return;
+        }
+
+        if ((float) $penalty->exemption_amount <= 0 && (string) $penalty->exemption_status !== 'approved') {
+            $this->dispatch('toast', [
+                'type' => 'warning',
+                'message' => tr('No active exemption was found for this penalty.')
+            ]);
+
+            return;
+        }
+
+        $notes = trim(
+            (string) $penalty->notes
+            . "\n[Audit] Exemption cancelled by "
+            . auth()->user()->name
+            . ' at '
+            . now()
+            . sprintf(
+                ' | previous_type=%s, previous_amount=%.2f, previous_net=%.2f, previous_reason=%s',
+                (string) ($penalty->exemption_type ?? '-'),
+                (float) $penalty->exemption_amount,
+                (float) $penalty->net_amount,
+                $this->formatExemptionReason($penalty->exemption_reason)
+            )
+        );
+
+        $penalty->update([
+            'exemption_type' => 'none',
+            'exemption_amount' => 0,
+            'net_amount' => (float) $penalty->calculated_amount,
+            'exemption_status' => 'none',
+            'exemption_reason' => null,
+            'exemption_attachment' => null,
+            'exempted_by' => null,
+            'exempted_at' => null,
+            'status' => 'pending',
+            'notes' => $notes,
+        ]);
+
+        $this->refreshData();
+
+        $this->dispatch('toast', [
+            'type' => 'info',
+            'message' => tr('Exemption cancelled.')
+        ]);
+    }
     public function openConfirmModal($id)
     {
         $this->requireAttendanceAny('attendance.penalties.manage');

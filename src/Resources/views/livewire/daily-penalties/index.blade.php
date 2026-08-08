@@ -495,7 +495,7 @@
                             @if($penalty->exemption_amount > 0)
                                 <div class="flex flex-col">
                                     <span class="text-sm font-semibold text-[color:var(--warning)] whitespace-nowrap">-{{ number_format($penalty->exemption_amount, 2) }}</span>
-                                    <span class="text-[10px] text-gray-400 whitespace-nowrap">{{ $penalty->exemption_reason }}</span>
+                                    <span class="text-[10px] text-gray-400 whitespace-nowrap">{{ $this->formatExemptionReason($penalty->exemption_reason) }}</span>
                                 </div>
                             @else
                                 <span class="text-xs text-gray-400">-</span>
@@ -520,6 +520,12 @@
                                             <i class="fas fa-gift me-2 text-[color:var(--warning)]"></i>
                                             <span>{{ tr('Exempt/Waive') }}</span>
                                         </x-ui.dropdown-item>
+                                        @if((float) $penalty->exemption_amount > 0 || (string) $penalty->exemption_status === 'approved')
+                                            <x-ui.dropdown-item wire:click="cancelExemption({{ $penalty->id }})" :disabled="$penalty->status === 'confirmed' || $outsideEditableWindow">
+                                                <i class="fas fa-undo me-2 text-[color:var(--error)]"></i>
+                                                <span>{{ tr('Cancel Exemption') }}</span>
+                                            </x-ui.dropdown-item>
+                                        @endif
                                     @endif
                                     @if($canManagePenalties)
                                         <x-ui.dropdown-item wire:click="openConfirmModal({{ $penalty->id }})" :disabled="$penalty->status !== 'pending'">
@@ -643,27 +649,31 @@
         </x-slot>
 
         <x-slot name="footer">
-            <x-ui.secondary-button
-                wire:click="closeExemptionModal"
-                wire:loading.attr="disabled"
-                wire:target="saveExemption"
-            >
-                {{ tr('Cancel') }}
-            </x-ui.secondary-button>
-            @if($canWaivePenalties)
-                <x-ui.primary-button
-                    wire:click="saveExemption"
+            <div class="flex w-full items-center justify-end gap-3">
+                <x-ui.secondary-button
+                    wire:click="closeExemptionModal"
                     wire:loading.attr="disabled"
-                    wire:target="saveExemption,exemptionForm.attachment"
-                    class="disabled:opacity-60 disabled:cursor-not-allowed"
+                    wire:target="saveExemption"
+                    class="min-w-[120px]"
                 >
-                    <span wire:loading.remove wire:target="saveExemption">{{ tr('Apply Waiver') }}</span>
-                    <span wire:loading wire:target="saveExemption" class="inline-flex items-center gap-2">
-                        <i class="fas fa-circle-notch fa-spin"></i>
-                        {{ tr('Saving...') }}
-                    </span>
-                </x-ui.primary-button>
-            @endif
+                    {{ tr('Cancel') }}
+                </x-ui.secondary-button>
+                @if($canWaivePenalties)
+                    <x-ui.primary-button
+                        :full-width="false"
+                        wire:click="saveExemption"
+                        wire:loading.attr="disabled"
+                        wire:target="saveExemption,exemptionForm.attachment"
+                        class="min-w-[190px] disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                        <span wire:loading.remove wire:target="saveExemption">{{ tr('Apply Waiver') }}</span>
+                        <span wire:loading wire:target="saveExemption" class="inline-flex items-center gap-2">
+                            <i class="fas fa-circle-notch fa-spin"></i>
+                            {{ tr('Saving...') }}
+                        </span>
+                    </x-ui.primary-button>
+                @endif
+            </div>
         </x-slot>
     </x-ui.modal>
 

@@ -15,10 +15,11 @@ use Carbon\Carbon;
 
 class PenaltyService
 {
+    private array $skipReasons = [];
     /**
      * Run penalty calculation for one specific day.
      *
-     * @return array{processed:int,created:int}
+     * @return array{processed:int,created:int,skipped?:array<string,int>}
      */
     public function calculateForDate($date, $companyId, array $employeeIds = []): array
     {
@@ -28,10 +29,12 @@ class PenaltyService
     /**
      * Run penalty calculation for a specific date range.
      *
-     * @return array{processed:int,created:int}
+     * @return array{processed:int,created:int,skipped?:array<string,int>}
      */
     public function calculateForRange($dateFrom, $dateTo, $companyId, array $employeeIds = []): array
     {
+        $this->skipReasons = [];
+
         DB::disableQueryLog();
 
         if (function_exists('set_time_limit')) {
@@ -48,7 +51,7 @@ class PenaltyService
         $this->prepareAbsentLogs($dateFrom, $dateTo, $companyId, $employeeIds);
 
         $logs = AttendanceDailyLog::forCompany($companyId)
-            ->with('employee')
+            ->with(['employee' => fn ($q) => $q->withoutGlobalScope('active_only')])
             ->whereBetween('attendance_date', [$dateFrom, $dateTo])
             ->whereIn('attendance_status', ['present', 'late', 'early_departure', 'absent', 'auto_checkout'])
             ->when(!empty($employeeIds), fn ($q) => $q->whereIn('employee_id', $employeeIds))
@@ -65,7 +68,11 @@ class PenaltyService
             }
         }
 
-        return ['processed' => $processed, 'created' => $createdOrUpdated];
+        return [
+            'processed' => $processed,
+            'created' => $createdOrUpdated,
+            'skipped' => $this->skipReasons,
+        ];
     }
 
     /**
@@ -160,60 +167,97 @@ class PenaltyService
             return false;
         }
 
-        $status = $this->resolvePenaltyStatus($log);
+        $lateMinutes = $this->getLateMinutes($log);
+        $earlyMinutes = $this->getEarlyDepartureMinutes($log);
 
-        $targetViolationType = match ($status) {
-            'late' => 'delay',
-            'early_departure' => 'early_departure',
-            'absent' => 'absent',
-            'auto_checkout' => 'auto_checkout',
-            default => null,
-        };
+        if ((string) $log->attendance_status === 'absent') {
+            $targetViolationTypes = ['absent'];
+        } elseif ((string) $log->attendance_status === 'auto_checkout') {
+            $grace = $this->resolveCompanyGraceSetting(
+                (int) $log->saas_company_id
+            );
 
-        if ($targetViolationType === 'delay') {
-            $lateMinutes = $this->getLateMinutes($log);
-            $lateAbsencePolicy = UnexcusedAbsencePolicy::query()
-                ->where('saas_company_id', $log->saas_company_id)
-                ->where('policy_id', $policyId)
-                ->where('absence_reason_type', 'late_early')
-                ->where('is_active', true)
-                ->where(function ($q) {
-                    $q->where('is_enabled', true)->orWhereNull('is_enabled');
-                })
-                ->where('late_minutes', '>', 0)
-                ->where('late_minutes', '<=', $lateMinutes)
-                ->first();
+            $targetViolationTypes = ($grace && (bool) $grace->auto_checkout_penalty_enabled)
+                ? ['auto_checkout']
+                : [];
+        } elseif ($this->shouldConvertLateEarlyToAbsence($log, $policyId, $lateMinutes, $earlyMinutes)) {
+            $targetViolationTypes = ['absent'];
+        } else {
+            $targetViolationTypes = [];
 
-            if ($lateAbsencePolicy) {
-                $targetViolationType = 'absent';
+            if ($lateMinutes > 0) {
+                $targetViolationTypes[] = 'delay';
+            }
+
+            if ($earlyMinutes > 0) {
+                $targetViolationTypes[] = 'early_departure';
             }
         }
 
-        // Delete any existing pending penalties for this employee on this date that do not match the target violation type
+        $targetViolationTypes = array_values(array_unique($targetViolationTypes));
+
         AttendanceDailyPenalty::where('saas_company_id', $log->saas_company_id)
             ->where('employee_id', $log->employee_id)
             ->where('attendance_date', $log->attendance_date)
             ->where('status', '!=', 'confirmed')
-            ->when($targetViolationType, fn ($q) => $q->where('violation_type', '!=', $targetViolationType))
+            ->when(
+                ! empty($targetViolationTypes),
+                fn ($query) => $query->whereNotIn('violation_type', $targetViolationTypes)
+            )
             ->delete();
 
-        if (! $targetViolationType) {
+        if (empty($targetViolationTypes)) {
+            $this->markSkipped('no_billable_violation');
             return false;
         }
 
-        if ($targetViolationType === 'auto_checkout') {
-            $grace = \Athka\SystemSettings\Models\AttendanceGraceSetting::where('saas_company_id', $log->saas_company_id)->first();
-            if (! ($grace && (bool) $grace->auto_checkout_penalty_enabled)) {
-                return false;
-            }
+        $created = false;
+
+        foreach ($targetViolationTypes as $violationType) {
+            $created = $this->processViolation($log, $policyId, $violationType, $group) || $created;
         }
 
-        return $this->processViolation($log, $policyId, $targetViolationType, $group);
+        return $created;
     }
 
     /**
      * @return bool true if penalty saved/updated
      */
+    private function shouldConvertLateEarlyToAbsence(
+        AttendanceDailyLog $log,
+        int $policyId,
+        int $lateMinutes,
+        int $earlyMinutes
+    ): bool {
+        if ($lateMinutes <= 0 && $earlyMinutes <= 0) {
+            return false;
+        }
+
+        return UnexcusedAbsencePolicy::query()
+            ->where('saas_company_id', $log->saas_company_id)
+            ->where('policy_id', $policyId)
+            ->where('absence_reason_type', 'late_early')
+            ->where('is_active', true)
+            ->where(function ($query) {
+                $query->where('is_enabled', true)->orWhereNull('is_enabled');
+            })
+            ->where(function ($query) use ($lateMinutes, $earlyMinutes) {
+                if ($lateMinutes > 0) {
+                    $query->orWhere(function ($lateQuery) use ($lateMinutes) {
+                        $lateQuery->where('late_minutes', '>', 0)
+                            ->where('late_minutes', '<=', $lateMinutes);
+                    });
+                }
+
+                if ($earlyMinutes > 0) {
+                    $query->orWhere(function ($earlyQuery) use ($earlyMinutes) {
+                        $earlyQuery->where('early_leave_minutes', '>', 0)
+                            ->where('early_leave_minutes', '<=', $earlyMinutes);
+                    });
+                }
+            })
+            ->exists();
+    }
     private function processViolation(AttendanceDailyLog $log, int $policyId, string $violationType, ?object $group = null): bool
     {
         $existing = AttendanceDailyPenalty::where([
@@ -293,33 +337,38 @@ class PenaltyService
             return false;
         }
 
+        $units = 1;
         $threshold = max(0, (int) ($penaltyPolicy->threshold_minutes ?? 0));
-        $interval = max(0, (int) ($penaltyPolicy->interval_minutes ?? 0));
+        $monthlyGraceUsedBefore = 0;
+        $monthlyGraceApplied = 0;
+        $billableMinutes = 0;
 
-        $dailyExcessMinutes = max(0, $minutes - $threshold);
-        $monthlyGraceMinutes = $this->resolveMonthlyGraceMinutes($log, $group);
-        $monthlyGraceUsedBefore = $this->calculateMonthlyGraceUsedBefore(
-            $log,
-            $policyId,
-            $monthlyGraceMinutes,
-            $group
-        );
-        $monthlyGraceRemaining = max(0, $monthlyGraceMinutes - $monthlyGraceUsedBefore);
-        $monthlyGraceApplied = min($dailyExcessMinutes, $monthlyGraceRemaining);
-        $billableMinutes = max(0, $dailyExcessMinutes - $monthlyGraceApplied);
+        if ($violationType !== 'auto_checkout') {
+            $interval = max(0, (int) ($penaltyPolicy->interval_minutes ?? 0));
+            $dailyExcessMinutes = max(0, $minutes - $threshold);
+            $monthlyGraceMinutes = $this->resolveMonthlyGraceMinutes($log, $group);
+            $monthlyGraceUsedBefore = $this->calculateMonthlyGraceUsedBefore(
+                $log,
+                $policyId,
+                $monthlyGraceMinutes,
+                $group
+            );
+            $monthlyGraceRemaining = max(0, $monthlyGraceMinutes - $monthlyGraceUsedBefore);
+            $monthlyGraceApplied = min($dailyExcessMinutes, $monthlyGraceRemaining);
+            $billableMinutes = max(0, $dailyExcessMinutes - $monthlyGraceApplied);
 
-        if ($billableMinutes === 0) {
-            if ($existing && $existing->status !== 'confirmed') {
-                $existing->delete();
+            if ($billableMinutes === 0) {
+                if ($existing && $existing->status !== 'confirmed') {
+                    $existing->delete();
+                }
+                $this->markSkipped('covered_by_grace');
+
+                return false;
             }
 
-            return false;
-        }
-
-        $units = 1;
-
-        if (in_array($violationType, ['delay', 'early_departure'], true) && $interval > 0) {
-            $units = (int) ceil($billableMinutes / $interval);
+            if (in_array($violationType, ['delay', 'early_departure'], true) && $interval > 0) {
+                $units = (int) ceil($billableMinutes / $interval);
+            }
         }
 
         $amount = 0.0;
@@ -331,6 +380,8 @@ class PenaltyService
             $dailyRate = ((float) ($log->employee->basic_salary ?? 0)) / 30;
             $amount = ($dailyRate * (((float) $penaltyPolicy->deduction_value) / 100)) * $units;
         }
+
+        $recalculatedState = $this->resolveRecalculatedPenaltyState($existing, (float) $amount);
 
         AttendanceDailyPenalty::updateOrCreate(
             [
@@ -344,8 +395,9 @@ class PenaltyService
                 'violation_minutes' => $minutes,
                 'penalty_policy_id' => $penaltyPolicy->id,
                 'calculated_amount' => $amount,
-                'net_amount' => $amount,
-                'status' => 'pending',
+                'exemption_amount' => $recalculatedState['exemption_amount'],
+                'net_amount' => $recalculatedState['net_amount'],
+                'status' => $recalculatedState['status'],
                 'notes' => ($existing ? $existing->notes : '')
                     . "\n[System] Calculated/Recalculated at " . now()
                     . sprintf(
@@ -476,7 +528,7 @@ class PenaltyService
         }
 
         $priorLogs = AttendanceDailyLog::forCompany($currentLog->saas_company_id)
-            ->with('employee')
+            ->with(['employee' => fn ($q) => $q->withoutGlobalScope('active_only')])
             ->where('employee_id', $currentLog->employee_id)
             ->whereBetween('attendance_date', [$monthStart, $dateBeforeCurrent])
             ->orderBy('attendance_date')
@@ -663,6 +715,8 @@ class PenaltyService
             (float) $absencePolicy->deduction_value
         );
 
+        $recalculatedState = $this->resolveRecalculatedPenaltyState($existing, (float) $amount);
+
         AttendanceDailyPenalty::updateOrCreate(
             [
                 'saas_company_id' => $log->saas_company_id,
@@ -675,8 +729,9 @@ class PenaltyService
                 'violation_minutes' => 0,
                 'penalty_policy_id' => null,
                 'calculated_amount' => $amount,
-                'net_amount' => $amount,
-                'status' => 'pending',
+                'exemption_amount' => $recalculatedState['exemption_amount'],
+                'net_amount' => $recalculatedState['net_amount'],
+                'status' => $recalculatedState['status'],
                 'notes' => ($existing ? $existing->notes : '') . "\n[System] Calculated/Recalculated absence penalty at " . now(),
             ]
         );
@@ -684,6 +739,36 @@ class PenaltyService
         return true;
     }
 
+    private function resolveRecalculatedPenaltyState(?AttendanceDailyPenalty $existing, float $calculatedAmount): array
+    {
+        $calculatedAmount = max(0, $calculatedAmount);
+
+        if (
+            ! $existing
+            || (string) $existing->exemption_status !== 'approved'
+            || (float) $existing->exemption_amount <= 0
+        ) {
+            return [
+                'exemption_amount' => 0,
+                'net_amount' => $calculatedAmount,
+                'status' => 'pending',
+            ];
+        }
+
+        $exemptionType = strtolower((string) $existing->exemption_type);
+        $existingExemptionAmount = (float) $existing->exemption_amount;
+        $exemptionAmount = $exemptionType === 'full'
+            || (string) $existing->status === 'waived'
+                ? $calculatedAmount
+                : min($existingExemptionAmount, $calculatedAmount);
+        $netAmount = max(0, $calculatedAmount - $exemptionAmount);
+
+        return [
+            'exemption_amount' => $exemptionAmount,
+            'net_amount' => $netAmount,
+            'status' => $netAmount <= 0 ? 'waived' : 'pending',
+        ];
+    }
     private function calculateDeductionAmount(AttendanceDailyLog $log, string $type, float $value, int $units = 1): float
     {
         $type = strtolower($type);
