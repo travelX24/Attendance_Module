@@ -513,7 +513,7 @@ if (! $dateFrom || ! $dateTo) {
 
             $createdCount = (int) ($res['created'] ?? 0);
             $skippedReasons = $this->formatSkippedReasons($res['skipped'] ?? []);
-            $toastType = $createdCount > 0 ? 'success' : 'warning';
+            $toastType = $createdCount > 0 ? 'success' : 'info';
             $toastMessage = $message
                 . ' | ' . tr('Processed logs:') . ' ' . ($res['processed'] ?? 0)
                 . ' | ' . tr('Penalties created:') . ' ' . $createdCount
@@ -521,6 +521,10 @@ if (! $dateFrom || ! $dateTo) {
 
             if ($createdCount === 0) {
                 $toastMessage .= ' | ' . tr('No penalties were created for the selected scope.');
+
+                if ($skippedReasons === '') {
+                    $skippedReasons = tr('No billable violation was found or the records are outside the active penalty rules.');
+                }
             }
 
             if ($skippedReasons !== '') {
