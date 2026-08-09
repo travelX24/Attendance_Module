@@ -459,8 +459,8 @@
                                     </div>
                                 </td>
 
-                                <td class="p-3">
-                                    <div class="flex items-center gap-2">
+                                <td class="p-3 whitespace-nowrap">
+                                    <div class="flex flex-nowrap items-center gap-2">
                                         <div class="flex -space-x-2 overflow-hidden">
                                             @foreach($r->approvalTasks as $task)
                                                 <div class="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm transition-all hover:scale-110 hover:z-10
@@ -480,8 +480,8 @@
                                 </td>
 
 
-                                <td class="p-3">
-                                    <div class="flex flex-wrap items-center gap-1.5">
+                                <td class="p-3 whitespace-nowrap">
+                                    <div class="flex flex-nowrap items-center gap-1.5">
                                         @if($r->attachment_path)
                                             <a href="{{ asset('storage/' . $r->attachment_path) }}" target="_blank"
                                                class="p-2 text-xs font-bold bg-white text-[color:var(--accent-orange)] border border-[color:var(--accent-orange)]/20 rounded-lg shadow-sm hover:bg-[color:var(--accent-orange)]/10 transition-all"
@@ -518,7 +518,7 @@
                                                 loading="approveLeave({{ $r->id }})"
                                                 :full-width="false"
                                                 size="sm"
-                                                class="px-4 py-2 text-xs font-bold !rounded-lg shadow-sm"
+                                                class="!inline-flex !items-center !justify-center !min-w-[96px] px-4 py-2 text-xs font-bold !rounded-lg shadow-sm shrink-0"
                                             >
                                                 <i class="fas fa-check me-2"></i> {{ tr('Approve') }}
                                             </x-ui.primary-button>
@@ -526,7 +526,7 @@
                                             <x-ui.secondary-button
                                                 type="button"
                                                 wire:click.prevent="openReject('leave', {{ $r->id }})"
-                                                class="px-4 py-2 text-xs font-bold !text-[color:var(--error)] !border-[color:var(--error)]/30 hover:!bg-[color:var(--error)]/10 !rounded-lg"
+                                                class="!inline-flex !items-center !justify-center !min-w-[96px] px-4 py-2 text-xs font-bold !text-[color:var(--error)] !border-[color:var(--error)]/30 hover:!bg-[color:var(--error)]/10 !rounded-lg shrink-0"
                                             >
                                                 <i class="fas fa-times me-2"></i> {{ tr('Reject') }}
                                             </x-ui.secondary-button>
@@ -636,8 +636,8 @@
                                 </td>
 
 
-                                <td class="p-3">
-                                    <div class="flex flex-wrap items-center gap-1.5">
+                                <td class="p-3 whitespace-nowrap">
+                                    <div class="flex flex-nowrap items-center gap-1.5">
                                         @if($r->attachment_path)
                                             <a href="{{ asset('storage/' . $r->attachment_path) }}" target="_blank"
                                                class="p-2 text-xs font-bold bg-white text-[color:var(--accent-orange)] border border-[color:var(--accent-orange)]/20 rounded-lg shadow-sm hover:bg-[color:var(--accent-orange)]/10 transition-all"
@@ -658,7 +658,7 @@
                                                 loading="approvePermission({{ $r->id }})"
                                                 :full-width="false"
                                                 size="sm"
-                                                class="px-4 py-2 text-xs font-bold !rounded-lg shadow-sm"
+                                                class="!inline-flex !items-center !justify-center !min-w-[96px] px-4 py-2 text-xs font-bold !rounded-lg shadow-sm shrink-0"
                                             >
                                                 <i class="fas fa-check me-2"></i> {{ tr('Approve') }}
                                             </x-ui.primary-button>
@@ -666,7 +666,7 @@
                                             <x-ui.secondary-button
                                                 type="button"
                                                 wire:click.prevent="openReject('permission', {{ $r->id }})"
-                                                class="px-4 py-2 text-xs font-bold !text-[color:var(--error)] !border-[color:var(--error)]/30 hover:!bg-[color:var(--error)]/10 !rounded-lg"
+                                                class="!inline-flex !items-center !justify-center !min-w-[96px] px-4 py-2 text-xs font-bold !text-[color:var(--error)] !border-[color:var(--error)]/30 hover:!bg-[color:var(--error)]/10 !rounded-lg shrink-0"
                                             >
                                                 <i class="fas fa-times me-2"></i> {{ tr('Reject') }}
                                             </x-ui.secondary-button>
@@ -745,8 +745,8 @@
                                     {{ company_date($row->cut_end_date) }}
                                 </td>
 
-                                <td class="p-3">
-                                    <div class="flex items-center gap-2">
+                                <td class="p-3 whitespace-nowrap">
+                                    <div class="flex flex-nowrap items-center gap-2">
                                         <div class="flex -space-x-2 overflow-hidden">
                                             @foreach($row->approvalTasks as $task)
                                                 <div class="w-7 h-7 rounded-full border-2 border-white flex items-center justify-center text-[10px] font-bold text-white shadow-sm transition-all hover:scale-110 hover:z-10
@@ -779,7 +779,7 @@
                                                 loading="approveCutLeave({{ (int) $row->id }})"
                                                 :full-width="false"
                                                 size="sm"
-                                                class="px-5 py-2.5 text-xs font-bold"
+                                                class="!inline-flex !items-center !justify-center !min-w-[96px] px-5 py-2.5 text-xs font-bold shrink-0"
                                             >
                                                 <i class="fas fa-check me-2"></i>
                                                 {{ tr('Approve') }}
@@ -788,7 +788,7 @@
                                             <x-ui.secondary-button
                                                 type="button"
                                                 wire:click.prevent="openReject('cut_leave', {{ (int) $row->id }})"
-                                                class="px-5 py-2.5 text-xs font-bold !text-[color:var(--error)] !border-[color:var(--error)] hover:!bg-[color:var(--error)]/10"
+                                                class="!inline-flex !items-center !justify-center !min-w-[96px] px-5 py-2.5 text-xs font-bold !text-[color:var(--error)] !border-[color:var(--error)] hover:!bg-[color:var(--error)]/10 shrink-0"
                                             >
                                                 {{ tr('Reject') }}
                                             </x-ui.secondary-button>
@@ -903,8 +903,8 @@
                                     </div>
                                 </td>
 
-                                <td class="p-3">
-                                    <div class="flex flex-wrap items-center gap-1.5">
+                                <td class="p-3 whitespace-nowrap">
+                                    <div class="flex flex-nowrap items-center gap-1.5">
                                         @if($r->attachment_path)
                                             <a href="{{ asset('storage/' . $r->attachment_path) }}" target="_blank"
                                                class="p-2 text-xs font-bold bg-white text-[color:var(--accent-orange)] border border-[color:var(--accent-orange)]/20 rounded-lg shadow-sm hover:bg-[color:var(--accent-orange)]/10 transition-all font-mono"
@@ -925,7 +925,7 @@
                                                 loading="approveMission({{ $r->id }})"
                                                 :full-width="false"
                                                 size="sm"
-                                                class="px-4 py-2 text-xs font-bold !rounded-lg shadow-sm"
+                                                class="!inline-flex !items-center !justify-center !min-w-[96px] px-4 py-2 text-xs font-bold !rounded-lg shadow-sm shrink-0"
                                             >
                                                 <i class="fas fa-check me-2"></i>
                                                 {{ tr('Approve') }}
@@ -934,7 +934,7 @@
                                             <x-ui.secondary-button
                                                 type="button"
                                                 wire:click.prevent="openReject('mission', {{ $r->id }})"
-                                                class="px-4 py-2 text-xs font-bold !text-[color:var(--error)] !border-[color:var(--error)]/30 hover:!bg-[color:var(--error)]/10 !rounded-lg"
+                                                class="!inline-flex !items-center !justify-center !min-w-[96px] px-4 py-2 text-xs font-bold !text-[color:var(--error)] !border-[color:var(--error)]/30 hover:!bg-[color:var(--error)]/10 !rounded-lg shrink-0"
                                             >
                                                 <i class="fas fa-times me-2"></i>
                                                 {{ tr('Reject') }}

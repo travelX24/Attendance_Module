@@ -100,7 +100,7 @@
             @endphp
 
             <x-ui.card padding="false" class="border border-gray-100 !overflow-hidden">
-                <div class="max-h-[50vh] overflow-auto">
+                <div class="overflow-x-auto">
                     <x-ui.table :headers="$headers" :headerAlign="$headerAlign" :enablePagination="false">
                         @forelse(($previewRows ?? []) as $row)
                             @php
