@@ -67,8 +67,8 @@ class Index extends Component
     public string $historySubTab = 'leaves';
     public array $expandedBalanceEmployees = [];
 
-    public int $groupEmployeeDisplayLimit = 12;
-    public int $groupEmployeeDisplayStep = 12;
+    public int $groupEmployeeDisplayLimit = 50;
+    public int $groupEmployeeDisplayStep = 50;
 
 
     public ?string $employeeBranchColumn = null;
@@ -596,7 +596,7 @@ class Index extends Component
 
     protected function resetGroupEmployeeDisplayLimit(): void
     {
-        $this->groupEmployeeDisplayLimit = 12;
+        $this->groupEmployeeDisplayLimit = 50;
     }
 
     public function updatedGroupEmployeeSearch(): void
@@ -1142,7 +1142,6 @@ private function allowedBranchIds(): array
         $this->resetPage('permPage');
     }
 }
-
 
 
 

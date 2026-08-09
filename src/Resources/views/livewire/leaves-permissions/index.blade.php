@@ -2323,59 +2323,13 @@
 
         <x-slot name="content">
             <div
-                class="space-y-4"
-                x-data="{ deduct: $wire.entangle('group_leave_deduct_from_balance').live }"
+                class="space-y-5"
+                x-data="{ deduct: $wire.entangle('group_leave_deduct_from_balance').live, employeeDropdown: false }"
             >
-                <div>
-                    <div class="text-xs text-gray-500 mb-1 font-bold">{{ tr('Reason') }}</div>
-                    <x-ui.textarea
-                        wire:model.defer="group_reason"
-                        rows="3"
-                        class="w-full"
-                        placeholder="{{ tr('Type the reason for the leave...') }}"
-                        :disabled="!$canManageLeaveRequests"
-                    />
-                </div>
-
-                <label class="flex items-center gap-2 text-sm text-gray-700">
-                    <input
-                        type="checkbox"
-                        x-model="deduct"
-                        class="rounded border-gray-300 text-[color:var(--accent-orange)] focus:ring-[color:var(--accent-orange)]"
-                        @if(!$canManageLeaveRequests) disabled @endif
-                    />
-                    <span class="font-semibold">{{ tr('Deduct from leave balance') }}</span>
-                </label>
-
-                <div x-cloak x-show="deduct" x-transition.opacity>
-                    <div class="text-xs text-gray-500 mb-1">{{ tr('Leave Type') }}</div>
-                    <x-ui.select
-                        wire:model.change="group_leave_policy_id"
-                        wire:loading.attr="disabled"
-                        wire:target="group_leave_deduct_from_balance,group_leave_policy_id"
-                        class="w-full"
-                    >
-                        <option value="0">--</option>
-                        @foreach(($policies ?? []) as $p)
-                            @if($p)
-                                <option value="{{ $p->id }}">{{ $p->name ?? $p->label ?? ('#'.$p->id) }}</option>
-                            @endif
-                        @endforeach
-                    </x-ui.select>
-
-                    <div
-                        wire:loading.flex
-                        wire:target="group_leave_deduct_from_balance,group_leave_policy_id"
-                        class="mt-2 items-center gap-2 text-[11px] font-semibold text-gray-500"
-                    >
-                        <i class="fas fa-circle-notch fa-spin"></i>
-                        <span>{{ tr('Loading') }}...</span>
-                    </div>
-
-                    @error('group_leave_policy_id')
-                        <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div>
-                    @enderror
-                </div>
+                @php
+                    $groupEmployeeRows = $groupEmployeesForSelect->take($groupEmployeeDisplayLimit);
+                    $groupEmployeesHasMore = $groupEmployeesForSelect->count() > $groupEmployeeDisplayLimit;
+                @endphp
 
                 <x-ui.card class="p-3 border border-gray-200 rounded-2xl bg-gray-50">
                     <div class="flex items-center justify-between gap-3 mb-2">
@@ -2386,17 +2340,7 @@
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-5 gap-3 mb-3">
-                        <div>
-                            <div class="text-xs text-gray-500 mb-1">{{ tr('Search') }}</div>
-                            <x-ui.input
-                                type="text"
-                                wire:model.live.debounce.400ms="groupEmployeeSearch"
-                                class="w-full"
-                                :disabled="!$canManageLeaveRequests"
-                            />
-                        </div>
-
+                    <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3 mb-3">
                         <div>
                             <div class="text-xs text-gray-500 mb-1">{{ tr('Branch') }}</div>
                             <x-ui.select wire:model.change="groupBranchId" class="w-full" :disabled="!$canManageLeaveRequests">
@@ -2443,63 +2387,84 @@
 
                     <div
                         wire:loading.flex
-                        wire:target="groupEmployeeSearch,groupBranchId,groupDepartmentId,groupJobTitleId,groupContractType"
+                        wire:target="groupBranchId,groupDepartmentId,groupJobTitleId,groupContractType"
                         class="mb-3 items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-[11px] font-semibold text-gray-500"
                     >
                         <i class="fas fa-circle-notch fa-spin"></i>
                         <span>{{ tr('Loading') }}...</span>
                     </div>
 
-                    @php
-                        $groupEmployeeRows = $groupEmployeesForSelect->take($groupEmployeeDisplayLimit);
-                        $groupEmployeesHasMore = $groupEmployeesForSelect->count() > $groupEmployeeDisplayLimit;
-                    @endphp
+                    <div class="relative" @click.outside="employeeDropdown = false">
+                        <button
+                            type="button"
+                            class="flex w-full items-center justify-between gap-3 rounded-xl border border-gray-200 bg-white px-4 py-3 text-start text-sm font-bold text-gray-700 shadow-sm transition hover:border-[color:var(--accent-orange)] focus:outline-none focus:ring-2 focus:ring-[color:var(--accent-orange)]/20"
+                            @click="employeeDropdown = ! employeeDropdown"
+                            @if(!$canManageLeaveRequests) disabled @endif
+                        >
+                            <span class="flex min-w-0 items-center gap-2">
+                                <i class="fas fa-users text-[color:var(--accent-orange)]"></i>
+                                <span class="truncate">
+                                    {{ count($groupEmployeeIds) > 0 ? tr('Employees selected') : tr('Select employees from list') }}
+                                </span>
+                            </span>
+                            <span class="flex items-center gap-2 text-xs text-gray-500">
+                                <span class="rounded-full bg-gray-100 px-2 py-1 font-black text-gray-700">{{ count($groupEmployeeIds) }}</span>
+                                <i class="fas fa-chevron-down text-[10px]" :class="{ 'rotate-180': employeeDropdown }"></i>
+                            </span>
+                        </button>
 
-                    <div class="bg-white rounded-xl border border-gray-200 p-3">
-                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2">
-                            @forelse($groupEmployeeRows as $e)
-                                <label
-                                    wire:key="group-leave-employee-{{ $e->id }}"
-                                    class="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 border border-transparent hover:border-gray-100 transition-all cursor-pointer group"
-                                >
-                                    <input
-                                        type="checkbox"
-                                        value="{{ $e->id }}"
-                                        wire:model.live="groupEmployeeIds"
-                                        wire:loading.attr="disabled"
-                                        wire:target="groupEmployeeIds"
-                                        class="w-4 h-4 rounded border-gray-300 text-[color:var(--accent-orange)] focus:ring-[color:var(--accent-orange)]"
-                                        @if(!$canManageLeaveRequests) disabled @endif
-                                    />
-                                    <div class="flex flex-col">
-                                        <span class="text-xs font-bold text-gray-800 group-hover:text-[color:var(--accent-orange)] transition-colors">
-                                            {{ $e->name_ar ?? $e->name_en ?? $e->name ?? $e->full_name ?? ('#'.$e->id) }}
-                                        </span>
-                                        <span class="text-[10px] text-gray-400">#{{ $e->id }}</span>
+                        <div
+                            x-cloak
+                            x-show="employeeDropdown"
+                            x-transition.opacity
+                            class="absolute inset-x-0 top-full z-[10002] mt-2 rounded-xl border border-gray-200 bg-white p-2 shadow-2xl"
+                        >
+                            <div class="max-h-72 overflow-y-auto pe-1">
+                                @forelse($groupEmployeeRows as $e)
+                                    <label
+                                        wire:key="group-leave-employee-{{ $e->id }}"
+                                        class="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-gray-50 transition cursor-pointer group"
+                                    >
+                                        <input
+                                            type="checkbox"
+                                            value="{{ $e->id }}"
+                                            wire:model.live="groupEmployeeIds"
+                                            wire:loading.attr="disabled"
+                                            wire:target="groupEmployeeIds"
+                                            class="w-4 h-4 rounded border-gray-300 text-[color:var(--accent-orange)] focus:ring-[color:var(--accent-orange)]"
+                                            @if(!$canManageLeaveRequests) disabled @endif
+                                        />
+                                        <div class="min-w-0 flex-1">
+                                            <div class="truncate text-xs font-bold text-gray-800 group-hover:text-[color:var(--accent-orange)]">
+                                                {{ $e->name_ar ?? $e->name_en ?? $e->name ?? $e->full_name ?? ('#'.$e->id) }}
+                                            </div>
+                                            <div class="text-[10px] text-gray-400">
+                                                {{ $e->employee_no ?? ('#'.$e->id) }}
+                                            </div>
+                                        </div>
+                                    </label>
+                                @empty
+                                    <div class="py-6 text-center text-xs font-semibold text-gray-500">
+                                        {{ tr('No employees found') }}
                                     </div>
-                                </label>
-                            @empty
-                                <div class="col-span-full py-5 text-center text-xs font-semibold text-gray-500">
-                                    {{ tr('No employees found') }}
-                                </div>
-                            @endforelse
-                        </div>
-
-                        @if($groupEmployeesHasMore)
-                            <div class="mt-3 flex justify-center border-t border-gray-100 pt-3">
-                                <button
-                                    type="button"
-                                    wire:click="showMoreGroupEmployees"
-                                    wire:loading.attr="disabled"
-                                    wire:target="showMoreGroupEmployees"
-                                    class="inline-flex items-center gap-2 rounded-xl border border-gray-200 bg-white px-5 py-2 text-xs font-bold text-gray-700 shadow-sm transition hover:border-[color:var(--accent-orange)] hover:text-[color:var(--accent-orange)] disabled:cursor-wait disabled:opacity-60"
-                                >
-                                    <span wire:loading.remove wire:target="showMoreGroupEmployees">{{ tr('Show More') }}</span>
-                                    <span wire:loading wire:target="showMoreGroupEmployees">{{ tr('Loading') }}...</span>
-                                    <i class="fas fa-chevron-down text-[10px]"></i>
-                                </button>
+                                @endforelse
                             </div>
-                        @endif
+
+                            @if($groupEmployeesHasMore)
+                                <div class="mt-2 border-t border-gray-100 pt-2">
+                                    <button
+                                        type="button"
+                                        wire:click="showMoreGroupEmployees"
+                                        wire:loading.attr="disabled"
+                                        wire:target="showMoreGroupEmployees"
+                                        class="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-4 py-2 text-xs font-bold text-gray-700 transition hover:border-[color:var(--accent-orange)] hover:text-[color:var(--accent-orange)] disabled:cursor-wait disabled:opacity-60"
+                                    >
+                                        <span wire:loading.remove wire:target="showMoreGroupEmployees">{{ tr('Show More') }}</span>
+                                        <span wire:loading wire:target="showMoreGroupEmployees">{{ tr('Loading') }}...</span>
+                                    </button>
+                                </div>
+                            @endif
+                        </div>
                     </div>
 
                     <div
@@ -2522,6 +2487,55 @@
                         {{ tr('Select employees first to continue.') }}
                     </div>
                 @else
+                    <x-ui.card class="p-3 border border-gray-200 rounded-2xl bg-white">
+                        <div class="mb-3 flex items-center justify-between gap-3">
+                            <div>
+                                <div class="text-sm font-black text-gray-900">{{ tr('Leave Type') }}</div>
+                                <div class="text-[11px] font-semibold text-gray-500">{{ tr('Select whether this request affects leave balance.') }}</div>
+                            </div>
+                        </div>
+
+                        <label class="flex items-center gap-2 text-sm text-gray-700">
+                            <input
+                                type="checkbox"
+                                x-model="deduct"
+                                class="rounded border-gray-300 text-[color:var(--accent-orange)] focus:ring-[color:var(--accent-orange)]"
+                                @if(!$canManageLeaveRequests) disabled @endif
+                            />
+                            <span class="font-semibold">{{ tr('Deduct from leave balance') }}</span>
+                        </label>
+
+                        <div x-cloak x-show="deduct" x-transition.opacity class="mt-3">
+                            <div class="text-xs text-gray-500 mb-1">{{ tr('Leave Type') }}</div>
+                            <x-ui.select
+                                wire:model.change="group_leave_policy_id"
+                                wire:loading.attr="disabled"
+                                wire:target="group_leave_deduct_from_balance,group_leave_policy_id"
+                                class="w-full"
+                            >
+                                <option value="0">--</option>
+                                @foreach(($policies ?? []) as $p)
+                                    @if($p)
+                                        <option value="{{ $p->id }}">{{ $p->name ?? $p->label ?? ('#'.$p->id) }}</option>
+                                    @endif
+                                @endforeach
+                            </x-ui.select>
+
+                            <div
+                                wire:loading.flex
+                                wire:target="group_leave_deduct_from_balance,group_leave_policy_id"
+                                class="mt-2 items-center gap-2 text-[11px] font-semibold text-gray-500"
+                            >
+                                <i class="fas fa-circle-notch fa-spin"></i>
+                                <span>{{ tr('Loading') }}...</span>
+                            </div>
+
+                            @error('group_leave_policy_id')
+                                <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div>
+                            @enderror
+                        </div>
+                    </x-ui.card>
+
                     <div>
                         <div class="text-xs text-gray-500 mb-1">{{ tr('Start Date') }}</div>
                         <x-ui.company-date-picker model="group_start_date" />
@@ -2632,6 +2646,20 @@
                     @endif
                 @endif
 
+                <div>
+                    <div class="text-xs text-gray-500 mb-1 font-bold">{{ tr('Reason') }}</div>
+                    <x-ui.textarea
+                        wire:model.defer="group_reason"
+                        rows="3"
+                        class="w-full"
+                        placeholder="{{ tr('Type the reason for the leave...') }}"
+                        :disabled="!$canManageLeaveRequests"
+                    />
+                    @error('group_reason')
+                        <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div>
+                    @enderror
+                </div>
+
                 <x-slot name="footer">
                     <div class="flex items-center justify-end gap-3">
                         <x-ui.secondary-button type="button" wire:click="closeCreateGroupLeave">
@@ -2646,8 +2674,8 @@
                                 wire:target="saveGroupLeave"
                                 class="!px-8"
                             >
-                                <span wire:loading.remove wire:target="saveGroupLeave">{{ tr('Save') }}</span>
-                                <span wire:loading wire:target="saveGroupLeave">{{ tr('Saving') }}...</span>
+                                <span wire:loading.remove wire:target="saveGroupLeave">{{ tr('Create Request') }}</span>
+                                <span wire:loading wire:target="saveGroupLeave">{{ tr('Creating') }}...</span>
                             </x-ui.primary-button>
                         @endif
                     </div>

@@ -1487,7 +1487,7 @@ trait WithLeaveRequests
         $this->groupContractType = '';
 
         if (property_exists($this, 'groupEmployeeDisplayLimit')) {
-            $this->groupEmployeeDisplayLimit = 12;
+            $this->groupEmployeeDisplayLimit = 50;
         }
 
         $this->group_leave_policy_duration_unit = 'full_day';
