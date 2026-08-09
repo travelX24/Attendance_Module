@@ -559,92 +559,60 @@
     <x-ui.modal wire:model="showExemptionModal" :title="tr('Apply Exemption/Waiver')">
         <x-slot name="content">
             <div class="space-y-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ tr('Exemption Type') }}</label>
-                    <select wire:model.live="exemptionForm.type" class="w-full border-gray-300 rounded-lg shadow-sm" :disabled="!$canWaivePenalties">
-                        <option value="full">{{ tr('Full Waiver (100%)') }}</option>
-                        <option value="partial">{{ tr('Partial Exemption') }}</option>
-                    </select>
-                    @error('exemptionForm.type')
-                        <p class="mt-1 text-xs font-semibold text-[color:var(--error)]">{{ $message }}</p>
-                    @enderror
-                </div>
+                <x-ui.select
+                    :label="tr('Exemption Type')"
+                    wire:model.live="exemptionForm.type"
+                    :disabled="!$canWaivePenalties"
+                >
+                    <option value="full">{{ tr('Full Waiver (100%)') }}</option>
+                    <option value="partial">{{ tr('Partial Exemption') }}</option>
+                </x-ui.select>
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ tr('Exemption Reason') }}</label>
-                    <select wire:model="exemptionForm.reason" class="w-full border-gray-300 rounded-lg shadow-sm" :disabled="!$canWaivePenalties">
-                        <option value="">{{ tr('Select reason...') }}</option>
-                        <option value="business_mission">{{ tr('Business Mission') }}</option>
-                        <option value="emergency_case">{{ tr('Emergency Case') }}</option>
-                        <option value="technical_issue">{{ tr('Technical / Device Issue') }}</option>
-                        <option value="late_permission">{{ tr('Late Permission/Leave') }}</option>
-                        <option value="medical_emergency">{{ tr('Medical Emergency') }}</option>
-                        <option value="other">{{ tr('Other') }}</option>
-                    </select>
-                    @error('exemptionForm.reason')
-                        <p class="mt-1 text-xs font-semibold text-[color:var(--error)]">{{ $message }}</p>
-                    @enderror
-                </div>
+                <x-ui.select
+                    :label="tr('Exemption Reason')"
+                    wire:model="exemptionForm.reason"
+                    :placeholder="tr('Select reason...')"
+                    :disabled="!$canWaivePenalties"
+                >
+                    <option value="">{{ tr('Select reason...') }}</option>
+                    <option value="business_mission">{{ tr('Business Mission') }}</option>
+                    <option value="emergency_case">{{ tr('Emergency Case') }}</option>
+                    <option value="technical_issue">{{ tr('Technical / Device Issue') }}</option>
+                    <option value="late_permission">{{ tr('Late Permission/Leave') }}</option>
+                    <option value="medical_emergency">{{ tr('Medical Emergency') }}</option>
+                    <option value="other">{{ tr('Other') }}</option>
+                </x-ui.select>
 
                 @if($exemptionForm['type'] === 'partial')
-                    <div>
-                        <label class="block text-sm font-medium text-gray-700 mb-1">{{ tr('Exempt Amount') }}</label>
-                        <x-ui.input
-                            type="number"
-                            min="0.01"
-                            step="0.01"
-                            wire:model="exemptionForm.amount"
-                            :disabled="!$canWaivePenalties"
-                        />
-                        @error('exemptionForm.amount')
-                            <p class="mt-1 text-xs font-semibold text-[color:var(--error)]">{{ $message }}</p>
-                        @enderror
-                    </div>
+                    <x-ui.input
+                        :label="tr('Exempt Amount')"
+                        type="number"
+                        min="0.01"
+                        step="0.01"
+                        wire:model="exemptionForm.amount"
+                        :disabled="!$canWaivePenalties"
+                    />
                 @endif
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ tr('Reason') }}</label>
-                    <textarea wire:model="exemptionForm.details" rows="3" maxlength="1000" class="w-full border-gray-300 rounded-lg shadow-sm" placeholder="{{ tr('Why is this penalty being waived?') }}" :disabled="!$canWaivePenalties"></textarea>
-                    @error('exemptionForm.details')
-                        <p class="mt-1 text-xs font-semibold text-[color:var(--error)]">{{ $message }}</p>
-                    @enderror
-                </div>
+                <x-ui.textarea
+                    :label="tr('Reason')"
+                    wire:model="exemptionForm.details"
+                    rows="3"
+                    maxlength="1000"
+                    :placeholder="tr('Why is this penalty being waived?')"
+                    :disabled="!$canWaivePenalties"
+                />
 
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-1">{{ tr('Supporting Documents') }}</label>
-                    <div class="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-xl">
-                        <div class="space-y-1 text-center">
-                            <i class="fas fa-cloud-upload-alt fa-2x text-gray-400 mb-2"></i>
-                            <div class="flex text-sm text-gray-600">
-                                <label for="file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-[color:var(--accent-orange)] hover:brightness-90">
-                                    <span>{{ tr('Upload a file') }}</span>
-                                    <input
-                                        id="file-upload"
-                                        type="file"
-                                        accept=".png,.jpg,.jpeg,.pdf"
-                                        wire:model="exemptionForm.attachment"
-                                        class="sr-only"
-                                        @if(!$canWaivePenalties) disabled @endif
-                                    >
-                                </label>
-                            </div>
-                            <p class="text-xs text-gray-500">PNG, JPG, PDF up to 10MB</p>
-                        </div>
-                    </div>
-                    <div wire:loading wire:target="exemptionForm.attachment" class="mt-2 text-xs text-gray-500 font-semibold">
-                        <i class="fas fa-circle-notch fa-spin me-1"></i>
-                        {{ tr('Uploading...') }}
-                    </div>
-                    @if ($exemptionForm['attachment'])
-                        <div class="mt-2 text-xs text-[color:var(--success)] font-bold flex items-center gap-1">
-                            <i class="fas fa-check-circle"></i>
-                            {{ $exemptionForm['attachment']->getClientOriginalName() }}
-                        </div>
-                    @endif
-                    @error('exemptionForm.attachment')
-                        <p class="mt-1 text-xs font-semibold text-[color:var(--error)]">{{ $message }}</p>
-                    @enderror
-                </div>
+                <x-ui.file
+                    :label="tr('Supporting Documents')"
+                    name="exemptionForm.attachment"
+                    wire:model="exemptionForm.attachment"
+                    :file="$exemptionForm['attachment']"
+                    accept=".png,.jpg,.jpeg,.pdf"
+                    :max-kb="10240"
+                    :disabled="!$canWaivePenalties"
+                    :hint="tr('PNG, JPG, PDF up to 10MB')"
+                />
             </div>
         </x-slot>
 

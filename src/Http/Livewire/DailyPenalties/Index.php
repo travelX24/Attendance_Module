@@ -105,6 +105,44 @@ class Index extends Component
         ];
     }
 
+    private function clearFieldErrorsByPrefix(string $field): void
+    {
+        $bag = $this->getErrorBag();
+
+        foreach (array_keys($bag->toArray()) as $key) {
+            if ($key === $field || str_starts_with($key, $field . '.')) {
+                $bag->forget($key);
+            }
+        }
+
+        $this->setErrorBag($bag);
+    }
+
+    public function clearUploadFieldError(string $field): void
+    {
+        $this->clearFieldErrorsByPrefix($field);
+    }
+
+    public function setUploadFieldError(string $field, string $message): void
+    {
+        $this->clearFieldErrorsByPrefix($field);
+
+        if (trim($message) !== '') {
+            $this->addError($field, $message);
+        }
+    }
+
+    public function setUploadFieldErrors(string $field, array $messages): void
+    {
+        $this->clearFieldErrorsByPrefix($field);
+
+        foreach ($messages as $message) {
+            if (is_string($message) && trim($message) !== '') {
+                $this->addError($field, $message);
+            }
+        }
+    }
+
     private function isOutsideEditableWindow($date): bool
     {
         return Carbon::parse($date)
