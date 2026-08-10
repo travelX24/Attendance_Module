@@ -179,10 +179,10 @@ trait WithScheduleFilters
                 $join->on('work_schedules.id', '=', 'employee_work_schedules.work_schedule_id')
                     ->where('work_schedules.saas_company_id', '=', $companyId);
             })
-            ->whereDate('employee_work_schedules.start_date', '<=', $todayDate)
+            ->where('employee_work_schedules.start_date', '<=', $todayDate)
             ->where(function ($q) use ($todayDate) {
                 $q->whereNull('employee_work_schedules.end_date')
-                    ->orWhereDate('employee_work_schedules.end_date', '>=', $todayDate);
+                    ->orWhere('employee_work_schedules.end_date', '>=', $todayDate);
             })
             ->when(!empty($employeeIdsScope), fn ($q) => $q->whereIn('employee_work_schedules.employee_id', $employeeIdsScope), fn ($q) => $q->whereRaw('1=0'))
             ->pluck('employee_work_schedules.employee_id')
@@ -217,7 +217,7 @@ trait WithScheduleFilters
        $endingSoonIds = EmployeeWorkSchedule::where('saas_company_id', $companyId)
             ->when(!empty($employeeIdsScope), fn ($q) => $q->whereIn('employee_id', $employeeIdsScope), fn ($q) => $q->whereRaw('1=0'))
             ->where('assignment_type', '!=', 'rotation')
-            ->whereDate('start_date', '<=', $todayDate)
+            ->where('start_date', '<=', $todayDate)
             ->whereNotNull('end_date')
             ->whereBetween('end_date', [$todayDate, $soonEndDate])
             ->pluck('employee_id')
@@ -258,10 +258,10 @@ trait WithScheduleFilters
         $inactiveScheduleIds = EmployeeWorkSchedule::query()
             ->where('employee_work_schedules.saas_company_id', $companyId)
             ->when(!empty($employeeIdsScope), fn ($q) => $q->whereIn('employee_work_schedules.employee_id', $employeeIdsScope), fn ($q) => $q->whereRaw('1=0'))
-            ->whereDate('employee_work_schedules.start_date', '<=', $todayDate)
+            ->where('employee_work_schedules.start_date', '<=', $todayDate)
             ->where(function ($q) use ($todayDate) {
                 $q->whereNull('employee_work_schedules.end_date')
-                    ->orWhereDate('employee_work_schedules.end_date', '>=', $todayDate);
+                    ->orWhere('employee_work_schedules.end_date', '>=', $todayDate);
             })
             ->join('work_schedules', 'work_schedules.id', '=', 'employee_work_schedules.work_schedule_id')
             ->where('work_schedules.saas_company_id', $companyId)

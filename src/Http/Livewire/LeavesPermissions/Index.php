@@ -769,6 +769,7 @@ class Index extends Component
     public function render()
     {
         $groupModalOpen = $this->createGroupLeaveOpen || $this->createGroupPermissionOpen;
+        $singleRequestModalOpen = $this->createLeaveOpen || $this->createPermissionOpen || $this->createMissionOpen;
 
         $pendingLeave = ! $groupModalOpen && $this->tab === 'pending'
             ? $this->pendingLeaveRequests
@@ -790,23 +791,23 @@ class Index extends Component
             ? $this->balances
             : $this->emptyPaginator('balancePage');
 
-        $prevCut = ! $groupModalOpen && $this->tab === 'history'
+        $prevCut = ! $groupModalOpen && $this->tab === 'history' && $this->historySubTab === 'cuts'
             ? $this->previousCutLeaveRequests
             : $this->emptyPaginator('historyCutPage');
 
-        $history = ! $groupModalOpen && $this->tab === 'history'
+        $history = ! $groupModalOpen && $this->tab === 'history' && $this->historySubTab === 'activity'
             ? $this->history
             : $this->emptyPaginator('historyPage');
 
-        $prevLeave = ! $groupModalOpen && $this->tab === 'history'
+        $prevLeave = ! $groupModalOpen && $this->tab === 'history' && $this->historySubTab === 'leaves'
             ? $this->previousLeaveRequests
             : $this->emptyPaginator('historyLeavePage');
 
-        $prevPerm = ! $groupModalOpen && $this->tab === 'history'
+        $prevPerm = ! $groupModalOpen && $this->tab === 'history' && $this->historySubTab === 'permissions'
             ? $this->previousPermissionRequests
             : $this->emptyPaginator('historyPermPage');
 
-        $prevMission = ! $groupModalOpen && $this->tab === 'history'
+        $prevMission = ! $groupModalOpen && $this->tab === 'history' && $this->historySubTab === 'missions'
             ? $this->previousMissionRequests
             : $this->emptyPaginator('historyMissionPage');
 
@@ -822,6 +823,8 @@ class Index extends Component
             }));
         }
 
+        $leaveRemainingBalances = $this->remainingBalancesForRequests($pendingLeave, $prevLeave);
+
         [$workStart, $workEnd] = $this->getCompanyWorkWindow($this->start_date ?: ($this->group_start_date ?: null));
 
         return view('attendance::livewire.leaves-permissions.index', [
@@ -829,14 +832,14 @@ class Index extends Component
             'policies' => $this->policies,
             'departments' => $this->departments,
             'jobTitles' => $this->jobTitles,
-            'employeesForSelect' => $groupModalOpen ? collect() : $this->employeesForSelect,
-            'createLeavePolicies' => $groupModalOpen ? collect() : $this->getCreateLeavePoliciesProperty(),
-            'replacementEmployees' => $groupModalOpen ? collect() : $this->replacementEmployees,
+            'employeesForSelect' => $singleRequestModalOpen ? $this->employeesForSelect : collect(),
+            'createLeavePolicies' => $this->createLeaveOpen ? $this->getCreateLeavePoliciesProperty() : collect(),
+            'replacementEmployees' => $this->createLeaveOpen ? $this->replacementEmployees : collect(),
             'branches' => $this->branches,
             'pendingLeaveRequests' => $pendingLeave,
             'pendingPermissionRequests' => $pendingPerm,
             'balances' => $balances,
-            'approvedLeavesForCut' => $groupModalOpen ? collect() : $this->approvedLeavesForCut,
+            'approvedLeavesForCut' => $this->cutLeaveOpen ? $this->approvedLeavesForCut : collect(),
             'history' => $history,
             'previousLeaveRequests' => $prevLeave,
             'previousPermissionRequests' => $prevPerm,
@@ -847,9 +850,54 @@ class Index extends Component
             'pendingMissionRequests' => $pendingMission,
             'previousMissionRequests' => $prevMission,
             'previousCutLeaveRequests' => $prevCut,
+            'leaveRemainingBalances' => $leaveRemainingBalances,
             'workStart' => $workStart,
             'workEnd' => $workEnd,
         ])->layout('layouts.company-admin');
+    }
+
+    private function remainingBalancesForRequests(...$requestSets): array
+    {
+        $requests = collect($requestSets)
+            ->flatMap(function ($set) {
+                return $set instanceof \Illuminate\Pagination\AbstractPaginator
+                    ? $set->getCollection()
+                    : collect($set);
+            })
+            ->filter(fn ($request) => $request && $request->leave_policy_id);
+
+        if ($requests->isEmpty()) {
+            return [];
+        }
+
+        $employeeIds = $requests->pluck('employee_id')->filter()->unique()->values();
+        $policyIds = $requests->pluck('leave_policy_id')->filter()->unique()->values();
+        $yearIds = $requests
+            ->map(fn ($request) => $request->policy_year_id ?: $this->selectedYearId)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($employeeIds->isEmpty() || $policyIds->isEmpty() || $yearIds->isEmpty()) {
+            return [];
+        }
+
+        $balances = AttendanceLeaveBalance::query()
+            ->where('company_id', $this->companyId)
+            ->whereIn('employee_id', $employeeIds)
+            ->whereIn('leave_policy_id', $policyIds)
+            ->whereIn('policy_year_id', $yearIds)
+            ->get()
+            ->keyBy(fn ($balance) => (int) $balance->employee_id . ':' . (int) $balance->leave_policy_id . ':' . (int) $balance->policy_year_id);
+
+        return $requests
+            ->mapWithKeys(function ($request) use ($balances) {
+                $yearId = $request->policy_year_id ?: $this->selectedYearId;
+                $key = (int) $request->employee_id . ':' . (int) $request->leave_policy_id . ':' . (int) $yearId;
+
+                return [(int) $request->id => (float) ($balances[$key]->remaining_days ?? 0)];
+            })
+            ->all();
     }
 
 
@@ -1157,5 +1205,3 @@ private function allowedBranchIds(): array
         $this->resetPage('permPage');
     }
 }
-
-

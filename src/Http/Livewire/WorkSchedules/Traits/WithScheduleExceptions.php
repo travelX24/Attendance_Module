@@ -6,6 +6,7 @@ use Athka\Employees\Models\Employee;
 use Athka\Attendance\Models\EmployeeWorkSchedule;
 use Athka\Attendance\Models\EmployeeWorkScheduleException;
 use Athka\Attendance\Models\AttendanceAuditLog;
+use Athka\SystemSettings\Models\WorkSchedule;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\ValidationException;
 use Carbon\Carbon;
@@ -33,6 +34,7 @@ trait WithScheduleExceptions
     public $showHistoryModal = false;
     public $historyList = [];
     public $historyEmployeeName = '';
+    public $historyScheduleNames = [];
 
     public function openExceptionsModal($employeeId): void
     {
@@ -190,6 +192,29 @@ trait WithScheduleExceptions
             ->with('actor')
             ->orderByDesc('id')
             ->get();
+
+        $scheduleIds = $this->historyList
+            ->flatMap(function ($log) {
+                $before = is_array($log->before_json) ? $log->before_json : [];
+                $after = is_array($log->after_json) ? $log->after_json : [];
+
+                return [
+                    $before['work_schedule_id'] ?? null,
+                    $after['work_schedule_id'] ?? null,
+                ];
+            })
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        $this->historyScheduleNames = $scheduleIds->isEmpty()
+            ? []
+            : WorkSchedule::where('saas_company_id', $companyId)
+                ->whereIn('id', $scheduleIds)
+                ->pluck('name', 'id')
+                ->toArray();
+
         $this->showHistoryModal = true;
     }
 }

@@ -71,7 +71,7 @@
     <x-ui.page-header title="{{ tr('Leaves and Permissions') }}" subtitle="{{ tr('Manage requests, approvals, and balances') }}" />
 @endsection
 
-<div class="p-6 space-y-6" dir="{{ $dir }}" wire:poll.5s>
+<div class="p-6 space-y-6" dir="{{ $dir }}" wire:poll.visible.30s>
 
     {{-- Tab Transition Indicator using loading-bar component --}}
     <x-ui.loading-bar :fullPage="true" />
@@ -417,12 +417,7 @@
                                         {{ $r->policy?->name ?? tr('Group absence') }}
                                     </div>
                                     @php
-                                        $yearId = $r->policy_year_id ?: $selectedYearId;
-                                        $balance = \Athka\Attendance\Models\AttendanceLeaveBalance::where('employee_id', $r->employee_id)
-                                                    ->where('leave_policy_id', $r->leave_policy_id)
-                                                    ->where('policy_year_id', $yearId)
-                                                    ->first();
-                                        $remaining = $balance ? (float) $balance->remaining_days : 0;
+                                        $remaining = $leaveRemainingBalances[$r->id] ?? 0;
                                     @endphp
                                     @if($r->policy)
                                     <div class="mt-1 text-[10px] text-gray-500 font-bold">
@@ -483,7 +478,7 @@
                                 <td class="p-3 whitespace-nowrap">
                                     <div class="flex flex-nowrap items-center gap-1.5">
                                         @if($r->attachment_path)
-                                            <a href="{{ asset('storage/' . $r->attachment_path) }}" target="_blank"
+                                            <a href="{{ \Illuminate\Support\Facades\Storage::url($r->attachment_path) }}" target="_blank"
                                                class="p-2 text-xs font-bold bg-white text-[color:var(--accent-orange)] border border-[color:var(--accent-orange)]/20 rounded-lg shadow-sm hover:bg-[color:var(--accent-orange)]/10 transition-all"
                                                title="{{ $r->attachment_name ?: tr('View Attachment') }}">
                                                 <i class="fas fa-paperclip"></i>
@@ -639,7 +634,7 @@
                                 <td class="p-3 whitespace-nowrap">
                                     <div class="flex flex-nowrap items-center gap-1.5">
                                         @if($r->attachment_path)
-                                            <a href="{{ asset('storage/' . $r->attachment_path) }}" target="_blank"
+                                            <a href="{{ \Illuminate\Support\Facades\Storage::url($r->attachment_path) }}" target="_blank"
                                                class="p-2 text-xs font-bold bg-white text-[color:var(--accent-orange)] border border-[color:var(--accent-orange)]/20 rounded-lg shadow-sm hover:bg-[color:var(--accent-orange)]/10 transition-all"
                                                title="{{ $r->attachment_name ?: tr('View Attachment') }}">
                                                 <i class="fas fa-paperclip"></i>
@@ -906,7 +901,7 @@
                                 <td class="p-3 whitespace-nowrap">
                                     <div class="flex flex-nowrap items-center gap-1.5">
                                         @if($r->attachment_path)
-                                            <a href="{{ asset('storage/' . $r->attachment_path) }}" target="_blank"
+                                            <a href="{{ \Illuminate\Support\Facades\Storage::url($r->attachment_path) }}" target="_blank"
                                                class="p-2 text-xs font-bold bg-white text-[color:var(--accent-orange)] border border-[color:var(--accent-orange)]/20 rounded-lg shadow-sm hover:bg-[color:var(--accent-orange)]/10 transition-all font-mono"
                                                title="{{ $r->attachment_name ?: tr('View Attachment') }}">
                                                 <i class="fas fa-paperclip"></i>
@@ -1297,12 +1292,7 @@
                                         {{ $r->policy?->name ?? tr('Group absence') }}
                                     </div>
                                     @php
-                                        $yearId = $r->policy_year_id ?: $selectedYearId;
-                                        $balance = \Athka\Attendance\Models\AttendanceLeaveBalance::where('employee_id', $r->employee_id)
-                                                    ->where('leave_policy_id', $r->leave_policy_id)
-                                                    ->where('policy_year_id', $yearId)
-                                                    ->first();
-                                        $remaining = $balance ? (float) $balance->remaining_days : 0;
+                                        $remaining = $leaveRemainingBalances[$r->id] ?? 0;
                                     @endphp
                                     @if($r->policy)
                                         <div class="mt-1 text-[10px] text-gray-500 font-bold">
@@ -1362,7 +1352,7 @@
                                 <td class="p-3">
                                     <div class="flex items-center gap-1.5">
                                         @if($r->attachment_path)
-                                            <a href="{{ asset('storage/' . $r->attachment_path) }}" target="_blank"
+                                            <a href="{{ \Illuminate\Support\Facades\Storage::url($r->attachment_path) }}" target="_blank"
                                                class="p-2 text-xs font-bold bg-white text-[color:var(--accent-orange)] border border-[color:var(--accent-orange)]/20 rounded-lg shadow-sm hover:bg-[color:var(--accent-orange)]/10 transition-all font-mono"
                                                title="{{ $r->attachment_name ?: tr('View Attachment') }}">
                                                 <i class="fas fa-paperclip"></i>
@@ -1497,7 +1487,7 @@
                                 <td class="p-3">
                                     <div class="flex items-center gap-1.5">
                                         @if($r->attachment_path)
-                                            <a href="{{ asset('storage/' . $r->attachment_path) }}" target="_blank"
+                                            <a href="{{ \Illuminate\Support\Facades\Storage::url($r->attachment_path) }}" target="_blank"
                                                class="p-2 text-xs font-bold bg-white text-[color:var(--accent-orange)] border border-[color:var(--accent-orange)]/20 rounded-lg shadow-sm hover:bg-[color:var(--accent-orange)]/10 transition-all font-mono"
                                                title="{{ $r->attachment_name ?: tr('View Attachment') }}">
                                                 <i class="fas fa-paperclip"></i>
@@ -1718,7 +1708,7 @@
                                 <td class="p-3">
                                     <div class="flex items-center gap-1.5">
                                         @if($r->attachment_path)
-                                            <a href="{{ asset('storage/' . $r->attachment_path) }}" target="_blank"
+                                            <a href="{{ \Illuminate\Support\Facades\Storage::url($r->attachment_path) }}" target="_blank"
                                                class="p-2 text-xs font-bold bg-white text-[color:var(--accent-orange)] border border-[color:var(--accent-orange)]/20 rounded-lg shadow-sm hover:bg-[color:var(--accent-orange)]/10 transition-all font-mono"
                                                title="{{ $r->attachment_name ?: tr('View Attachment') }}">
                                                 <i class="fas fa-paperclip"></i>

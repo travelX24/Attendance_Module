@@ -195,10 +195,10 @@ class Index extends Component
                 ->whereColumn('employee_work_schedules.employee_id', 'employees.id')
                 ->where('employee_work_schedules.saas_company_id', $companyId)
                 ->where('work_schedules.saas_company_id', $companyId)
-                ->whereDate('employee_work_schedules.start_date', '<=', $today)
+                ->where('employee_work_schedules.start_date', '<=', $today)
                 ->where(function ($q) use ($today) {
                     $q->whereNull('employee_work_schedules.end_date')
-                        ->orWhereDate('employee_work_schedules.end_date', '>=', $today);
+                        ->orWhere('employee_work_schedules.end_date', '>=', $today);
                 })
                 ->orderByDesc('employee_work_schedules.start_date')
                 ->orderByDesc('employee_work_schedules.id')
@@ -207,10 +207,10 @@ class Index extends Component
             'current_schedule_id' => EmployeeWorkSchedule::select('work_schedule_id')
                 ->whereColumn('employee_id', 'employees.id')
                 ->where('saas_company_id', $companyId)
-                ->whereDate('start_date', '<=', $today)
+                ->where('start_date', '<=', $today)
                 ->where(function ($q) use ($today) {
                     $q->whereNull('end_date')
-                        ->orWhereDate('end_date', '>=', $today);
+                        ->orWhere('end_date', '>=', $today);
                 })
                 ->orderByDesc('start_date')
                 ->orderByDesc('id')
@@ -219,10 +219,10 @@ class Index extends Component
             'current_assignment_type' => EmployeeWorkSchedule::select('assignment_type')
                 ->whereColumn('employee_id', 'employees.id')
                 ->where('saas_company_id', $companyId)
-                ->whereDate('start_date', '<=', $today)
+                ->where('start_date', '<=', $today)
                 ->where(function ($q) use ($today) {
                     $q->whereNull('end_date')
-                        ->orWhereDate('end_date', '>=', $today);
+                        ->orWhere('end_date', '>=', $today);
                 })
                 ->orderByDesc('start_date')
                 ->orderByDesc('id')
@@ -231,10 +231,10 @@ class Index extends Component
             'current_schedule_start' => EmployeeWorkSchedule::select('start_date')
                 ->whereColumn('employee_id', 'employees.id')
                 ->where('saas_company_id', $companyId)
-                ->whereDate('start_date', '<=', $today)
+                ->where('start_date', '<=', $today)
                 ->where(function ($q) use ($today) {
                     $q->whereNull('end_date')
-                        ->orWhereDate('end_date', '>=', $today);
+                        ->orWhere('end_date', '>=', $today);
                 })
                 ->orderByDesc('start_date')
                 ->orderByDesc('id')
@@ -243,10 +243,10 @@ class Index extends Component
             'current_schedule_end' => EmployeeWorkSchedule::select('end_date')
                 ->whereColumn('employee_id', 'employees.id')
                 ->where('saas_company_id', $companyId)
-                ->whereDate('start_date', '<=', $today)
+                ->where('start_date', '<=', $today)
                 ->where(function ($q) use ($today) {
                     $q->whereNull('end_date')
-                        ->orWhereDate('end_date', '>=', $today);
+                        ->orWhere('end_date', '>=', $today);
                 })
                 ->orderByDesc('start_date')
                 ->orderByDesc('id')
@@ -257,10 +257,10 @@ class Index extends Component
                 ->whereColumn('employee_work_schedules.employee_id', 'employees.id')
                 ->where('employee_work_schedules.saas_company_id', $companyId)
                 ->where('work_schedules.saas_company_id', $companyId)
-                ->whereDate('employee_work_schedules.start_date', '<=', $today)
+                ->where('employee_work_schedules.start_date', '<=', $today)
                 ->where(function ($q) use ($today) {
                     $q->whereNull('employee_work_schedules.end_date')
-                        ->orWhereDate('employee_work_schedules.end_date', '>=', $today);
+                        ->orWhere('employee_work_schedules.end_date', '>=', $today);
                 })
                 ->orderByDesc('employee_work_schedules.start_date')
                 ->orderByDesc('employee_work_schedules.id')
@@ -271,28 +271,28 @@ class Index extends Component
                 ->whereColumn('employee_work_schedules.employee_id', 'employees.id')
                 ->where('employee_work_schedules.saas_company_id', $companyId)
                 ->where('work_schedules.saas_company_id', $companyId)
-                ->whereDate('employee_work_schedules.start_date', '>', $today)
+                ->where('employee_work_schedules.start_date', '>', $today)
                 ->orderBy('employee_work_schedules.start_date')
                 ->limit(1),
 
             'next_schedule_start' => EmployeeWorkSchedule::select('start_date')
                 ->whereColumn('employee_id', 'employees.id')
                 ->where('saas_company_id', $companyId)
-                ->whereDate('start_date', '>', $today)
+                ->where('start_date', '>', $today)
                 ->orderBy('start_date')
                 ->limit(1),
 
             'next_schedule_end' => EmployeeWorkSchedule::select('end_date')
                 ->whereColumn('employee_id', 'employees.id')
                 ->where('saas_company_id', $companyId)
-                ->whereDate('start_date', '>', $today)
+                ->where('start_date', '>', $today)
                 ->orderBy('start_date')
                 ->limit(1),
 
           'future_schedules_count' => EmployeeWorkSchedule::selectRaw('COUNT(*)')
                 ->whereColumn('employee_id', 'employees.id')
                 ->where('saas_company_id', $companyId)
-                ->whereDate('start_date', '>', $today),
+                ->where('start_date', '>', $today),
 
             'all_schedules_count' => EmployeeWorkSchedule::selectRaw('COUNT(*)')
                 ->whereColumn('employee_id', 'employees.id')

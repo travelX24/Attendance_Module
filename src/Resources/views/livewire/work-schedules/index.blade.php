@@ -195,7 +195,7 @@
     </div>
 
     {{-- Filters & Content --}}
-    <x-ui.card padding="false" class="!overflow-visible" wire:poll.60s>
+    <x-ui.card padding="false" class="!overflow-visible" wire:poll.visible.120s>
         {{-- Toolbar / Filters --}}
         <div class="p-4 border-b border-gray-100 bg-gray-50/30 relative">
             {{-- Filters Grid --}}

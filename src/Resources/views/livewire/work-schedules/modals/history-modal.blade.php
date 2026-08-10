@@ -83,8 +83,7 @@
                                         $data = ($log->action === 'work_schedule.deleted') ? $before : $after;
                                         
                                         $scheduleId = $data['work_schedule_id'] ?? 0;
-                                        $schedule = \Athka\SystemSettings\Models\WorkSchedule::find($scheduleId);
-                                        $schName = $schedule ? $schedule->name : ($scheduleId ? tr('Schedule') . ' #' . $scheduleId : tr('N/A'));
+                                        $schName = $historyScheduleNames[$scheduleId] ?? ($scheduleId ? tr('Schedule') . ' #' . $scheduleId : tr('N/A'));
                                         
                                         $startDate = $data['start_date'] ?? null;
                                         $endDate = $data['end_date'] ?? null;
@@ -99,7 +98,7 @@
                                             <div class="flex items-center justify-between gap-2">
                                                 <p class="text-sm font-bold {{ $isDeleted ? 'text-[color:var(--error)] line-through' : 'text-gray-900' }} flex items-center gap-2">
                                                     {{ $schName }}
-                                                    @if(!$schedule && $scheduleId && !$isDeleted)
+                                                    @if(!isset($historyScheduleNames[$scheduleId]) && $scheduleId && !$isDeleted)
                                                         <i class="fas fa-exclamation-triangle text-[color:var(--warning)] text-[10px]" title="{{ tr('Schedule no longer exists') }}"></i>
                                                     @endif
                                                 </p>
@@ -131,7 +130,7 @@
                                                 @if($log->action === 'work_schedule.changed' && $before)
                                                     <div class="w-full mt-1 pt-1 border-t border-dashed border-gray-100 text-[10px] text-gray-400 italic">
                                                         <i class="fas fa-exchange-alt mr-1"></i>
-                                                        {{ tr('Prev Schedule') }}: {{ \Athka\SystemSettings\Models\WorkSchedule::find($before['work_schedule_id'] ?? 0)?->name ?: '#' . ($before['work_schedule_id'] ?? '?') }}
+                                                        {{ tr('Prev Schedule') }}: {{ $historyScheduleNames[$before['work_schedule_id'] ?? 0] ?? ('#' . ($before['work_schedule_id'] ?? '?')) }}
                                                     </div>
                                                 @endif
                                             </div>

@@ -509,7 +509,7 @@
                         <td class="px-6 py-4 text-center whitespace-nowrap">
                             <x-ui.badge :type="$statusBadge['type']">{{ $statusBadge['label'] }}</x-ui.badge>
                             @if($penalty->exemption_attachment)
-                                <a href="{{ asset('storage/'.$penalty->exemption_attachment) }}" target="_blank" class="mt-1 block text-[10px] text-[color:var(--accent-orange)] hover:underline whitespace-nowrap">
+                                <a href="{{ \Illuminate\Support\Facades\Storage::url($penalty->exemption_attachment) }}" target="_blank" class="mt-1 block text-[10px] text-[color:var(--accent-orange)] hover:underline whitespace-nowrap">
                                     <i class="fas fa-paperclip me-1"></i> {{ tr('Attachment') }}
                                 </a>
                             @endif
