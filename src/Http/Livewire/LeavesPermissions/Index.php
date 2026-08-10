@@ -860,7 +860,6 @@ class Index extends Component
  */
 protected function validatePermissionWithinWorkWindow(...$args): bool
 {
-    // 1) Detect mode (single/group) if passed as first arg
     $mode = null;
     if (isset($args[0]) && is_string($args[0]) && in_array($args[0], ['group', 'single', 'permission'], true)) {
         $mode = $args[0] === 'permission' ? 'single' : $args[0];
@@ -898,18 +897,18 @@ protected function validatePermissionWithinWorkWindow(...$args): bool
     $date = null;
     $from = null;
     $to   = null;
+    $employee = null;
 
     if (isset($args[0], $args[1]) && $looksLikeTime($args[0]) && $looksLikeTime($args[1]) && !isset($args[2])) {
-        // called as (from, to)
         $from = $args[0];
         $to   = $args[1];
     } else {
         $date = $args[0] ?? null;
         $from = $args[1] ?? null;
         $to   = $args[2] ?? null;
+        $employee = $args[3] ?? null;
     }
 
-    // 3) Auto-detect group/single if not provided
     if (!$mode) {
         $hasGroup = !empty($this->group_from_time ?? null) || !empty($this->group_to_time ?? null);
         $mode = $hasGroup ? 'group' : 'single';
@@ -927,10 +926,40 @@ protected function validatePermissionWithinWorkWindow(...$args): bool
     $from = is_string($from) && trim($from) !== '' ? $from : ($this->{$fromField} ?? null);
     $to   = is_string($to)   && trim($to)   !== '' ? $to   : ($this->{$toField}   ?? null);
 
-    // Nothing to validate yet
     if (!$from || !$to) return true;
 
-    // 4) Get company work window (already exists in your traits)
+    $dateCarbon = $date ? Carbon::parse($date)->startOfDay() : now()->startOfDay();
+
+    if (!$employee && $mode === 'single' && !empty($this->permission_employee_id ?? null)) {
+        $employee = Employee::find((int) $this->permission_employee_id);
+    }
+
+    if ($employee instanceof Employee && method_exists($this, 'resolvePermissionWorkWindowForEmployee')) {
+        $resolved = $this->resolvePermissionWorkWindowForEmployee($dateCarbon, $employee);
+
+        if (($resolved['resolved'] ?? false) && (!($resolved['is_workday'] ?? true) || empty($resolved['periods'] ?? []))) {
+            $this->addError('permission_date', tr('Selected date is not a working day.'));
+            return false;
+        }
+
+        $periods = (array) ($resolved['periods'] ?? []);
+        if (!empty($periods)) {
+            if (method_exists($this, 'permissionTimeFitsAnyPeriod') && $this->permissionTimeFitsAnyPeriod($dateCarbon, $from, $to, $periods)) {
+                try {
+                    $this->resetErrorBag([$fromField, $toField]);
+                } catch (\Throwable $e) {
+                }
+
+                return true;
+            }
+
+            $window = $resolved['window'] ?? null;
+            $range = $window ? ' (' . $window[0] . ' - ' . $window[1] . ')' : '';
+            $this->addError($fromField, tr('Time must be within working hours') . $range);
+            return false;
+        }
+    }
+
     [$workStart, $workEnd] = $this->getCompanyWorkWindow($date);
 
     if (!$workStart || !$workEnd) return true;
@@ -942,11 +971,9 @@ protected function validatePermissionWithinWorkWindow(...$args): bool
 
     if ($ws === null || $we === null || $f === null || $t === null) return true;
 
-    // Clear previous related errors (safe)
     try {
         $this->resetErrorBag([$fromField, $toField]);
     } catch (\Throwable $e) {
-        // ignore if not supported in your Livewire version
     }
 
     $inWindow = function (int $x) use ($ws, $we): bool {
@@ -957,24 +984,12 @@ protected function validatePermissionWithinWorkWindow(...$args): bool
         return ($x >= $ws) || ($x <= $we);
     };
 
-    $ok = true;
-
-    if (!$inWindow($f)) {
-        $this->addError($fromField, tr('Time must be within working hours.'));
-        $ok = false;
+    if (!$inWindow($f) || !$inWindow($t)) {
+        $this->addError($fromField, tr('Time must be within working hours') . " ($workStart - $workEnd)");
+        return false;
     }
 
-    if (!$inWindow($t)) {
-        $this->addError($toField, tr('Time must be within working hours.'));
-        $ok = false;
-    }
-
-    // Optional: also show exact range (uncomment if you want)
-    // if (!$ok) {
-    //     $this->addError($toField, tr('Allowed range') . ": {$workStart} - {$workEnd}");
-    // }
-
-    return $ok;
+    return true;
 }
 protected function detectEmployeeBranchColumn(): ?string
 {
@@ -1142,6 +1157,5 @@ private function allowedBranchIds(): array
         $this->resetPage('permPage');
     }
 }
-
 
 

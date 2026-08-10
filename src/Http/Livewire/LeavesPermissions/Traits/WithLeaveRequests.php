@@ -421,6 +421,20 @@ trait WithLeaveRequests
     {
         $this->requireAttendanceAny('requests.leaves.create');
         $this->ensureCanManage();
+        $this->resetValidation([
+            'employee_id',
+            'leave_policy_id',
+            'start_date',
+            'end_date',
+            'reason',
+            'replacement_employee_id',
+            'leave_work_schedule_period_id',
+            'leave_half_day_part',
+            'leave_from_time',
+            'leave_to_time',
+            'leave_attachment',
+            'leave_note_ack',
+        ]);
 
         // 0) Early validation to avoid 404/500 before policy-specific rules
         $this->validate([
@@ -908,9 +922,9 @@ trait WithLeaveRequests
     {
         $s = (array) ($policy->settings ?? []);
 
-        $minDays = (int) data_get($s, 'notice.min_days', 0);
-        $maxAdvance = (int) data_get($s, 'notice.max_advance_days', 3650);
-        $allowRetro = (bool) data_get($s, 'notice.allow_retroactive', false);
+        $minDays = (int) data_get($s, 'notice_min_days', data_get($s, 'notice.min_days', 0));
+        $maxAdvance = (int) data_get($s, 'notice_max_advance_days', data_get($s, 'notice.max_advance_days', 3650));
+        $allowRetro = (bool) data_get($s, 'allow_retroactive', data_get($s, 'notice.allow_retroactive', false));
 
         $today = now()->startOfDay();
 
@@ -2021,6 +2035,17 @@ trait WithLeaveRequests
     {
         $this->requireAttendanceAny('attendance.leaves.manage');
         $this->ensureCanManage();
+        $this->resetValidation([
+            'group_leave_policy_id',
+            'group_start_date',
+            'group_end_date',
+            'group_reason',
+            'groupEmployeeIds',
+            'groupEmployeeIds.*',
+            'group_leave_half_day_part',
+            'group_leave_from_time',
+            'group_leave_to_time',
+        ]);
 
         $policy = null;
 

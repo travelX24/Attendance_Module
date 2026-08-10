@@ -115,6 +115,14 @@ trait WithPermissionRequests
     {
         $this->requireAttendanceAny('requests.permissions.manage');
         $this->ensureCanManage();
+        $this->resetValidation([
+            'permission_employee_id',
+            'permission_date',
+            'from_time',
+            'to_time',
+            'minutes',
+            'permission_reason',
+        ]);
 
         $policy = $this->permissionPolicyRow();
         if (!$policy) {
@@ -216,7 +224,7 @@ trait WithPermissionRequests
         }
 
         // âœ… validate within working hours (Ø¨Ù†ÙØ³ Ù…Ù†Ø·Ù‚ Ø§Ù„Ø´ÙØª Ø¹Ù†Ø¯Ùƒ)
-        if (!$this->validatePermissionWithinWorkWindow($date, $from, $to)) {
+        if (!$this->validatePermissionWithinWorkWindow($date, $from, $to, $employee)) {
             return;
         }
 
@@ -346,6 +354,15 @@ trait WithPermissionRequests
     {
         $this->requireAttendanceAny('requests.permissions.manage');
         $this->ensureCanManage();
+        $this->resetValidation([
+            'groupPermissionEmployeeIds',
+            'groupPermissionEmployeeIds.*',
+            'group_permission_date',
+            'group_from_time',
+            'group_to_time',
+            'group_minutes',
+            'group_permission_reason',
+        ]);
 
         $policy = $this->permissionPolicyRow();
         if (!$policy) {
@@ -636,10 +653,162 @@ trait WithPermissionRequests
     }
 
     // ✅ Group Work Window validation (same logic but fields for group)
+    protected function resolvePermissionWorkWindowForEmployee(Carbon $date, ?Employee $employee = null): array
+    {
+        $dateString = $date->toDateString();
+        $resolved = false;
+        $isWorkday = true;
+        $periods = [];
+
+        if ($employee && class_exists(\Athka\SystemSettings\Services\WorkScheduleService::class)) {
+            $resolved = true;
+            $service = app(\Athka\SystemSettings\Services\WorkScheduleService::class);
+            $schedule = $service->getEffectiveSchedule((int) $this->companyId, $employee, $dateString);
+            $holidays = $service->getHolidays((int) $this->companyId, $dateString, $dateString);
+            $metrics = $service->getMetricsForDate($dateString, $schedule, $holidays, $employee, [
+                'leaves' => collect(),
+                'missions' => collect(),
+                'permissions' => collect(),
+            ]);
+
+            $isWorkday = (bool) ($metrics['is_workday'] ?? false);
+            $periods = collect($metrics['periods'] ?? [])
+                ->map(function ($period) {
+                    $start = substr((string) ($period['start_time'] ?? ''), 0, 5);
+                    $end = substr((string) ($period['end_time'] ?? ''), 0, 5);
+
+                    return [
+                        'start' => $start,
+                        'end' => $end,
+                        'is_night' => (bool) ($period['is_night_shift'] ?? false),
+                    ];
+                })
+                ->filter(fn ($period) => $period['start'] !== '' && $period['end'] !== '')
+                ->values()
+                ->all();
+        }
+
+        if (!$resolved && method_exists($this, 'getWorkSchedulePeriodsForDate')) {
+            $periods = (array) $this->getWorkSchedulePeriodsForDate($date);
+        }
+
+        return [
+            'resolved' => $resolved,
+            'is_workday' => $isWorkday,
+            'periods' => $periods,
+            'window' => $this->permissionWorkWindowFromPeriods($periods),
+        ];
+    }
+
+    protected function permissionWorkWindowFromPeriods(array $periods): ?array
+    {
+        $starts = [];
+        $ends = [];
+        $hasNight = false;
+
+        foreach ($periods as $period) {
+            $start = substr((string) ($period['start'] ?? ''), 0, 5);
+            $end = substr((string) ($period['end'] ?? ''), 0, 5);
+            if ($start !== '') $starts[] = $start;
+            if ($end !== '') $ends[] = $end;
+            if (!empty($period['is_night'])) $hasNight = true;
+        }
+
+        if (empty($starts) || empty($ends)) {
+            return null;
+        }
+
+        sort($starts);
+        sort($ends);
+
+        return [$starts[0], $hasNight ? '23:59' : $ends[count($ends) - 1]];
+    }
+
+    protected function permissionTimeFitsAnyPeriod(Carbon $date, string $from, string $to, array $periods): bool
+    {
+        if (!method_exists($this, 'parseTimeSafe')) {
+            return true;
+        }
+
+        $fromT = $this->parseTimeSafe($from);
+        $toT = $this->parseTimeSafe($to);
+        if (!$fromT || !$toT) {
+            return true;
+        }
+
+        $fromDT = $date->copy()->setTime($fromT->hour, $fromT->minute, 0);
+        $toDT = $date->copy()->setTime($toT->hour, $toT->minute, 0);
+
+        if ($toDT->lte($fromDT)) {
+            $hasNight = collect($periods)->contains(fn ($period) => !empty($period['is_night']));
+            if (!$hasNight) {
+                return false;
+            }
+            $toDT->addDay();
+        }
+
+        foreach ($periods as $period) {
+            $startT = $this->parseTimeSafe((string) ($period['start'] ?? ''));
+            $endT = $this->parseTimeSafe((string) ($period['end'] ?? ''));
+            if (!$startT || !$endT) {
+                continue;
+            }
+
+            $startDT = $date->copy()->setTime($startT->hour, $startT->minute, 0);
+            $endDT = $date->copy()->setTime($endT->hour, $endT->minute, 0);
+
+            if (!empty($period['is_night']) || $endDT->lte($startDT)) {
+                $endDT->addDay();
+            }
+
+            if ($fromDT->gte($startDT) && $toDT->lte($endDT)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     protected function validateGroupPermissionWithinWorkWindow(Carbon $date, string $from, string $to): bool
     {
         if (!method_exists($this, 'companyWorkingDays') || !method_exists($this, 'parseTimeSafe')) {
             return true;
+        }
+
+        $employeeIdsForSchedule = array_values(array_unique(array_map('intval', (array) ($this->groupPermissionEmployeeIds ?? []))));
+        $employeeIdsForSchedule = array_values(array_filter($employeeIdsForSchedule, fn ($value) => $value > 0));
+
+        if (!empty($employeeIdsForSchedule) && class_exists(\Athka\SystemSettings\Services\WorkScheduleService::class)) {
+            $employeesForSchedule = Employee::query()->whereIn('id', $employeeIdsForSchedule)->get()->keyBy('id');
+            $allResolved = true;
+
+            foreach ($employeeIdsForSchedule as $employeeId) {
+                $employee = $employeesForSchedule->get($employeeId);
+                if (!$employee) {
+                    continue;
+                }
+
+                $resolved = $this->resolvePermissionWorkWindowForEmployee($date, $employee);
+                $allResolved = $allResolved && (bool) ($resolved['resolved'] ?? false);
+                $employeeName = $employee->name_ar ?? $employee->name_en ?? $employee->name ?? ('#' . $employeeId);
+
+                if (($resolved['resolved'] ?? false) && (!($resolved['is_workday'] ?? true) || empty($resolved['periods'] ?? []))) {
+                    $this->addError('group_permission_date', tr('Selected date is not a working day.') . ' - ' . $employeeName);
+                    return false;
+                }
+
+                $periods = (array) ($resolved['periods'] ?? []);
+                if (!empty($periods) && !$this->permissionTimeFitsAnyPeriod($date, $from, $to, $periods)) {
+                    $window = $resolved['window'] ?? null;
+                    $range = $window ? ' (' . $window[0] . ' - ' . $window[1] . ')' : '';
+                    $this->addError('group_from_time', tr('Time must be within working hours') . $range . ' - ' . $employeeName);
+                    return false;
+                }
+            }
+
+            if ($allResolved) {
+                return true;
+            }
         }
 
         // Map Carbon dayOfWeek (0=Sunday ... 6=Saturday) to Arabic day names
