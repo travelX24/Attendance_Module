@@ -491,6 +491,7 @@ trait WithAttendanceEdits
                          $day['status'] = 'holiday';
                    }
                   
+                  $day['_original'] = $this->monthlyEditSnapshot($day);
                   $this->monthlyEditForm[] = $day;
              
              $current->addDay();
@@ -513,6 +514,7 @@ trait WithAttendanceEdits
         
         foreach ($this->monthlyEditForm as $row) {
              if (!$row['id']) continue;
+             if (!$this->monthlyEditRowChanged($row)) continue;
 
              $log = AttendanceDailyLog::forCompany($companyId)->with('details')->find($row['id']);
              if (!$log) continue;
@@ -573,6 +575,38 @@ trait WithAttendanceEdits
         $this->showMonthlyEditModal = false;
         $this->loadStats();
         $this->dispatch('toast', ['type' => 'success', 'message' => tr('Monthly sheet updated successfully.')]);
+    }
+
+    private function monthlyEditRowChanged(array $row): bool
+    {
+        if (!array_key_exists('_original', $row) || !is_array($row['_original'])) {
+            return true;
+        }
+
+        return $this->monthlyEditSnapshot($row) !== $row['_original'];
+    }
+
+    private function monthlyEditSnapshot(array $row): array
+    {
+        return [
+            'status' => (string) ($row['status'] ?? ''),
+            'notes' => trim((string) ($row['notes'] ?? '')),
+            'periods' => $this->normalizeMonthlyEditPeriods($row['periods'] ?? []),
+        ];
+    }
+
+    private function normalizeMonthlyEditPeriods(array $periods): array
+    {
+        return collect($periods)
+            ->map(function ($period) {
+                return [
+                    'check_in' => trim((string) ($period['check_in'] ?? '')),
+                    'check_out' => trim((string) ($period['check_out'] ?? '')),
+                ];
+            })
+            ->filter(fn ($period) => $period['check_in'] !== '' || $period['check_out'] !== '')
+            ->values()
+            ->all();
     }
 
     public function addMonthlyPeriod($dayIndex)

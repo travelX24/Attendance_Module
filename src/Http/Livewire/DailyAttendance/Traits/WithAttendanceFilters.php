@@ -9,6 +9,7 @@ use Athka\SystemSettings\Models\JobTitle;
 use Athka\SystemSettings\Models\WorkSchedule;
 use Carbon\Carbon;
 use Athka\Saas\Models\Branch;
+use Athka\Attendance\Models\AttendanceAuditLog;
 use Athka\Attendance\Models\EmployeeWorkSchedule;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
@@ -28,6 +29,11 @@ trait WithAttendanceFilters
     public $branch_id = 'all';
     public $job_title_id = 'all';
     public $status = 'ACTIVE';
+    public $showSummaryEditHistoryModal = false;
+    public $summaryEditHistoryEmployeeName = '';
+    public $summaryEditHistoryEmployeeNo = '';
+    public $summaryEditHistoryPeriod = '';
+    public $summaryEditHistory = [];
 
     public function updatingSearch()
     {
@@ -54,6 +60,45 @@ trait WithAttendanceFilters
             $this->generateMissingLogs(true);
         }
         $this->loadStats();
+    }
+
+    public function openSummaryEditHistoryModal($employeeId): void
+    {
+        $this->requireAttendanceAny(['attendance.daily.view', 'attendance.daily.view-subordinates', 'attendance.daily.manage']);
+
+        $companyId = auth()->user()->saas_company_id;
+        $employeeQuery = Employee::withoutGlobalScope('active_only')->forCompany($companyId);
+        $employeeQuery = $this->applyDataScoping($employeeQuery, 'attendance.daily.view', 'attendance.daily.view-subordinates', '');
+
+        $allowed = $this->allowedBranchIds();
+        if (!empty($allowed)) {
+            $employeeQuery->whereIn('branch_id', $allowed);
+        }
+
+        if ($this->branch_id !== 'all') {
+            $employeeQuery->where('branch_id', (int) $this->branch_id);
+        }
+
+        $employee = $employeeQuery->findOrFail((int) $employeeId);
+        [$startDate, $endDate] = $this->summaryHistoryDateRange();
+
+        $this->summaryEditHistoryEmployeeName = $employee->name_ar ?? $employee->name_en ?? '-';
+        $this->summaryEditHistoryEmployeeNo = $employee->employee_no ?? '-';
+        $this->summaryEditHistoryPeriod = company_date($startDate) . ' - ' . company_date($endDate);
+        $this->summaryEditHistory = $this->attendanceEditHistoryForEmployees([(int) $employee->id], $startDate, $endDate)
+            ->get((int) $employee->id, collect())
+            ->values()
+            ->all();
+        $this->showSummaryEditHistoryModal = true;
+    }
+
+    public function closeSummaryEditHistoryModal(): void
+    {
+        $this->showSummaryEditHistoryModal = false;
+        $this->summaryEditHistoryEmployeeName = '';
+        $this->summaryEditHistoryEmployeeNo = '';
+        $this->summaryEditHistoryPeriod = '';
+        $this->summaryEditHistory = [];
     }
 
     public function updatedDateFrom($value)
@@ -242,6 +287,7 @@ trait WithAttendanceFilters
             $summaryByEmployee = collect();
             $partialLeaveDaysByEmployee = collect();
             $scheduleNames = collect();
+            $editHistoryByEmployee = collect();
 
             if (!empty($employeeIds)) {
                 $logs = AttendanceDailyLog::forCompany($companyId)
@@ -324,12 +370,16 @@ trait WithAttendanceFilters
                         ->whereIn('id', $scheduleIds)
                         ->pluck('name', 'id');
                 }
+
+                $editHistoryByEmployee = $this->attendanceEditHistoryForEmployees($employeeIds, $startDate, $endDate);
             }
 
             foreach ($employees as $employee) {
                 $summary = $summaryByEmployee->get($employee->id);
                 $scheduleId = $summary->schedule_id ?? null;
                 $partialLeaveDays = (float) ($partialLeaveDaysByEmployee->get($employee->id) ?? 0);
+                $editHistory = $editHistoryByEmployee->get((int) $employee->id, collect())->values();
+                $latestEdit = $editHistory->first();
 
                 $employee->summary = (object)[
                     'total_days' => (int) ($summary->total_days ?? 0),
@@ -343,6 +393,8 @@ trait WithAttendanceFilters
                     'total_actual_hours' => (float) ($summary->total_actual_hours ?? 0),
                     'avg_compliance' => (float) ($summary->avg_compliance ?? 0),
                     'schedule_name' => $scheduleId ? ($scheduleNames[$scheduleId] ?? '-') : '-',
+                    'edit_history_count' => $editHistory->count(),
+                    'latest_edit' => $latestEdit,
                 ];
             }
 
@@ -435,6 +487,133 @@ trait WithAttendanceFilters
         }
 
         return $query->orderByDesc('attendance_date')->paginate(20);
+    }
+
+    private function summaryHistoryDateRange(): array
+    {
+        $startDate = $this->date_from ?: now()->startOfMonth()->toDateString();
+        $endDate = $this->date_to ?: now()->endOfMonth()->toDateString();
+
+        return [$startDate, $endDate];
+    }
+
+    private function attendanceEditHistoryForEmployees(array $employeeIds, string $startDate, string $endDate)
+    {
+        $employeeIds = array_values(array_filter(array_map('intval', $employeeIds), fn ($id) => $id > 0));
+
+        if (empty($employeeIds)) {
+            return collect();
+        }
+
+        $companyId = auth()->user()->saas_company_id;
+        $attendanceLogs = AttendanceDailyLog::forCompany($companyId)
+            ->whereIn('employee_id', $employeeIds)
+            ->whereBetween('attendance_date', [$startDate, $endDate])
+            ->get(['id', 'employee_id', 'attendance_date'])
+            ->keyBy('id');
+
+        if ($attendanceLogs->isEmpty()) {
+            return collect();
+        }
+
+        return AttendanceAuditLog::query()
+            ->where('saas_company_id', $companyId)
+            ->where('entity_type', 'attendance_daily_log')
+            ->whereIn('entity_id', $attendanceLogs->keys()->all())
+            ->whereIn('action', ['attendance.edited', 'attendance.edited_bulk'])
+            ->with('actor')
+            ->orderByDesc('created_at')
+            ->get()
+            ->filter(fn ($audit) => $this->attendanceAuditHasVisibleChange($audit))
+            ->map(function ($audit) use ($attendanceLogs) {
+                $attendanceLog = $attendanceLogs->get($audit->entity_id);
+                $employeeId = (int) ($audit->employee_id ?: ($attendanceLog->employee_id ?? 0));
+                $actor = $audit->actor;
+
+                return [
+                    'employee_id' => $employeeId,
+                    'attendance_date' => $attendanceLog?->attendance_date ? company_date($attendanceLog->attendance_date) : '-',
+                    'edited_at' => $audit->created_at ? $audit->created_at->format('Y-m-d H:i') : '-',
+                    'actor_name' => $actor ? ($actor->name_ar ?? $actor->name_en ?? $actor->name ?? tr('System')) : tr('System'),
+                    'reason' => $audit->meta_json['reason'] ?? $audit->meta_json['notes'] ?? '-',
+                    'action_label' => $audit->action === 'attendance.edited_bulk'
+                        ? tr('Monthly sheet edit')
+                        : tr('Attendance edit'),
+                ];
+            })
+            ->filter(fn ($entry) => $entry['employee_id'] > 0)
+            ->groupBy('employee_id');
+    }
+
+    private function attendanceAuditHasVisibleChange(AttendanceAuditLog $audit): bool
+    {
+        $before = (array) ($audit->before_json ?? []);
+        $after = (array) ($audit->after_json ?? []);
+
+        return [
+            'status' => $before['attendance_status'] ?? null,
+            'check_in' => $this->normalizeAuditTime($before['check_in_time'] ?? null),
+            'check_out' => $this->normalizeAuditTime($before['check_out_time'] ?? null),
+            'notes' => $this->normalizeAuditNotes($before['meta_data'] ?? []),
+            'attempts' => $this->normalizeAuditAttempts($before['check_attempts'] ?? []),
+        ] !== [
+            'status' => $after['attendance_status'] ?? null,
+            'check_in' => $this->normalizeAuditTime($after['check_in_time'] ?? null),
+            'check_out' => $this->normalizeAuditTime($after['check_out_time'] ?? null),
+            'notes' => $this->normalizeAuditNotes($after['meta_data'] ?? []),
+            'attempts' => $this->normalizeAuditAttempts($after['check_attempts'] ?? []),
+        ];
+    }
+
+    private function normalizeAuditTime($value): ?string
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        try {
+            return Carbon::parse($value)->format('H:i');
+        } catch (\Throwable) {
+            return preg_match('/\d{2}:\d{2}/', (string) $value, $matches) ? $matches[0] : (string) $value;
+        }
+    }
+
+    private function normalizeAuditNotes($metaData): string
+    {
+        $metaData = $this->decodeAuditArray($metaData);
+
+        return trim((string) ($metaData['notes'] ?? ''));
+    }
+
+    private function normalizeAuditAttempts($attempts): array
+    {
+        return collect($this->decodeAuditArray($attempts))
+            ->map(function ($attempt) {
+                $attempt = is_array($attempt) ? $attempt : [];
+
+                return [
+                    'check_in' => $this->normalizeAuditTime($attempt['check_in'] ?? $attempt['check_in_time'] ?? null),
+                    'check_out' => $this->normalizeAuditTime($attempt['check_out'] ?? $attempt['check_out_time'] ?? null),
+                ];
+            })
+            ->filter(fn ($attempt) => $attempt['check_in'] !== null || $attempt['check_out'] !== null)
+            ->values()
+            ->all();
+    }
+
+    private function decodeAuditArray($value): array
+    {
+        if (is_array($value)) {
+            return $value;
+        }
+
+        if (is_string($value) && $value !== '') {
+            $decoded = json_decode($value, true);
+
+            return is_array($decoded) ? $decoded : [];
+        }
+
+        return [];
     }
 
     public function getDepartmentsProperty()

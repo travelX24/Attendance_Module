@@ -905,6 +905,17 @@ class PenaltyService
         return $total;
     }
 
+    private function markSkipped(string $reason): void
+    {
+        $reason = trim($reason);
+
+        if ($reason === '') {
+            return;
+        }
+
+        $this->skipReasons[$reason] = ($this->skipReasons[$reason] ?? 0) + 1;
+    }
+
     private function parseTimeOnDate($date, $time): ?Carbon
     {
         if (blank($date) || blank($time)) {

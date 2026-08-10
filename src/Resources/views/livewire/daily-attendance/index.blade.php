@@ -709,9 +709,10 @@
                     tr('Attendance Analytics'),
                     tr('Hours Summary'),
                     tr('Compliance'),
+                    tr('Modification History'),
                     tr('Actions'),
                 ];
-                $summaryAlign = ['start', 'center', 'center', 'center', 'center', 'center', 'center'];
+                $summaryAlign = ['start', 'center', 'center', 'center', 'center', 'center', 'center', 'center'];
             @endphp
 
             <x-ui.table :headers="$summaryHeaders" :headerAlign="$summaryAlign" :enablePagination="false">
@@ -855,6 +856,37 @@
                             </div>
                         </td>
 
+                        {{-- Modification History --}}
+                        <td class="px-6 py-4 text-center">
+                            @php
+                                $historyCount = (int) ($employee->summary->edit_history_count ?? 0);
+                                $latestEdit = $employee->summary->latest_edit ?? null;
+                            @endphp
+
+                            @if($historyCount > 0 && $latestEdit)
+                                <div class="flex flex-col items-center gap-2 max-w-[180px] mx-auto">
+                                    <button
+                                        type="button"
+                                        wire:click="openSummaryEditHistoryModal({{ $employee->id }})"
+                                        class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-white text-[color:var(--brand-via)] border border-[color:var(--brand-via)]/30 text-[10px] font-bold shadow-sm hover:bg-[color:var(--app-soft-bg)] hover:border-[color:var(--brand-via)] hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[color:var(--brand-via)]/20 transition-all"
+                                    >
+                                        <i class="fas fa-history"></i>
+                                        <span>{{ $historyCount }}</span>
+                                    </button>
+                                    <div class="text-[10px] text-gray-500 leading-relaxed">
+                                        <div class="font-semibold text-gray-700 truncate max-w-[160px]" title="{{ $latestEdit['actor_name'] ?? '-' }}">
+                                            {{ $latestEdit['actor_name'] ?? '-' }}
+                                        </div>
+                                        <div class="truncate max-w-[160px]" title="{{ $latestEdit['reason'] ?? '-' }}">
+                                            {{ $latestEdit['reason'] ?? '-' }}
+                                        </div>
+                                    </div>
+                                </div>
+                            @else
+                                <span class="text-[10px] text-gray-300">-</span>
+                            @endif
+                        </td>
+
                         {{-- Actions --}}
                         <td class="px-6 py-4 text-center">
                             @if($canManageDaily)
@@ -868,7 +900,7 @@
                      </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="px-6 py-12 text-center text-gray-500 italic">{{ tr('No employees found.') }}</td>
+                        <td colspan="8" class="px-6 py-12 text-center text-gray-500 italic">{{ tr('No employees found.') }}</td>
                     </tr>
                 @endforelse
             </x-ui.table>
@@ -906,5 +938,8 @@
         @endif
         @if($showMonthlyEditModal)
             @include('attendance::livewire.daily-attendance.modals.monthly-edit-modal')
+        @endif
+        @if($showSummaryEditHistoryModal)
+            @include('attendance::livewire.daily-attendance.modals.summary-edit-history-modal')
         @endif
     </div></div>

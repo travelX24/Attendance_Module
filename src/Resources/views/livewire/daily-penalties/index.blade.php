@@ -100,12 +100,14 @@
                         ]"
                         width="full"
                         :disabled="!$canFilterPenalties"
+                        :defer="false"
+                        :applyOnChange="true"
                     />
                 </div>
 
                 @if($calculation_mode === 'single_day')
                     {{-- Single Day Navigator --}}
-                    <div class="sm:col-span-2 lg:col-span-2">
+                    <div class="sm:col-span-2 lg:col-span-2" wire:key="daily-penalties-date-single">
                         <label class="block text-xs font-semibold text-gray-600 mb-1.5">
                             {{ tr('Date') }}
                         </label>
@@ -150,7 +152,7 @@
                         </div>
                     </div>
                 @else
-                    <div>
+                    <div wire:key="daily-penalties-date-from-range">
                         <x-ui.company-date-picker
                             model="date_from"
                             :label="tr('From Date')"
@@ -158,12 +160,12 @@
                         />
                     </div>
 
-                    <div>
+                    <div wire:key="daily-penalties-date-to-range">
                         <x-ui.company-date-picker
                             model="date_to"
                             :label="tr('To Date')"
-                                                        :min-date="$date_from"
-:disabled="!$canFilterPenalties"
+                            :min-date="$date_from"
+                            :disabled="!$canFilterPenalties"
                         />
                     </div>
                 @endif

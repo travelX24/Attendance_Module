@@ -108,6 +108,7 @@ class Index extends Component
         $this->showCreateModal = false;
         $this->showBulkApprovalModal = false;
         $this->showApprovedEditConfirmModal = false;
+        $this->showSummaryEditHistoryModal = false;
         $this->reset(['approvedEditConfirmText', 'approvedEditConfirmUnderstood']);
     }
 
