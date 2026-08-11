@@ -1,69 +1,106 @@
-<x-ui.modal wire:model="showSummaryEditHistoryModal" max-width="2xl">
+<x-ui.modal wire:model="showSummaryEditHistoryModal" max-width="7xl">
     <x-slot name="title">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 bg-[color:var(--app-soft-bg)] text-[color:var(--brand-via)] rounded-xl flex items-center justify-center text-lg border border-[color:var(--border-soft)] shadow-sm">
+        <div class="flex items-center gap-3 min-w-0">
+            <div class="w-10 h-10 bg-[color:var(--app-soft-bg)] text-[color:var(--brand-via)] rounded-xl flex items-center justify-center text-lg border border-[color:var(--border-soft)] shadow-sm shrink-0">
                 <i class="fas fa-history"></i>
             </div>
-            <div>
-                <h3 class="font-bold text-gray-900 text-lg leading-tight">{{ tr('Modification History') }}</h3>
-                <p class="text-xs text-gray-500 mt-0.5">{{ $summaryEditHistoryPeriod }}</p>
+            <div class="min-w-0">
+                <h3 class="font-bold text-gray-900 text-lg leading-tight truncate">{{ $summaryEditHistoryEmployeeName ?: '-' }}</h3>
+                <div class="flex flex-wrap items-center gap-2 text-xs text-gray-500 mt-0.5">
+                    <span class="font-semibold text-[color:var(--brand-via)]">#{{ $summaryEditHistoryEmployeeNo ?: '-' }}</span>
+                    <span class="text-gray-300">|</span>
+                    <span>{{ $summaryEditHistoryPeriod }}</span>
+                </div>
             </div>
         </div>
     </x-slot>
 
     <x-slot name="content">
-        <div class="space-y-5">
-            <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-xl border border-gray-100">
-                <div class="w-10 h-10 rounded-full bg-white flex items-center justify-center text-[color:var(--brand-via)] font-bold shrink-0 border border-[color:var(--border-soft)]">
-                    {{ mb_substr($summaryEditHistoryEmployeeName ?: '?', 0, 1) }}
-                </div>
-                <div class="min-w-0">
-                    <p class="text-sm font-semibold text-gray-900 truncate">{{ $summaryEditHistoryEmployeeName ?: '-' }}</p>
-                    <p class="text-xs text-gray-500">#{{ $summaryEditHistoryEmployeeNo ?: '-' }}</p>
+        @php
+            $historyLabels = str_starts_with((string) app()->getLocale(), 'ar')
+                ? [
+                    'modification_date' => 'تاريخ التعديل',
+                    'modified_day_date' => 'تاريخ ويوم اليوم الذي تم تعديله',
+                    'modified_period' => 'الفترة المعدلة',
+                    'modification_type' => 'نوع التعديل',
+                    'before_time' => 'الوقت قبل التعديل',
+                    'after_time' => 'الوقت المعدل',
+                    'reason' => 'سبب التعديل',
+                    'actor' => 'اسم الموظف الذي عدل',
+                ]
+                : [
+                    'modification_date' => 'Modification Date',
+                    'modified_day_date' => 'Modified Day and Date',
+                    'modified_period' => 'Modified Period',
+                    'modification_type' => 'Modification Type',
+                    'before_time' => 'Time Before Modification',
+                    'after_time' => 'Modified Time',
+                    'reason' => 'Modification Reason',
+                    'actor' => 'Edited By',
+                ];
+        @endphp
+
+        @if(count($summaryEditHistory) > 0)
+            <div class="rounded-xl border border-gray-100 bg-white shadow-sm overflow-hidden">
+                <div class="overflow-x-auto">
+                    <table class="min-w-[1180px] w-full text-sm text-right">
+                        <thead class="bg-gray-50 text-gray-600">
+                            <tr class="border-b border-gray-100">
+                                <th class="px-4 py-3 text-xs font-bold whitespace-nowrap">{{ $historyLabels['modification_date'] }}</th>
+                                <th class="px-4 py-3 text-xs font-bold whitespace-nowrap">{{ $historyLabels['modified_day_date'] }}</th>
+                                <th class="px-4 py-3 text-xs font-bold whitespace-nowrap">{{ $historyLabels['modified_period'] }}</th>
+                                <th class="px-4 py-3 text-xs font-bold whitespace-nowrap">{{ $historyLabels['modification_type'] }}</th>
+                                <th class="px-4 py-3 text-xs font-bold whitespace-nowrap">{{ $historyLabels['before_time'] }}</th>
+                                <th class="px-4 py-3 text-xs font-bold whitespace-nowrap">{{ $historyLabels['after_time'] }}</th>
+                                <th class="px-4 py-3 text-xs font-bold min-w-[220px]">{{ $historyLabels['reason'] }}</th>
+                                <th class="px-4 py-3 text-xs font-bold whitespace-nowrap">{{ $historyLabels['actor'] }}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            @foreach($summaryEditHistory as $entry)
+                                <tr class="hover:bg-gray-50/70 transition-colors">
+                                    <td class="px-4 py-3 text-xs font-semibold text-gray-800 whitespace-nowrap">
+                                        {{ $entry['edited_at'] ?? '-' }}
+                                    </td>
+                                    <td class="px-4 py-3 text-xs text-gray-700 whitespace-nowrap">
+                                        {{ $entry['attendance_date_with_day'] ?? ($entry['attendance_date'] ?? '-') }}
+                                    </td>
+                                    <td class="px-4 py-3 whitespace-nowrap">
+                                        <span class="inline-flex items-center rounded-full bg-gray-50 border border-gray-100 px-2.5 py-1 text-xs font-bold text-gray-700">
+                                            {{ $entry['period_label'] ?? '-' }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3 whitespace-nowrap">
+                                        <span class="inline-flex items-center rounded-full bg-[color:var(--app-soft-bg)] border border-[color:var(--border-soft)] px-2.5 py-1 text-xs font-bold text-[color:var(--brand-via)]">
+                                            {{ $entry['change_type_label'] ?? '-' }}
+                                        </span>
+                                    </td>
+                                    <td class="px-4 py-3 text-xs font-mono text-gray-600 whitespace-nowrap">
+                                        {{ $entry['before_time'] ?? '-' }}
+                                    </td>
+                                    <td class="px-4 py-3 text-xs font-mono font-bold text-gray-900 whitespace-nowrap">
+                                        {{ $entry['after_time'] ?? '-' }}
+                                    </td>
+                                    <td class="px-4 py-3 text-xs text-gray-700 leading-relaxed">
+                                        {{ $entry['reason'] ?? '-' }}
+                                    </td>
+                                    <td class="px-4 py-3 text-xs font-semibold text-gray-800 whitespace-nowrap">
+                                        {{ $entry['actor_name'] ?? tr('System') }}
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
                 </div>
             </div>
-
-            @if(count($summaryEditHistory) > 0)
-                <div class="space-y-4">
-                    @foreach($summaryEditHistory as $entry)
-                        <div class="relative ps-6 pb-2 border-s-2 border-gray-100 last:border-transparent">
-                            <div class="absolute -start-[9px] top-0 w-4 h-4 rounded-full bg-white border-2 border-[color:var(--brand-via)] flex items-center justify-center">
-                                <div class="w-1.5 h-1.5 rounded-full bg-[color:var(--brand-via)]"></div>
-                            </div>
-
-                            <div class="bg-white rounded-xl p-4 border border-gray-100 shadow-sm">
-                                <div class="flex flex-wrap items-center justify-between gap-2 mb-2">
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        <span class="text-xs font-bold text-gray-900">{{ $entry['actor_name'] ?? tr('System') }}</span>
-                                        <span class="px-2 py-0.5 rounded-full bg-gray-50 border border-gray-100 text-[10px] text-gray-500">
-                                            {{ $entry['action_label'] ?? tr('Attendance edit') }}
-                                        </span>
-                                    </div>
-                                    <span class="text-[10px] text-gray-400">{{ $entry['edited_at'] ?? '-' }}</span>
-                                </div>
-
-                                <div class="text-[11px] text-gray-500 mb-2">
-                                    <i class="fas fa-calendar-day me-1 text-gray-300"></i>
-                                    {{ tr('Attendance Date') }}: {{ $entry['attendance_date'] ?? '-' }}
-                                </div>
-
-                                <p class="text-xs text-gray-700 leading-relaxed bg-gray-50/70 rounded-lg p-3 border border-gray-100">
-                                    <i class="fas fa-quote-left text-[10px] text-gray-300 me-1"></i>
-                                    {{ $entry['reason'] ?? '-' }}
-                                </p>
-                            </div>
-                        </div>
-                    @endforeach
+        @else
+            <div class="py-10 text-center">
+                <div class="w-14 h-14 mx-auto rounded-full bg-gray-50 flex items-center justify-center text-gray-300 mb-3">
+                    <i class="fas fa-history fa-lg"></i>
                 </div>
-            @else
-                <div class="py-10 text-center">
-                    <div class="w-14 h-14 mx-auto rounded-full bg-gray-50 flex items-center justify-center text-gray-300 mb-3">
-                        <i class="fas fa-history fa-lg"></i>
-                    </div>
-                    <p class="text-sm text-gray-500 italic">{{ tr('No modification history found for this period.') }}</p>
-                </div>
-            @endif
-        </div>
+                <p class="text-sm text-gray-500 italic">{{ tr('No modification history found for this period.') }}</p>
+            </div>
+        @endif
     </x-slot>
 
     <x-slot name="footer">

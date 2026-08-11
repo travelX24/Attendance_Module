@@ -183,6 +183,8 @@
                         ]"
                         width="full"
                         :disabled="!$canFilterPenalties"
+                        :defer="false"
+                        :applyOnChange="true"
                     />
                 </div>
 
@@ -198,6 +200,8 @@
                         ]"
                         width="full"
                         :disabled="!$canFilterPenalties"
+                        :defer="false"
+                        :applyOnChange="true"
                     />
                 </div>
 
@@ -209,6 +213,8 @@
                         :options="\Athka\Employees\Support\EmployeeStatus::filterOptions(true)"
                         width="full"
                         :disabled="!$canFilterPenalties"
+                        :defer="false"
+                        :applyOnChange="true"
                     />
                 </div>
 
@@ -220,6 +226,8 @@
                         :options="$branches->map(fn($b) => ['value' => $b->id, 'label' => $b->name])->toArray()"
                         width="full"
                         :disabled="!$canFilterPenalties"
+                        :defer="false"
+                        :applyOnChange="true"
                     />
                 </div>
 
@@ -231,6 +239,8 @@
                         :options="$departments->map(fn($d) => ['value' => $d->id, 'label' => $d->name])->toArray()"
                         width="full"
                         :disabled="!$canFilterPenalties"
+                        :defer="false"
+                        :applyOnChange="true"
                     />
                 </div>
 
@@ -242,6 +252,8 @@
                         :options="$jobTitles->map(fn($j) => ['value' => $j->id, 'label' => $j->name])->toArray()"
                         width="full"
                         :disabled="!$canFilterPenalties"
+                        :defer="false"
+                        :applyOnChange="true"
                     />
                 </div>
             </div>
@@ -253,6 +265,7 @@
                                ($wire.calculation_mode && $wire.calculation_mode !== 'single_day') ||
                                ($wire.violation_type_filter && $wire.violation_type_filter !== 'all') ||
                                ($wire.status_filter && $wire.status_filter !== 'all') ||
+                               ($wire.status_emp_filter && $wire.status_emp_filter !== 'all') ||
                                ($wire.branch_id && $wire.branch_id !== 'all' && $wire.branch_id !== '') ||
                                ($wire.department_id && $wire.department_id !== 'all') ||
                                ($wire.job_title_id && $wire.job_title_id !== 'all');

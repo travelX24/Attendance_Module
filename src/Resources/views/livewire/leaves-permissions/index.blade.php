@@ -2377,7 +2377,7 @@
 
                     <div
                         wire:loading.flex
-                        wire:target="groupBranchId,groupDepartmentId,groupJobTitleId,groupContractType"
+                        wire:target="groupEmployeeSearch,groupBranchId,groupDepartmentId,groupJobTitleId,groupContractType"
                         class="mb-3 items-center gap-2 rounded-xl border border-gray-200 bg-white px-3 py-2 text-[11px] font-semibold text-gray-500"
                     >
                         <i class="fas fa-circle-notch fa-spin"></i>
@@ -2409,6 +2409,28 @@
                             x-transition.opacity
                             class="absolute inset-x-0 top-full z-[10002] mt-2 rounded-xl border border-gray-200 bg-white p-2 shadow-2xl"
                         >
+                            <div class="mb-2">
+                                <div class="relative">
+                                    <x-ui.input
+                                        type="text"
+                                        wire:model.live.debounce.300ms="groupEmployeeSearch"
+                                        class="w-full {{ app()->isLocale('ar') ? 'ps-9' : 'pe-9' }}"
+                                        placeholder="{{ tr('Search by employee name or number...') }}"
+                                        :disabled="!$canManageLeaveRequests"
+                                    />
+                                    <i class="fas fa-search absolute top-1/2 -translate-y-1/2 {{ app()->isLocale('ar') ? 'left-3' : 'right-3' }} text-xs text-gray-400"></i>
+                                </div>
+
+                                <div
+                                    wire:loading.flex
+                                    wire:target="groupEmployeeSearch"
+                                    class="mt-2 items-center gap-2 text-[11px] font-semibold text-gray-500"
+                                >
+                                    <i class="fas fa-circle-notch fa-spin"></i>
+                                    <span>{{ tr('Searching') }}...</span>
+                                </div>
+                            </div>
+
                             <div class="max-h-72 overflow-y-auto pe-1">
                                 @forelse($groupEmployeeRows as $e)
                                     <label
@@ -2527,11 +2549,17 @@
                     </x-ui.card>
 
                     <div>
-                        <div class="text-xs text-gray-500 mb-1">{{ tr('Start Date') }}</div>
-                        <x-ui.company-date-picker model="group_start_date" />
-                        @error('group_start_date')
-                            <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div>
-                        @enderror
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                            <div>
+                                <div class="text-xs text-gray-500 mb-1">{{ tr('Start Date') }}</div>
+                                <x-ui.company-date-picker model="group_start_date" />
+                            </div>
+
+                            <div>
+                                <div class="text-xs text-gray-500 mb-1">{{ tr('End Date') }}</div>
+                                <x-ui.company-date-picker model="group_end_date" :min-date="$group_start_date" />
+                            </div>
+                        </div>
                     </div>
 
                     @if(empty($group_start_date))
@@ -2580,15 +2608,7 @@
                                 </div>
                             @endif
 
-                            @if($group_leave_duration_unit === 'full_day')
-                                <div>
-                                    <div class="text-xs text-gray-500 mb-1">{{ tr('End Date') }}</div>
-                                    <x-ui.company-date-picker model="group_end_date" />
-                                    @error('group_end_date')
-                                        <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div>
-                                    @enderror
-                                </div>
-                            @elseif($group_leave_duration_unit === 'half_day')
+                            @if($group_leave_duration_unit === 'half_day')
                                 <div>
                                     <div class="text-xs text-gray-500 mb-1">{{ tr('Half day') }}</div>
                                     <x-ui.select wire:model.change="group_leave_half_day_part" class="w-full">
@@ -2599,7 +2619,7 @@
                                         <div class="text-xs text-red-600 mt-1">{{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}</div>
                                     @enderror
                                 </div>
-                            @else
+                            @elseif($group_leave_duration_unit === 'hours')
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
                                     <div>
                                         <div class="text-xs text-gray-500 mb-1">{{ tr('From') }}</div>

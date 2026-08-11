@@ -529,20 +529,161 @@ trait WithAttendanceFilters
                 $attendanceLog = $attendanceLogs->get($audit->entity_id);
                 $employeeId = (int) ($audit->employee_id ?: ($attendanceLog->employee_id ?? 0));
                 $actor = $audit->actor;
+                $actorName = $actor ? ($actor->name_ar ?? $actor->name_en ?? $actor->name ?? tr('System')) : tr('System');
 
-                return [
-                    'employee_id' => $employeeId,
-                    'attendance_date' => $attendanceLog?->attendance_date ? company_date($attendanceLog->attendance_date) : '-',
-                    'edited_at' => $audit->created_at ? $audit->created_at->format('Y-m-d H:i') : '-',
-                    'actor_name' => $actor ? ($actor->name_ar ?? $actor->name_en ?? $actor->name ?? tr('System')) : tr('System'),
-                    'reason' => $audit->meta_json['reason'] ?? $audit->meta_json['notes'] ?? '-',
-                    'action_label' => $audit->action === 'attendance.edited_bulk'
-                        ? tr('Monthly sheet edit')
-                        : tr('Attendance edit'),
-                ];
+                return $this->attendanceAuditHistoryRow($audit, $attendanceLog, $employeeId, $actorName);
             })
             ->filter(fn ($entry) => $entry['employee_id'] > 0)
             ->groupBy('employee_id');
+    }
+
+    private function attendanceAuditHistoryRow(AttendanceAuditLog $audit, ?AttendanceDailyLog $attendanceLog, int $employeeId, string $actorName): array
+    {
+        $before = (array) ($audit->before_json ?? []);
+        $after = (array) ($audit->after_json ?? []);
+        $meta = $this->decodeAuditArray($audit->meta_json ?? []);
+        $change = $this->attendanceAuditChangeDetails($before, $after);
+
+        return [
+            'employee_id' => $employeeId,
+            'attendance_date' => $attendanceLog?->attendance_date ? company_date($attendanceLog->attendance_date) : '-',
+            'attendance_date_with_day' => $this->formatAttendanceHistoryDateWithDay($attendanceLog?->attendance_date),
+            'edited_at' => $audit->created_at ? $audit->created_at->format('Y-m-d H:i') : '-',
+            'period_label' => $change['period_label'],
+            'change_type_label' => $change['change_type_label'],
+            'before_time' => $change['before_time'],
+            'after_time' => $change['after_time'],
+            'actor_name' => $actorName,
+            'reason' => $meta['reason'] ?? $meta['notes'] ?? '-',
+            'action_label' => $audit->action === 'attendance.edited_bulk'
+                ? tr('Monthly sheet edit')
+                : tr('Attendance edit'),
+        ];
+    }
+
+    private function attendanceAuditChangeDetails(array $before, array $after): array
+    {
+        $beforeAttempts = $this->normalizeAuditAttemptSlots($before['check_attempts'] ?? []);
+        $afterAttempts = $this->normalizeAuditAttemptSlots($after['check_attempts'] ?? []);
+        $maxAttempts = max(count($beforeAttempts), count($afterAttempts));
+        $changedIndexes = [];
+        $checkInChanged = false;
+        $checkOutChanged = false;
+
+        for ($index = 0; $index < $maxAttempts; $index++) {
+            $beforeAttempt = $beforeAttempts[$index] ?? ['check_in' => null, 'check_out' => null];
+            $afterAttempt = $afterAttempts[$index] ?? ['check_in' => null, 'check_out' => null];
+            $attemptCheckInChanged = ($beforeAttempt['check_in'] ?? null) !== ($afterAttempt['check_in'] ?? null);
+            $attemptCheckOutChanged = ($beforeAttempt['check_out'] ?? null) !== ($afterAttempt['check_out'] ?? null);
+
+            if ($attemptCheckInChanged || $attemptCheckOutChanged) {
+                $changedIndexes[] = $index;
+                $checkInChanged = $checkInChanged || $attemptCheckInChanged;
+                $checkOutChanged = $checkOutChanged || $attemptCheckOutChanged;
+            }
+        }
+
+        $mainCheckInChanged = $this->normalizeAuditTime($before['check_in_time'] ?? null) !== $this->normalizeAuditTime($after['check_in_time'] ?? null);
+        $mainCheckOutChanged = $this->normalizeAuditTime($before['check_out_time'] ?? null) !== $this->normalizeAuditTime($after['check_out_time'] ?? null);
+
+        $checkInChanged = $checkInChanged || $mainCheckInChanged;
+        $checkOutChanged = $checkOutChanged || $mainCheckOutChanged;
+
+        $changeType = match (true) {
+            $checkInChanged && !$checkOutChanged => 'check_in',
+            $checkOutChanged && !$checkInChanged => 'check_out',
+            default => 'all',
+        };
+
+        return [
+            'period_label' => $this->attendanceHistoryPeriodLabel($changedIndexes),
+            'change_type_label' => $this->attendanceHistoryChangeTypeLabel($changeType),
+            'before_time' => $this->formatAuditChangeTime($before, $beforeAttempts, $changedIndexes, $changeType),
+            'after_time' => $this->formatAuditChangeTime($after, $afterAttempts, $changedIndexes, $changeType),
+        ];
+    }
+
+    private function attendanceHistoryPeriodLabel(array $changedIndexes): string
+    {
+        if (count($changedIndexes) !== 1) {
+            return $this->attendanceHistoryText('الجميع', 'All');
+        }
+
+        return match ((int) $changedIndexes[0]) {
+            0 => $this->attendanceHistoryText('الأولى', 'First'),
+            1 => $this->attendanceHistoryText('الثانية', 'Second'),
+            default => $this->attendanceHistoryText('الفترة ' . ((int) $changedIndexes[0] + 1), 'Period ' . ((int) $changedIndexes[0] + 1)),
+        };
+    }
+
+    private function attendanceHistoryChangeTypeLabel(string $changeType): string
+    {
+        return match ($changeType) {
+            'check_in' => $this->attendanceHistoryText('حضور', 'Check in'),
+            'check_out' => $this->attendanceHistoryText('انصراف', 'Check out'),
+            default => $this->attendanceHistoryText('الجميع', 'All'),
+        };
+    }
+
+    private function formatAuditChangeTime(array $snapshot, array $attempts, array $changedIndexes, string $changeType): string
+    {
+        $values = [];
+
+        foreach ($changedIndexes as $index) {
+            $attempt = $attempts[$index] ?? ['check_in' => null, 'check_out' => null];
+
+            if ($changeType === 'check_in') {
+                $values[] = $attempt['check_in'] ?? null;
+            } elseif ($changeType === 'check_out') {
+                $values[] = $attempt['check_out'] ?? null;
+            } else {
+                $checkIn = $attempt['check_in'] ?? null;
+                $checkOut = $attempt['check_out'] ?? null;
+
+                if ($checkIn !== null || $checkOut !== null) {
+                    $values[] = ($checkIn ?: '--:--') . ' - ' . ($checkOut ?: '--:--');
+                }
+            }
+        }
+
+        if (empty($values)) {
+            $checkIn = $this->normalizeAuditTime($snapshot['check_in_time'] ?? null);
+            $checkOut = $this->normalizeAuditTime($snapshot['check_out_time'] ?? null);
+
+            $values[] = match ($changeType) {
+                'check_in' => $checkIn,
+                'check_out' => $checkOut,
+                default => ($checkIn !== null || $checkOut !== null)
+                    ? (($checkIn ?: '--:--') . ' - ' . ($checkOut ?: '--:--'))
+                    : null,
+            };
+        }
+
+        $values = array_values(array_unique(array_filter($values, fn ($value) => $value !== null && $value !== '')));
+
+        return !empty($values) ? implode(' / ', $values) : '-';
+    }
+
+    private function formatAttendanceHistoryDateWithDay($date): string
+    {
+        if (!$date) {
+            return '-';
+        }
+
+        try {
+            $carbonDate = Carbon::parse($date);
+            $locale = (string) app()->getLocale();
+            $dayName = $carbonDate->copy()->locale($locale ?: 'en')->translatedFormat('l');
+
+            return company_date($carbonDate->toDateString()) . ' - ' . $dayName;
+        } catch (\Throwable) {
+            return company_date($date);
+        }
+    }
+
+    private function attendanceHistoryText(string $ar, string $en): string
+    {
+        return str_starts_with((string) app()->getLocale(), 'ar') ? $ar : $en;
     }
 
     private function attendanceAuditHasVisibleChange(AttendanceAuditLog $audit): bool
@@ -587,6 +728,14 @@ trait WithAttendanceFilters
 
     private function normalizeAuditAttempts($attempts): array
     {
+        return collect($this->normalizeAuditAttemptSlots($attempts))
+            ->filter(fn ($attempt) => $attempt['check_in'] !== null || $attempt['check_out'] !== null)
+            ->values()
+            ->all();
+    }
+
+    private function normalizeAuditAttemptSlots($attempts): array
+    {
         return collect($this->decodeAuditArray($attempts))
             ->map(function ($attempt) {
                 $attempt = is_array($attempt) ? $attempt : [];
@@ -596,7 +745,6 @@ trait WithAttendanceFilters
                     'check_out' => $this->normalizeAuditTime($attempt['check_out'] ?? $attempt['check_out_time'] ?? null),
                 ];
             })
-            ->filter(fn ($attempt) => $attempt['check_in'] !== null || $attempt['check_out'] !== null)
             ->values()
             ->all();
     }

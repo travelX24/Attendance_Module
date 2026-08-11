@@ -1605,27 +1605,35 @@ trait WithLeaveRequests
 
     protected function computeRequestedDays(LeavePolicy $policy, Carbon $start, Carbon $end): float
     {
-        $settings = (array) ($policy->settings ?? []);
-        $weekendPolicy = (string) data_get($settings, 'weekend_policy', 'exclude');
-        $workingDays = $this->companyWorkingDays();
-        $holidays = OfficialHolidayOccurrence::where('company_id', $this->companyId)
-            ->where(fn($q) => $q->whereBetween('start_date', [$start->toDateString(), $end->toDateString()])
-                ->orWhereBetween('end_date', [$start->toDateString(), $end->toDateString()]))
-            ->get();
-
-        $wsService = class_exists(\Athka\SystemSettings\Services\WorkScheduleService::class) 
-            ? app(\Athka\SystemSettings\Services\WorkScheduleService::class) : null;
-            
         $employee = null;
         if (!empty($this->employee_id)) {
             $employee = \Athka\Employees\Models\Employee::find($this->employee_id);
         }
 
+        return $this->computeRequestedDaysForEmployee($policy, $start, $end, $employee);
+    }
+
+    protected function computeRequestedDaysForEmployee(LeavePolicy $policy, Carbon $start, Carbon $end, ?Employee $employee = null, $holidays = null): float
+    {
+        $settings = (array) ($policy->settings ?? []);
+        $weekendPolicy = (string) data_get($settings, 'weekend_policy', 'exclude');
+
+        return $this->computeWorkingDaysForEmployee($start, $end, $employee, $weekendPolicy, $holidays);
+    }
+
+    protected function computeWorkingDaysForEmployee(Carbon $start, Carbon $end, ?Employee $employee = null, string $weekendPolicy = 'exclude', $holidays = null): float
+    {
+        $workingDays = $this->companyWorkingDays();
+        $holidays ??= $this->officialHolidaysForRange($start, $end);
+        $hasScheduleService = class_exists(WorkScheduleService::class);
+
         $days = 0.0;
         $cursor = $start->copy();
-
         while ($cursor->lte($end)) {
-            if ($holidays->contains(fn($h) => $cursor->between($h->start_date, $h->end_date))) {
+            if ($holidays->contains(fn($h) => $cursor->between(
+                Carbon::parse($h->start_date)->startOfDay(),
+                Carbon::parse($h->end_date)->startOfDay()
+            ))) {
                 $cursor->addDay();
                 continue;
             }
@@ -1633,30 +1641,87 @@ trait WithLeaveRequests
             $isWorkday = false;
             if ($weekendPolicy === 'include') {
                 $isWorkday = true;
+            } elseif ($hasScheduleService && $employee) {
+                $isWorkday = ! empty($this->getEmployeeWorkSchedulePeriodsForDate($employee, $cursor));
             } else {
-                if ($wsService && $employee) {
-                    $schedule = $wsService->getEffectiveSchedule((int)$this->companyId, $employee, $cursor->toDateString());
-                    if ($schedule) {
-                        $raw = $schedule->work_days ?? [];
-                        $workDaysArr = is_string($raw) ? json_decode($raw, true) : $raw;
-                        $workDaysArr = is_array($workDaysArr) ? array_map('strtolower', $workDaysArr) : [];
-                        $dayNameStr = strtolower($cursor->englishDayOfWeek);
-                        $isWorkday = in_array($dayNameStr, $workDaysArr, true);
-                    } else {
-                        $isWorkday = in_array((int)$cursor->dayOfWeek, $workingDays, true);
-                    }
-                } else {
-                    $isWorkday = in_array((int)$cursor->dayOfWeek, $workingDays, true);
-                }
+                $isWorkday = in_array((int)$cursor->dayOfWeek, $workingDays, true);
             }
 
             if ($isWorkday) {
-                $days += 1;
+                $days += 1.0;
             }
+
             $cursor->addDay();
         }
 
         return $days;
+    }
+
+    protected function officialHolidaysForRange(Carbon $start, Carbon $end)
+    {
+        return OfficialHolidayOccurrence::where('company_id', $this->companyId)
+            ->where(function ($q) use ($start, $end) {
+                $q->whereBetween('start_date', [$start->toDateString(), $end->toDateString()])
+                    ->orWhereBetween('end_date', [$start->toDateString(), $end->toDateString()])
+                    ->orWhere(function ($qq) use ($start, $end) {
+                        $qq->where('start_date', '<=', $start->toDateString())
+                            ->where('end_date', '>=', $end->toDateString());
+                    });
+            })
+            ->get();
+    }
+
+    protected function selectedGroupEmployeesForLeaveRequest()
+    {
+        $employeeIds = $this->selectedGroupEmployeeIds();
+
+        if (empty($employeeIds)) {
+            return collect();
+        }
+
+        $allowed = $this->lpAllowedBranchIdsSafe();
+        $branchCol = $this->employeeBranchColumn ?: $this->detectEmployeeBranchColumn();
+
+        return Employee::query()
+            ->when($this->employeeCompanyColumn, fn ($q) => $q->where($this->employeeCompanyColumn, $this->companyId))
+            ->when($branchCol && !empty($allowed), fn ($q) => $q->whereIn($branchCol, $allowed))
+            ->whereIn('id', $employeeIds)
+            ->get()
+            ->keyBy('id');
+    }
+
+    protected function computeGroupRequestedDaysByEmployee(LeavePolicy $policy, Carbon $start, Carbon $end): array
+    {
+        $employeeIds = $this->selectedGroupEmployeeIds();
+        $employees = $this->selectedGroupEmployeesForLeaveRequest();
+        $holidays = $this->officialHolidaysForRange($start, $end);
+        $daysByEmployee = [];
+
+        foreach ($employeeIds as $employeeId) {
+            $employee = $employees->get($employeeId);
+            $daysByEmployee[$employeeId] = $employee
+                ? $this->computeRequestedDaysForEmployee($policy, $start, $end, $employee, $holidays)
+                : 0.0;
+        }
+
+        return $daysByEmployee;
+    }
+
+    protected function computeGroupAbsenceDaysByEmployee(Carbon $start, Carbon $end): array
+    {
+        $employeeIds = $this->selectedGroupEmployeeIds();
+        $employees = $this->selectedGroupEmployeesForLeaveRequest();
+        $holidays = $this->officialHolidaysForRange($start, $end);
+        $daysByEmployee = [];
+
+        foreach ($employeeIds as $employeeId) {
+            $employee = $employees->get($employeeId);
+            $daysByEmployee[$employeeId] = $employee
+                ? $this->computeWorkingDaysForEmployee($start, $end, $employee, 'exclude', $holidays)
+                : 0.0;
+        }
+
+        return $daysByEmployee;
     }
 
     protected function companyWorkingDays(): array
@@ -2140,6 +2205,7 @@ trait WithLeaveRequests
         $toTime = null;
         $minutes = null;
         $groupHalfDayPeriods = [];
+        $requestedDaysByEmployee = [];
 
         if (
             $this->group_leave_deduct_from_balance &&
@@ -2163,8 +2229,11 @@ trait WithLeaveRequests
             if ($this->group_leave_duration_unit === 'half_day') {
                 $halfPart = (string) ($data['group_leave_half_day_part'] ?? 'first_half');
 
-                $base = $this->computeRequestedDays($policy, $start, $start);
-                $requestedDays = $base > 0 ? 0.5 : 0.0;
+                $eligibleDaysByEmployee = $this->computeGroupRequestedDaysByEmployee($policy, $start, $start);
+                foreach ($eligibleDaysByEmployee as $employeeId => $eligibleDays) {
+                    $requestedDaysByEmployee[(int) $employeeId] = $eligibleDays > 0 ? 0.5 : 0.0;
+                }
+                $requestedDays = 0.5;
             } elseif ($this->group_leave_duration_unit === 'hours') {
                 $fromTime = (string) ($data['group_leave_from_time'] ?? '');
                 $toTime   = (string) ($data['group_leave_to_time'] ?? '');
@@ -2185,11 +2254,7 @@ trait WithLeaveRequests
                     return;
                 }
 
-                $base = $this->computeRequestedDays($policy, $start, $start);
-                if ($base <= 0) {
-                    $this->addError('group_start_date', tr('Selected date is not eligible for this policy'));
-                    return;
-                }
+                $eligibleDaysByEmployee = $this->computeGroupRequestedDaysByEmployee($policy, $start, $start);
 
                 $settings = (array) ($policy->settings ?? []);
                 $workdayMinutesSetting = data_get($settings, 'workday_minutes', null);
@@ -2209,15 +2274,29 @@ trait WithLeaveRequests
                 $this->group_leave_minutes = $mins;
 
                 $requestedDays = round($mins / $workdayMinutes, 6);
+                $requestedDaysByEmployee = [];
+                foreach ($eligibleDaysByEmployee as $employeeId => $eligibleDays) {
+                    $requestedDaysByEmployee[(int) $employeeId] = $eligibleDays > 0 ? $requestedDays : 0.0;
+                }
             } else {
-                $requestedDays = $this->computeRequestedDays($policy, $start, $end);
+                $requestedDaysByEmployee = $this->computeGroupRequestedDaysByEmployee($policy, $start, $end);
+                $requestedDays = empty($requestedDaysByEmployee) ? 0.0 : max($requestedDaysByEmployee);
             }
         } else {
-            $requestedDays = $this->computeGroupAbsenceDays($start, $end);
+            $requestedDaysByEmployee = $this->computeGroupAbsenceDaysByEmployee($start, $end);
+            $requestedDays = empty($requestedDaysByEmployee) ? 0.0 : max($requestedDaysByEmployee);
         }
 
-        if ($requestedDays <= 0) {
-            $this->addError('group_start_date', tr('Invalid date range'));
+        $invalidEmployeeDayCount = collect($requestedDaysByEmployee)
+            ->filter(fn ($days) => (float) $days <= 0)
+            ->count();
+
+        if ($requestedDays <= 0 || $invalidEmployeeDayCount > 0) {
+            $message = app()->isLocale('ar')
+                ? 'النطاق الزمني لا يحتوي على أيام عمل لموظف واحد أو أكثر.'
+                : tr('Selected date range does not include working days for one or more selected employees.');
+
+            $this->addError('group_start_date', $message);
             return;
         }
 
@@ -2242,7 +2321,7 @@ trait WithLeaveRequests
 
         $yearId = $this->selectedYearId ? (int) $this->selectedYearId : null;
 
-        DB::transaction(function () use ($start, $end, $requestedDays, $data, $yearId, $policy, $halfPart, $fromTime, $toTime, $minutes, $groupHalfDayPeriods) {
+        DB::transaction(function () use ($start, $end, $requestedDays, $requestedDaysByEmployee, $data, $yearId, $policy, $halfPart, $fromTime, $toTime, $minutes, $groupHalfDayPeriods) {
             foreach ($this->groupEmployeeIds as $empId) {
                 $allowed = $this->lpAllowedBranchIdsSafe();
                 $branchCol = $this->employeeBranchColumn ?: $this->detectEmployeeBranchColumn();
@@ -2257,6 +2336,7 @@ trait WithLeaveRequests
                 $rowToTime = $toTime;
                 $rowMinutes = $minutes;
                 $rowWorkSchedulePeriodId = null;
+                $rowRequestedDays = (float) ($requestedDaysByEmployee[(int) $empId] ?? $requestedDays);
 
                 if ($this->group_leave_duration_unit === 'half_day') {
                     $selectedPeriod = $groupHalfDayPeriods[(int) $employee->id] ?? null;
@@ -2294,7 +2374,7 @@ trait WithLeaveRequests
 
                     $remaining = (float) ($this->calculateLeaveBalanceAmounts($policy, $employee, $takenForBalance)['remaining'] ?? 0);
 
-                    if ($requestedDays > $remaining) {
+                    if ($rowRequestedDays > $remaining) {
                         $isException = true;
                         $exceptionStatus = 'pending_hr';
                     }
@@ -2313,7 +2393,7 @@ trait WithLeaveRequests
                     'start_date' => $start->toDateString(),
                     'end_date'   => $end->toDateString(),
 
-                    'requested_days' => $requestedDays,
+                    'requested_days' => $rowRequestedDays,
                     'reason' => $data['group_reason'] ?? null,
 
                     'duration_unit' => $this->group_leave_deduct_from_balance
@@ -2336,7 +2416,7 @@ trait WithLeaveRequests
                 ]);
 
                 $this->logAction('leave', (int) $row->id, 'created', [
-                    'requested_days' => $requestedDays,
+                    'requested_days' => $rowRequestedDays,
                     'mode' => $this->group_leave_deduct_from_balance
                         ? 'group_leave_with_policy'
                         : 'group_absence_no_policy',
