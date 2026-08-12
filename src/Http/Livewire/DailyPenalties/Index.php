@@ -872,15 +872,25 @@ if (! $dateFrom || ! $dateTo) {
             return $value;
         }
 
-        foreach (['Windows-1256', 'ISO-8859-6', 'Windows-1252', 'ISO-8859-1'] as $encoding) {
-            if (! function_exists('mb_convert_encoding')) {
-                break;
-            }
+        if (function_exists('mb_convert_encoding')) {
+            $supportedEncodings = function_exists('mb_list_encodings')
+                ? array_map('strtoupper', mb_list_encodings())
+                : [];
 
-            $converted = @mb_convert_encoding($value, 'UTF-8', $encoding);
+            foreach (['Windows-1256', 'ISO-8859-6', 'Windows-1252', 'ISO-8859-1'] as $encoding) {
+                if ($supportedEncodings !== [] && ! in_array(strtoupper($encoding), $supportedEncodings, true)) {
+                    continue;
+                }
 
-            if (is_string($converted) && $converted !== '' && mb_check_encoding($converted, 'UTF-8')) {
-                return $converted;
+                try {
+                    $converted = mb_convert_encoding($value, 'UTF-8', $encoding);
+                } catch (\ValueError) {
+                    continue;
+                }
+
+                if (is_string($converted) && $converted !== '' && mb_check_encoding($converted, 'UTF-8')) {
+                    return $converted;
+                }
             }
         }
 
