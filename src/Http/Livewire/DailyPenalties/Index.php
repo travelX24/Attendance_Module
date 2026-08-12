@@ -868,41 +868,36 @@ if (! $dateFrom || ! $dateTo) {
             return '';
         }
 
-        if (function_exists('mb_check_encoding') && mb_check_encoding($value, 'UTF-8')) {
+        if ($this->isValidUtf8($value)) {
             return $value;
         }
 
-        if (function_exists('mb_convert_encoding')) {
-            $supportedEncodings = function_exists('mb_list_encodings')
-                ? array_map('strtoupper', mb_list_encodings())
-                : [];
+        if (function_exists('iconv')) {
+            foreach (['CP1256', 'WINDOWS-1256', 'ISO-8859-6', 'WINDOWS-1252', 'ISO-8859-1'] as $encoding) {
+                $converted = @iconv($encoding, 'UTF-8//IGNORE', $value);
 
-            foreach (['Windows-1256', 'ISO-8859-6', 'Windows-1252', 'ISO-8859-1'] as $encoding) {
-                if ($supportedEncodings !== [] && ! in_array(strtoupper($encoding), $supportedEncodings, true)) {
-                    continue;
-                }
-
-                try {
-                    $converted = mb_convert_encoding($value, 'UTF-8', $encoding);
-                } catch (\ValueError) {
-                    continue;
-                }
-
-                if (is_string($converted) && $converted !== '' && mb_check_encoding($converted, 'UTF-8')) {
+                if (is_string($converted) && $converted !== '' && $this->isValidUtf8($converted)) {
                     return $converted;
                 }
             }
-        }
 
-        if (function_exists('iconv')) {
             $converted = @iconv('UTF-8', 'UTF-8//IGNORE', $value);
 
-            if (is_string($converted)) {
+            if (is_string($converted) && $this->isValidUtf8($converted)) {
                 return $converted;
             }
         }
 
         return preg_replace('/[^\x09\x0A\x0D\x20-\x7E]/', '', $value) ?? '';
+    }
+
+    private function isValidUtf8(string $value): bool
+    {
+        if (function_exists('mb_check_encoding')) {
+            return mb_check_encoding($value, 'UTF-8');
+        }
+
+        return preg_match('//u', $value) === 1;
     }
 
     private function formatSkippedReasons(array $skipped): string
