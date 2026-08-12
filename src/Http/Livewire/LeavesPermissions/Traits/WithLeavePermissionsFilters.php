@@ -197,7 +197,59 @@ trait WithLeavePermissionsFilters
             });
         }
 
+        $this->applyEmployeesWithAssignedScheduleFilter($q, $empTable);
+
         return $q->orderByDesc('id')->limit(1000)->get();
+    }
+
+    protected function applyEmployeesWithAssignedScheduleFilter($q, string $employeeTable)
+    {
+        $hasWorkSchedules = Schema::hasTable('employee_work_schedules');
+        $hasShiftRotations = Schema::hasTable('employee_shift_rotations');
+
+        if (!$hasWorkSchedules && !$hasShiftRotations) {
+            return $q;
+        }
+
+        return $q->where(function ($scheduleQuery) use ($employeeTable, $hasWorkSchedules, $hasShiftRotations) {
+            $hasCondition = false;
+
+            if ($hasWorkSchedules) {
+                $scheduleQuery->whereExists(function ($sub) use ($employeeTable) {
+                    $sub->selectRaw('1')
+                        ->from('employee_work_schedules as ews')
+                        ->whereColumn('ews.employee_id', $employeeTable . '.id');
+
+                    if (Schema::hasColumn('employee_work_schedules', 'saas_company_id')) {
+                        $sub->where('ews.saas_company_id', $this->companyId);
+                    }
+
+                    if (Schema::hasColumn('employee_work_schedules', 'is_active')) {
+                        $sub->where('ews.is_active', 1);
+                    }
+                });
+
+                $hasCondition = true;
+            }
+
+            if ($hasShiftRotations) {
+                $method = $hasCondition ? 'orWhereExists' : 'whereExists';
+
+                $scheduleQuery->{$method}(function ($sub) use ($employeeTable) {
+                    $sub->selectRaw('1')
+                        ->from('employee_shift_rotations as esr')
+                        ->whereColumn('esr.employee_id', $employeeTable . '.id');
+
+                    if (Schema::hasColumn('employee_shift_rotations', 'saas_company_id')) {
+                        $sub->where('esr.saas_company_id', $this->companyId);
+                    }
+
+                    if (Schema::hasColumn('employee_shift_rotations', 'is_active')) {
+                        $sub->where('esr.is_active', 1);
+                    }
+                });
+            }
+        });
     }
 
     protected function resolveCompanyId(): int

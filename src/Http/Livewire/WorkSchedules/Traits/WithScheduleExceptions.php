@@ -42,24 +42,52 @@ trait WithScheduleExceptions
         $this->resetModalFlags();
         $companyId = $this->getCompanyId();
 
-        $empQ = Employee::forCompany($companyId)->where('status', 'active')->whereKey($employeeId);
+        $empQ = Employee::withoutGlobalScope('active_only')
+            ->forCompany($companyId)
+            ->whereKey($employeeId);
 
         $locationCol = $this->resolveEmployeeLocationColumn();
         if ($locationCol && !empty($this->allowedLocationIds)) {
             $empQ->whereIn($locationCol, $this->allowedLocationIds);
         }
 
-        $emp = $empQ->firstOrFail();
+        $emp = $empQ->first();
 
-        $assignment = EmployeeWorkSchedule::where('saas_company_id', $companyId)
+        if (!$emp) {
+            $this->dispatch('toast', [
+                'type' => 'error',
+                'message' => tr('Employee not found'),
+            ]);
+            return;
+        }
+
+        $today = now()->toDateString();
+
+        $assignment = EmployeeWorkSchedule::query()
+            ->where('employee_work_schedules.saas_company_id', $companyId)
             ->where('employee_id', $employeeId)
-            ->where('is_active', true)
-            ->latest('id')
+            ->where('start_date', '<=', $today)
+            ->where(function ($q) use ($today) {
+                $q->whereNull('end_date')
+                    ->orWhere('end_date', '>=', $today);
+            })
+            ->whereExists(function ($q) use ($companyId) {
+                $q->selectRaw('1')
+                    ->from('work_schedules')
+                    ->whereColumn('work_schedules.id', 'employee_work_schedules.work_schedule_id')
+                    ->where('work_schedules.saas_company_id', $companyId)
+                    ->where(function ($scheduleQuery) {
+                        $scheduleQuery->where('work_schedules.is_active', true)
+                            ->orWhereNull('work_schedules.is_active');
+                    });
+            })
+            ->orderByDesc('start_date')
+            ->orderByDesc('id')
             ->first();
 
         if (!$assignment) {
             $this->dispatch('toast', [
-                'type' => 'error',
+                'type' => 'warning',
                 'message' => tr('This employee has no active schedule to apply exceptions on.'),
             ]);
             return;

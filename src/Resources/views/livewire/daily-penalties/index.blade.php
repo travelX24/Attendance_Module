@@ -388,8 +388,8 @@
                 '<div class="flex items-center justify-center"><input type="checkbox" wire:model.live="selectAll" class="w-4 h-4 rounded-md border-gray-300 text-[color:var(--accent-orange)] focus:ring-[color:var(--accent-orange)] transition-all cursor-pointer" ' . (!$canManagePenalties ? 'disabled' : '') . '></div>',
                 tr('Employee'),
                 tr('Dept/Job'),
-                tr('Date'),
-                tr('Actual In/Out'),
+                tr('Schedule Time'),
+                tr('Actual Time'),
                 tr('Violation'),
                 tr('Duration'),
                 tr('Calculated'),
@@ -435,6 +435,14 @@
                         $outsideEditableWindow = \Carbon\Carbon::parse(
                             $penalty->attendance_date
                         )->startOfDay()->lt(now()->subDays(7)->startOfDay());
+
+                        $attendanceLog = $penalty->attendanceLog;
+                        $scheduledIn = $attendanceLog?->scheduled_check_in ? \Carbon\Carbon::parse($attendanceLog->scheduled_check_in)->format('H:i') : '-';
+                        $scheduledOut = $attendanceLog?->scheduled_check_out ? \Carbon\Carbon::parse($attendanceLog->scheduled_check_out)->format('H:i') : '-';
+                        $actualIn = $attendanceLog?->check_in_time ? \Carbon\Carbon::parse($attendanceLog->check_in_time)->format('H:i') : '-';
+                        $actualOut = $attendanceLog?->check_out_time ? \Carbon\Carbon::parse($attendanceLog->check_out_time)->format('H:i') : '-';
+                        $hasActiveExemption = $this->hasActiveExemption($penalty);
+                        $hasExemptionHistory = $this->hasExemptionHistory($penalty);
                     @endphp
 
                     @if($currentPenaltyDate !== $lastPenaltyDate)
@@ -489,12 +497,17 @@
                             </div>
                         </td>
                         <td class="px-6 py-4 text-center">
-                            <span class="text-sm text-gray-700 font-medium whitespace-nowrap">{{ company_date($penalty->attendance_date) }}</span>
+                            <div class="inline-flex min-w-[110px] items-center justify-center rounded-lg bg-gray-50 px-3 py-1.5">
+                                <span class="text-xs font-bold text-gray-700 whitespace-nowrap">{{ $scheduledIn }} - {{ $scheduledOut }}</span>
+                            </div>
                         </td>
                         <td class="px-6 py-4 text-center">
-                            <div class="flex flex-col items-center">
-                                <span class="text-xs text-[color:var(--success)] font-bold whitespace-nowrap">{{ $penalty->attendanceLog->check_in_time ? \Carbon\Carbon::parse($penalty->attendanceLog->check_in_time)->format('H:i') : '-' }}</span>
-                                <span class="text-xs text-[color:var(--error)] font-bold whitespace-nowrap">{{ $penalty->attendanceLog->check_out_time ? \Carbon\Carbon::parse($penalty->attendanceLog->check_out_time)->format('H:i') : '-' }}</span>
+                            <div class="inline-flex min-w-[110px] items-center justify-center rounded-lg bg-[color:var(--accent-orange)]/5 px-3 py-1.5">
+                                <span class="text-xs font-bold whitespace-nowrap">
+                                    <span class="text-[color:var(--success)]">{{ $actualIn }}</span>
+                                    <span class="text-gray-400">-</span>
+                                    <span class="text-[color:var(--error)]">{{ $actualOut }}</span>
+                                </span>
                             </div>
                         </td>
                         <td class="px-6 py-4 text-center whitespace-nowrap">
@@ -529,18 +542,25 @@
                         </td>
                         <td class="px-6 py-4 text-center">
                             <x-ui.actions-menu>
-                                @if($canManagePenalties || $canWaivePenalties)
+                                @if($canManagePenalties || $canWaivePenalties || $hasExemptionHistory)
                                     @if($canWaivePenalties)
-                                        <x-ui.dropdown-item wire:click="openExemptionModal({{ $penalty->id }})" :disabled="$penalty->status === 'confirmed' || $outsideEditableWindow">
-                                            <i class="fas fa-gift me-2 text-[color:var(--warning)]"></i>
-                                            <span>{{ tr('Exempt/Waive') }}</span>
-                                        </x-ui.dropdown-item>
-                                        @if((float) $penalty->exemption_amount > 0 || (string) $penalty->exemption_status === 'approved')
+                                        @if($hasActiveExemption)
                                             <x-ui.dropdown-item wire:click="cancelExemption({{ $penalty->id }})" :disabled="$penalty->status === 'confirmed' || $outsideEditableWindow">
                                                 <i class="fas fa-undo me-2 text-[color:var(--error)]"></i>
                                                 <span>{{ tr('Cancel Exemption') }}</span>
                                             </x-ui.dropdown-item>
+                                        @else
+                                            <x-ui.dropdown-item wire:click="openExemptionModal({{ $penalty->id }})" :disabled="$penalty->status === 'confirmed' || $outsideEditableWindow">
+                                                <i class="fas fa-gift me-2 text-[color:var(--warning)]"></i>
+                                                <span>{{ tr('Exempt/Waive') }}</span>
+                                            </x-ui.dropdown-item>
                                         @endif
+                                    @endif
+                                    @if($hasExemptionHistory)
+                                        <x-ui.dropdown-item wire:click="openExemptionHistoryModal({{ $penalty->id }})">
+                                            <i class="fas fa-history me-2 text-[color:var(--text-secondary)]"></i>
+                                            <span>{{ $this->penaltyUiText('', 'Exemption History') }}</span>
+                                        </x-ui.dropdown-item>
                                     @endif
                                     @if($canManagePenalties)
                                         <x-ui.dropdown-item wire:click="openConfirmModal({{ $penalty->id }})" :disabled="$penalty->status !== 'pending'">
@@ -657,6 +677,65 @@
                     </x-ui.primary-button>
                 @endif
             </div>
+        </x-slot>
+    </x-ui.modal>
+
+    <x-ui.modal wire:model="showExemptionHistoryModal" :title="$this->penaltyUiText('', 'Exemption History')">
+        <x-slot name="content">
+            <div class="space-y-4">
+                @if($exemptionHistoryPenaltyPreview)
+                    <div class="rounded-lg border border-gray-100 bg-gray-50 p-3">
+                        <div class="text-sm font-bold text-gray-900">
+                            {{ $exemptionHistoryPenaltyPreview['employee_name'] }}
+                        </div>
+                        <div class="mt-1 text-xs text-gray-500">
+                            {{ $exemptionHistoryPenaltyPreview['employee_no'] }}
+                            <span class="mx-1">|</span>
+                            {{ company_date($exemptionHistoryPenaltyPreview['attendance_date']) }}
+                        </div>
+                    </div>
+                @endif
+
+                <div class="space-y-3">
+                    @forelse($exemptionHistory as $entry)
+                        <div class="rounded-lg border border-gray-100 bg-white p-3 shadow-sm">
+                            <div class="flex items-start justify-between gap-3">
+                                <div class="flex items-center gap-2">
+                                    <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[color:var(--app-soft-bg)] text-[color:var(--brand-via)]">
+                                        <i class="fas {{ $entry['icon'] }} text-xs"></i>
+                                    </span>
+                                    <div>
+                                        <div class="text-sm font-bold text-gray-900">{{ $entry['title'] }}</div>
+                                        <div class="text-xs text-gray-500">{{ $this->penaltyUiText('', 'By') }}: {{ $entry['actor'] }}</div>
+                                    </div>
+                                </div>
+                                <span class="text-xs text-gray-400 whitespace-nowrap">{{ $entry['date'] }}</span>
+                            </div>
+
+                            @if(!empty($entry['details']))
+                                <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                    @foreach($entry['details'] as $detail)
+                                        <div class="rounded-md bg-gray-50 px-3 py-2">
+                                            <div class="text-[10px] font-semibold text-gray-400">{{ $detail['label'] }}</div>
+                                            <div class="text-xs font-semibold text-gray-700 break-words">{{ $detail['value'] }}</div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </div>
+                    @empty
+                        <div class="rounded-lg border border-dashed border-gray-200 p-6 text-center text-sm text-gray-500">
+                            {{ $this->penaltyUiText('', 'No exemption history found.') }}
+                        </div>
+                    @endforelse
+                </div>
+            </div>
+        </x-slot>
+
+        <x-slot name="footer">
+            <x-ui.secondary-button wire:click="closeExemptionHistoryModal">
+                {{ $this->penaltyUiText('', 'Close') }}
+            </x-ui.secondary-button>
         </x-slot>
     </x-ui.modal>
 

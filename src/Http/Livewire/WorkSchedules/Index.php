@@ -470,7 +470,50 @@ class Index extends Component
         $scheduleNames = WorkSchedule::where('saas_company_id', $companyId)
             ->pluck('name', 'id');
 
-        $this->scheduleEyeRows = $rows->map(function ($r) use ($today, $companyId, $rotations, $scheduleNames) {
+        $scheduleIds = $rows->pluck('work_schedule_id')
+            ->filter()
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        foreach ($rotations as $rotation) {
+            if (!empty($rotation->work_schedule_id_a)) {
+                $scheduleIds[] = (int) $rotation->work_schedule_id_a;
+            }
+
+            if (!empty($rotation->work_schedule_id_b)) {
+                $scheduleIds[] = (int) $rotation->work_schedule_id_b;
+            }
+        }
+
+        $scheduleIds = array_values(array_unique(array_filter($scheduleIds)));
+        $periodsBySchedule = [];
+
+        if (!empty($scheduleIds) && Schema::hasTable('work_schedule_periods')) {
+            $periodQuery = DB::table('work_schedule_periods')
+                ->whereIn('work_schedule_id', $scheduleIds)
+                ->orderBy('work_schedule_id');
+
+            if (Schema::hasColumn('work_schedule_periods', 'sort_order')) {
+                $periodQuery->orderBy('sort_order');
+            }
+
+            $periodRows = $periodQuery
+                ->orderBy('id')
+                ->get(['work_schedule_id', 'start_time', 'end_time']);
+
+            foreach ($periodRows as $periodRow) {
+                $startTime = substr((string) $periodRow->start_time, 0, 5);
+                $endTime = substr((string) $periodRow->end_time, 0, 5);
+
+                if ($startTime === '' || $endTime === '') {
+                    continue;
+                }
+
+                $periodsBySchedule[(int) $periodRow->work_schedule_id][] = $startTime . ' - ' . $endTime;
+            }
+        }
+
+        $this->scheduleEyeRows = $rows->map(function ($r) use ($today, $companyId, $rotations, $scheduleNames, $periodsBySchedule) {
             $start = $r->start_date ? Carbon::parse($r->start_date)->startOfDay() : null;
             $end   = $r->end_date ? Carbon::parse($r->end_date)->startOfDay() : null;
 
@@ -486,7 +529,8 @@ class Index extends Component
             }
 
             $type = (string) ($r->assignment_type ?? '');
-            $scheduleName = (string) ($r->schedule_name ?: ('#' . $r->work_schedule_id));
+            $scheduleId = (int) $r->work_schedule_id;
+            $scheduleName = (string) ($r->schedule_name ?: ('#' . $scheduleId));
             $rotationInfo = null;
 
             if ($type === 'rotation') {
@@ -517,6 +561,8 @@ class Index extends Component
                         'name_b' => $nameB,
                         'schedule_id_a' => (int) $rot->work_schedule_id_a,
                         'schedule_id_b' => (int) $rot->work_schedule_id_b,
+                        'periods_a' => $periodsBySchedule[(int) $rot->work_schedule_id_a] ?? [],
+                        'periods_b' => $periodsBySchedule[(int) $rot->work_schedule_id_b] ?? [],
                     ];
                 }
             }
@@ -532,6 +578,7 @@ class Index extends Component
             return [
                 'id' => (int) $r->id,
                 'schedule_name' => $scheduleName,
+                'periods' => $periodsBySchedule[$scheduleId] ?? [],
                 'start_date' => $this->formatCompanyDate((string)$r->start_date, $companyId),
                 'end_date' => $this->formatCompanyDate((string)$r->end_date, $companyId),
                 'is_active' => (int) $r->is_active,

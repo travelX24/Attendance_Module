@@ -16,6 +16,7 @@ use Illuminate\Support\Facades\DB;
 use Livewire\WithFileUploads;
 use Illuminate\Support\Facades\Storage;
 use Athka\Attendance\Services\PenaltyService;
+use Athka\SystemSettings\Services\WorkScheduleService;
 use Carbon\Carbon;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Athka\Saas\Models\Branch;
@@ -69,6 +70,9 @@ class Index extends Component
     public $showConfirmModal = false;
     public $confirmPenaltyId = null;
     public $confirmPenaltyPreview = null;
+    public $showExemptionHistoryModal = false;
+    public $exemptionHistoryPenaltyPreview = null;
+    public $exemptionHistory = [];
 
     protected $queryString = [
         'search' => ['except' => ''],
@@ -551,6 +555,7 @@ if (! $dateFrom || ! $dateTo) {
 
             $createdCount = (int) ($res['created'] ?? 0);
             $skippedReasons = $this->formatSkippedReasons($res['skipped'] ?? []);
+            $calendarSkipMessage = $this->calendarSkipMessage($companyId, $dateFrom, $dateTo, $employeeIds, $createdCount);
             $toastType = $createdCount > 0 ? 'success' : 'info';
             $toastMessage = $message
                 . ' | ' . tr('Processed logs:') . ' ' . ($res['processed'] ?? 0)
@@ -558,9 +563,14 @@ if (! $dateFrom || ! $dateTo) {
                 . ' | ' . tr('Employees:') . ' ' . count($employeeIds);
 
             if ($createdCount === 0) {
-                $toastMessage .= ' | ' . tr('No penalties were created for the selected scope.');
+                if ($calendarSkipMessage !== '') {
+                    $toastMessage = $calendarSkipMessage;
+                    $skippedReasons = '';
+                } else {
+                    $toastMessage .= ' | ' . tr('No penalties were created for the selected scope.');
+                }
 
-                if ($skippedReasons === '') {
+                if ($skippedReasons === '' && $calendarSkipMessage === '') {
                     $skippedReasons = tr('No billable violation was found or the records are outside the active penalty rules.');
                 }
             }
@@ -659,6 +669,179 @@ if (! $dateFrom || ! $dateTo) {
             ? tr(ucwords(str_replace('_', ' ', $fallback)))
             : '-';
     }
+
+    public function hasActiveExemption(AttendanceDailyPenalty $penalty): bool
+    {
+        return (float) $penalty->exemption_amount > 0
+            || (string) $penalty->exemption_status === 'approved';
+    }
+
+    public function hasExemptionHistory(AttendanceDailyPenalty $penalty): bool
+    {
+        return ! empty($this->parseExemptionHistory((string) $penalty->notes));
+    }
+
+    public function penaltyUiText(string $ar, string $en): string
+    {
+        if (! str_starts_with((string) app()->getLocale(), 'ar')) {
+            return $en;
+        }
+
+        return match ($en) {
+            'Exemption applied' => "\u{062A}\u{0645} \u{062A}\u{0637}\u{0628}\u{064A}\u{0642} \u{0627}\u{0644}\u{0625}\u{0639}\u{0641}\u{0627}\u{0621}",
+            'Exemption cancelled' => "\u{062A}\u{0645} \u{0625}\u{0644}\u{063A}\u{0627}\u{0621} \u{0627}\u{0644}\u{0625}\u{0639}\u{0641}\u{0627}\u{0621}",
+            'Previous exemption archived' => "\u{062A}\u{0645}\u{062A} \u{0623}\u{0631}\u{0634}\u{0641}\u{0629} \u{0627}\u{0644}\u{0625}\u{0639}\u{0641}\u{0627}\u{0621} \u{0627}\u{0644}\u{0633}\u{0627}\u{0628}\u{0642}",
+            'Exemption Type' => "\u{0646}\u{0648}\u{0639} \u{0627}\u{0644}\u{0625}\u{0639}\u{0641}\u{0627}\u{0621}",
+            'Exempt Amount' => "\u{0645}\u{0628}\u{0644}\u{063A} \u{0627}\u{0644}\u{0625}\u{0639}\u{0641}\u{0627}\u{0621}",
+            'Net Amount' => "\u{0627}\u{0644}\u{0645}\u{0628}\u{0644}\u{063A} \u{0627}\u{0644}\u{0635}\u{0627}\u{0641}\u{064A}",
+            'Reason' => "\u{0627}\u{0644}\u{0633}\u{0628}\u{0628}",
+            'Exempted At' => "\u{062A}\u{0627}\u{0631}\u{064A}\u{062E} \u{0627}\u{0644}\u{0625}\u{0639}\u{0641}\u{0627}\u{0621}",
+            'Full Waiver (100%)' => "\u{0627}\u{0644}\u{062A}\u{0646}\u{0627}\u{0632}\u{0644} \u{0627}\u{0644}\u{0643}\u{0627}\u{0645}\u{0644} (100%)",
+            'Partial Exemption' => "\u{0625}\u{0639}\u{0641}\u{0627}\u{0621} \u{062C}\u{0632}\u{0626}\u{064A}",
+            'None' => "\u{0644}\u{0627} \u{064A}\u{0648}\u{062C}\u{062F}",
+            'Cancel the current exemption before creating a new one.' => "\u{0642}\u{0645} \u{0628}\u{0625}\u{0644}\u{063A}\u{0627}\u{0621} \u{0627}\u{0644}\u{0625}\u{0639}\u{0641}\u{0627}\u{0621} \u{0627}\u{0644}\u{062D}\u{0627}\u{0644}\u{064A} \u{0642}\u{0628}\u{0644} \u{0625}\u{0646}\u{0634}\u{0627}\u{0621} \u{0625}\u{0639}\u{0641}\u{0627}\u{0621} \u{062C}\u{062F}\u{064A}\u{062F}.",
+            'Exemption History' => "\u{0633}\u{062C}\u{0644} \u{0627}\u{0644}\u{0625}\u{0639}\u{0641}\u{0627}\u{0621}\u{0627}\u{062A}",
+            'By' => "\u{0628}\u{0648}\u{0627}\u{0633}\u{0637}\u{0629}",
+            'No exemption history found.' => "\u{0644}\u{0627} \u{064A}\u{0648}\u{062C}\u{062F} \u{0633}\u{062C}\u{0644} \u{0625}\u{0639}\u{0641}\u{0627}\u{0621}\u{0627}\u{062A}.",
+            'Close' => "\u{0625}\u{063A}\u{0644}\u{0627}\u{0642}",
+            default => $ar,
+        };
+    }
+
+    public function openExemptionHistoryModal($id): void
+    {
+        $this->requireAttendanceAny([
+            'attendance.penalties.view',
+            'attendance.penalties.view-subordinates',
+            'attendance.penalties.manage',
+            'attendance.penalties.waive',
+        ]);
+
+        $penalty = $this->findPenaltyOrFail((int) $id);
+
+        $this->exemptionHistoryPenaltyPreview = [
+            'employee_name' => $penalty->employee?->name_ar ?: ($penalty->employee?->name_en ?: '-'),
+            'employee_no' => $penalty->employee?->employee_no ?: '-',
+            'attendance_date' => $penalty->attendance_date,
+        ];
+        $this->exemptionHistory = $this->parseExemptionHistory((string) $penalty->notes);
+        $this->showExemptionHistoryModal = true;
+    }
+
+    public function closeExemptionHistoryModal(): void
+    {
+        $this->showExemptionHistoryModal = false;
+        $this->exemptionHistoryPenaltyPreview = null;
+        $this->exemptionHistory = [];
+    }
+
+    private function parseExemptionHistory(string $notes): array
+    {
+        $history = [];
+
+        foreach (preg_split('/\R/', $notes) ?: [] as $line) {
+            $line = trim((string) $line);
+
+            if (! str_starts_with($line, '[Audit] ')) {
+                continue;
+            }
+
+            $body = substr($line, 8);
+            $entry = null;
+
+            if (preg_match('/^Exemption applied by (.*?) at (.*?) \| (.*)$/', $body, $matches)) {
+                $entry = [
+                    'title' => $this->penaltyUiText('تم تطبيق الإعفاء', 'Exemption applied'),
+                    'actor' => $matches[1] ?: '-',
+                    'date' => $matches[2] ?: '-',
+                    'icon' => 'fa-gift',
+                    'badge' => 'success',
+                    'details' => $this->parseExemptionHistoryDetails($matches[3] ?? ''),
+                ];
+            } elseif (preg_match('/^Exemption cancelled by (.*?) at (.*?) \| (.*)$/', $body, $matches)) {
+                $entry = [
+                    'title' => $this->penaltyUiText('تم إلغاء الإعفاء', 'Exemption cancelled'),
+                    'actor' => $matches[1] ?: '-',
+                    'date' => $matches[2] ?: '-',
+                    'icon' => 'fa-undo',
+                    'badge' => 'danger',
+                    'details' => $this->parseExemptionHistoryDetails($matches[3] ?? ''),
+                ];
+            } elseif (preg_match('/^Previous exemption archived before replacement at (.*?) \| (.*)$/', $body, $matches)) {
+                $entry = [
+                    'title' => $this->penaltyUiText('تمت أرشفة الإعفاء السابق', 'Previous exemption archived'),
+                    'actor' => '-',
+                    'date' => $matches[1] ?: '-',
+                    'icon' => 'fa-archive',
+                    'badge' => 'warning',
+                    'details' => $this->parseExemptionHistoryDetails($matches[2] ?? ''),
+                ];
+            }
+
+            if ($entry) {
+                $history[] = $entry;
+            }
+        }
+
+        return array_reverse($history);
+    }
+
+    private function parseExemptionHistoryDetails(string $details): array
+    {
+        $parsed = [];
+
+        foreach (preg_split('/,\s*/', trim($details)) ?: [] as $part) {
+            [$key, $value] = array_pad(explode('=', $part, 2), 2, '');
+            $key = trim((string) $key);
+            $value = trim((string) $value);
+
+            if ($key === '') {
+                continue;
+            }
+
+            $parsed[] = [
+                'label' => $this->exemptionHistoryDetailLabel($key),
+                'value' => $this->formatExemptionHistoryValue($key, $value),
+            ];
+        }
+
+        return $parsed;
+    }
+
+    private function exemptionHistoryDetailLabel(string $key): string
+    {
+        return match ($key) {
+            'type', 'previous_type' => $this->penaltyUiText('نوع الإعفاء', 'Exemption Type'),
+            'amount', 'previous_amount' => $this->penaltyUiText('مبلغ الإعفاء', 'Exempt Amount'),
+            'net', 'previous_net' => $this->penaltyUiText('المبلغ الصافي', 'Net Amount'),
+            'reason', 'previous_reason' => $this->penaltyUiText('السبب', 'Reason'),
+            'exempted_at' => $this->penaltyUiText('تاريخ الإعفاء', 'Exempted At'),
+            default => tr(ucwords(str_replace('_', ' ', $key))),
+        };
+    }
+
+    private function formatExemptionHistoryValue(string $key, string $value): string
+    {
+        if (in_array($key, ['amount', 'previous_amount', 'net', 'previous_net'], true) && is_numeric($value)) {
+            return number_format((float) $value, 2);
+        }
+
+        if (in_array($key, ['type', 'previous_type'], true)) {
+            return match ($value) {
+                'full' => $this->penaltyUiText('التنازل الكامل (100%)', 'Full Waiver (100%)'),
+                'partial' => $this->penaltyUiText('إعفاء جزئي', 'Partial Exemption'),
+                'none' => $this->penaltyUiText('لا يوجد', 'None'),
+                default => $value !== '' ? $value : '-',
+            };
+        }
+
+        if (in_array($key, ['reason', 'previous_reason'], true)) {
+            return $this->formatExemptionReason($value);
+        }
+
+        return $value !== '' ? $value : '-';
+    }
+
     private function formatSkippedReasons(array $skipped): string
     {
         if (empty($skipped)) {
@@ -690,6 +873,157 @@ if (! $dateFrom || ! $dateTo) {
             ->map(fn ($count, $reason) => ($labels[$reason] ?? $reason) . ' (' . $count . ')')
             ->implode(', ');
     }
+
+    private function calendarSkipMessage(int $companyId, string $dateFrom, string $dateTo, array $employeeIds, int $createdCount): string
+    {
+        if ($createdCount > 0 || empty($employeeIds)) {
+            return '';
+        }
+
+        $summary = $this->calendarSkipSummary($companyId, $dateFrom, $dateTo, $employeeIds);
+
+        if (
+            ($summary['official_holiday'] ?? 0) <= 0
+            && ($summary['exceptional_day'] ?? 0) <= 0
+            && ($summary['weekly_off'] ?? 0) <= 0
+            && ($summary['no_schedule'] ?? 0) <= 0
+        ) {
+            return '';
+        }
+
+        $isSingleDay = Carbon::parse($dateFrom)->toDateString() === Carbon::parse($dateTo)->toDateString();
+        $isArabic = str_starts_with((string) app()->getLocale(), 'ar');
+
+        if ($isSingleDay) {
+            if (($summary['official_holiday'] ?? 0) > 0) {
+                return $isArabic
+                    ? "\u{0627}\u{0644}\u{064A}\u{0648}\u{0645} \u{0639}\u{0637}\u{0644}\u{0629} \u{0631}\u{0633}\u{0645}\u{064A}\u{0629}\u{060C} \u{0644}\u{0627} \u{064A}\u{062A}\u{0645} \u{0627}\u{062D}\u{062A}\u{0633}\u{0627}\u{0628} \u{0627}\u{0644}\u{062C}\u{0632}\u{0627}\u{0621}\u{0627}\u{062A}."
+                    : 'This day is an official holiday; penalties are not calculated.';
+            }
+
+            if (($summary['exceptional_day'] ?? 0) > 0) {
+                return $isArabic
+                    ? "\u{0627}\u{0644}\u{064A}\u{0648}\u{0645} \u{0645}\u{0639}\u{062A}\u{0645}\u{062F} \u{0643}\u{064A}\u{0648}\u{0645} \u{0627}\u{0633}\u{062A}\u{062B}\u{0646}\u{0627}\u{0626}\u{064A}\u{060C} \u{0644}\u{0627} \u{064A}\u{062A}\u{0645} \u{0627}\u{062D}\u{062A}\u{0633}\u{0627}\u{0628} \u{0627}\u{0644}\u{062C}\u{0632}\u{0627}\u{0621}\u{0627}\u{062A}."
+                    : 'This day is approved as an exceptional day; penalties are not calculated.';
+            }
+
+            if (($summary['weekly_off'] ?? 0) > 0) {
+                return $isArabic
+                    ? "\u{0627}\u{0644}\u{064A}\u{0648}\u{0645} \u{064A}\u{0648}\u{0645} \u{0631}\u{0627}\u{062D}\u{0629} \u{0623}\u{0633}\u{0628}\u{0648}\u{0639}\u{064A}\u{0629}\u{060C} \u{0644}\u{0627} \u{064A}\u{062A}\u{0645} \u{0627}\u{062D}\u{062A}\u{0633}\u{0627}\u{0628} \u{0627}\u{0644}\u{062C}\u{0632}\u{0627}\u{0621}\u{0627}\u{062A}."
+                    : 'This day is a weekly day off; penalties are not calculated.';
+            }
+
+            return $isArabic
+                ? "\u{0644}\u{0627} \u{064A}\u{0648}\u{062C}\u{062F} \u{062C}\u{062F}\u{0648}\u{0644} \u{0639}\u{0645}\u{0644} \u{0646}\u{0634}\u{0637} \u{0644}\u{0647}\u{0630}\u{0627} \u{0627}\u{0644}\u{064A}\u{0648}\u{0645}\u{060C} \u{0644}\u{0627} \u{064A}\u{062A}\u{0645} \u{0627}\u{062D}\u{062A}\u{0633}\u{0627}\u{0628} \u{0627}\u{0644}\u{062C}\u{0632}\u{0627}\u{0621}\u{0627}\u{062A}."
+                : 'No active work schedule exists for this day; penalties are not calculated.';
+        }
+
+        $parts = [];
+
+        if (($summary['official_holiday'] ?? 0) > 0) {
+            $parts[] = ($isArabic ? "\u{0639}\u{0637}\u{0644}\u{0629} \u{0631}\u{0633}\u{0645}\u{064A}\u{0629}" : 'official holiday') . ' (' . $summary['official_holiday'] . ')';
+        }
+
+        if (($summary['exceptional_day'] ?? 0) > 0) {
+            $parts[] = ($isArabic ? "\u{064A}\u{0648}\u{0645} \u{0627}\u{0633}\u{062A}\u{062B}\u{0646}\u{0627}\u{0626}\u{064A}" : 'exceptional day') . ' (' . $summary['exceptional_day'] . ')';
+        }
+
+        if (($summary['weekly_off'] ?? 0) > 0) {
+            $parts[] = ($isArabic ? "\u{0631}\u{0627}\u{062D}\u{0629} \u{0623}\u{0633}\u{0628}\u{0648}\u{0639}\u{064A}\u{0629}" : 'weekly day off') . ' (' . $summary['weekly_off'] . ')';
+        }
+
+        if (($summary['no_schedule'] ?? 0) > 0) {
+            $parts[] = ($isArabic ? "\u{0628}\u{062F}\u{0648}\u{0646} \u{062C}\u{062F}\u{0648}\u{0644} \u{0639}\u{0645}\u{0644}" : 'no work schedule') . ' (' . $summary['no_schedule'] . ')';
+        }
+
+        return $isArabic
+            ? "\u{0644}\u{0627} \u{064A}\u{062A}\u{0645} \u{0627}\u{062D}\u{062A}\u{0633}\u{0627}\u{0628} \u{0627}\u{0644}\u{062C}\u{0632}\u{0627}\u{0621}\u{0627}\u{062A} \u{0644}\u{0644}\u{0623}\u{064A}\u{0627}\u{0645} \u{0627}\u{0644}\u{062A}\u{0627}\u{0644}\u{064A}\u{0629}: " . implode("\u{060C} ", $parts) . '.'
+            : 'Penalties are not calculated for the following days: ' . implode(', ', $parts) . '.';
+    }
+
+    private function calendarSkipSummary(int $companyId, string $dateFrom, string $dateTo, array $employeeIds): array
+    {
+        $scheduleService = app(WorkScheduleService::class);
+        $employees = Employee::withoutGlobalScope('active_only')
+            ->whereIn('id', $employeeIds)
+            ->get()
+            ->keyBy('id');
+
+        $summary = [
+            'official_holiday' => 0,
+            'exceptional_day' => 0,
+            'weekly_off' => 0,
+            'no_schedule' => 0,
+        ];
+
+        $cursor = Carbon::parse($dateFrom)->startOfDay();
+        $end = Carbon::parse($dateTo)->startOfDay();
+
+        while ($cursor->lte($end)) {
+            $dateStr = $cursor->toDateString();
+            $dayReason = null;
+            $dayReasons = [];
+            $hasWorkingSchedule = false;
+            $holidays = $scheduleService->getHolidays($companyId, $dateStr, $dateStr);
+            $employeeTotal = $employees->count();
+
+            foreach ($employeeIds as $employeeId) {
+                $employee = $employees->get((int) $employeeId);
+                if (! $employee) {
+                    continue;
+                }
+
+                $exceptionalDay = $scheduleService->getExceptionalDay($companyId, $dateStr, $employee);
+
+                if ($exceptionalDay && (bool) ($exceptionalDay->is_holiday ?? true)) {
+                    $dayReasons[] = (bool) ($exceptionalDay->is_official_holiday ?? false)
+                        ? 'official_holiday'
+                        : 'exceptional_day';
+                    continue;
+                }
+
+                $schedule = $scheduleService->getEffectiveSchedule($companyId, $employee, $dateStr);
+                $metrics = $scheduleService->getMetricsForDate($dateStr, $schedule, $holidays, $employee);
+                $status = (string) ($metrics['status'] ?? '');
+
+                if ($status === 'holiday') {
+                    $dayReasons[] = 'official_holiday';
+                    continue;
+                }
+
+                if ($status === 'workday') {
+                    $hasWorkingSchedule = true;
+                    break;
+                }
+
+                if ($status === 'off') {
+                    $dayReasons[] = 'weekly_off';
+                    continue;
+                }
+
+                if ($status === 'no_schedule') {
+                    $dayReasons[] = 'no_schedule';
+                }
+            }
+
+            if (! $hasWorkingSchedule && $employeeTotal > 0 && count($dayReasons) === $employeeTotal) {
+                foreach (['official_holiday', 'exceptional_day', 'weekly_off', 'no_schedule'] as $reason) {
+                    if (in_array($reason, $dayReasons, true)) {
+                        $dayReason = $reason;
+                        break;
+                    }
+                }
+            }
+
+            if ($dayReason) {
+                $summary[$dayReason]++;
+            }
+
+            $cursor->addDay();
+        }
+
+        return $summary;
+    }
     public function openExemptionModal($id)
     {
         $this->requireAttendanceAny('attendance.penalties.waive');
@@ -708,6 +1042,15 @@ if (! $dateFrom || ! $dateTo) {
             $this->dispatch('toast', [
                 'type' => 'error',
                 'message' => tr('Confirmed penalties cannot be modified.')
+            ]);
+
+            return;
+        }
+
+        if ($this->hasActiveExemption($penalty)) {
+            $this->dispatch('toast', [
+                'type' => 'warning',
+                'message' => $this->penaltyUiText('قم بإلغاء الإعفاء الحالي قبل إنشاء إعفاء جديد.', 'Cancel the current exemption before creating a new one.')
             ]);
 
             return;

@@ -27,9 +27,9 @@
                 </div>
             @else
                 <x-ui.table
-                    :headers="[tr('Schedule'), tr('Start'), tr('End'), tr('Assignment Type'), tr('Status'), tr('Action')]"
+                    :headers="[tr('Schedule'), tr('Periods'), tr('Start'), tr('End'), tr('Assignment Type'), tr('Status'), tr('Action')]"
                     :enablePagination="false"
-                    :headerAlign="['start','start','start','start','start','end']"
+                    :headerAlign="['start','start','start','start','start','start','end']"
                 >
                     @foreach($scheduleEyeRows as $r)
                         @php
@@ -84,8 +84,53 @@
                                 </div>
                             </td>
 
+                            <td class="py-2.5 px-3 text-sm">
+                                @if(!empty($r['rotation_info']))
+                                    <div class="space-y-2">
+                                        <div>
+                                            <div class="mb-1 flex items-center gap-1 text-[10px] font-black text-[color:var(--accent-orange)]">
+                                                <span class="w-4 h-4 rounded-md bg-[color:var(--accent-orange)]/10 border border-[color:var(--accent-orange)]/20 flex items-center justify-center">A</span>
+                                                <span>{{ $r['rotation_info']['name_a'] ?? '-' }}</span>
+                                            </div>
+                                            <div class="space-y-0.5">
+                                                @foreach(($r['rotation_info']['periods_a'] ?? []) as $periodIndex => $period)
+                                                    <div class="text-[10px] leading-4 font-semibold">
+                                                        <span class="text-gray-400">{{ tr('Period') }} {{ $periodIndex + 1 }}:</span>
+                                                        <span class="font-mono text-gray-600">{{ $period }}</span>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <div class="mb-1 flex items-center gap-1 text-[10px] font-black text-[color:var(--warning)]">
+                                                <span class="w-4 h-4 rounded-md bg-[color:var(--warning)]/10 border border-[color:var(--warning)]/25 flex items-center justify-center">B</span>
+                                                <span>{{ $r['rotation_info']['name_b'] ?? '-' }}</span>
+                                            </div>
+                                            <div class="space-y-0.5">
+                                                @foreach(($r['rotation_info']['periods_b'] ?? []) as $periodIndex => $period)
+                                                    <div class="text-[10px] leading-4 font-semibold">
+                                                        <span class="text-gray-400">{{ tr('Period') }} {{ $periodIndex + 1 }}:</span>
+                                                        <span class="font-mono text-gray-600">{{ $period }}</span>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    </div>
+                                @else
+                                    <div class="space-y-0.5">
+                                        @foreach(($r['periods'] ?? []) as $periodIndex => $period)
+                                            <div class="text-[10px] leading-4 font-semibold">
+                                                <span class="text-gray-400">{{ tr('Period') }} {{ $periodIndex + 1 }}:</span>
+                                                <span class="font-mono text-gray-600">{{ $period }}</span>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </td>
+
                             <td class="py-2.5 px-3 font-mono text-gray-700 text-sm">
-                                {{ $row['start_date'] ?? $r['start_date'] ?? '-' }}
+                                {{ $r['start_date'] ?? '-' }}
                             </td>
 
                             <td class="py-2.5 px-3 font-mono text-gray-700 text-sm">

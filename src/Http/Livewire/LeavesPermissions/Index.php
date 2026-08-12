@@ -583,6 +583,8 @@ class Index extends Component
             $q->where('status', (string) $this->status);
         }
 
+        $this->applyEmployeesWithAssignedScheduleFilter($q, $employeeTable);
+
         return $q
             ->orderByDesc('id')
             ->limit($this->groupEmployeeDisplayLimit + 1)

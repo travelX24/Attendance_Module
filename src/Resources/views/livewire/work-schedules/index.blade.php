@@ -655,7 +655,7 @@
                                 <span>{{ tr('Schedule Preview') }}</span>
                             </x-ui.dropdown-item>
 
-                            <x-ui.dropdown-item wire:click="openExceptionsModal({{ $employee->id }})" :disabled="!$employee->current_schedule_name">
+                            <x-ui.dropdown-item wire:click="openExceptionsModal({{ $employee->id }})">
                                 <i class="fas fa-calendar-times me-2"></i>
                                 <span>{{ tr('Exceptions') }}</span>
                             </x-ui.dropdown-item>
