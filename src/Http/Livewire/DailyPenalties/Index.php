@@ -634,7 +634,7 @@ if (! $dateFrom || ! $dateTo) {
 
     public function formatExemptionReason(?string $reason): string
     {
-        $reason = trim((string) $reason);
+        $reason = trim($this->cleanAuditText((string) $reason));
 
         if ($reason === '') {
             return '-';
@@ -643,9 +643,10 @@ if (! $dateFrom || ! $dateTo) {
         [$rawKey, $details] = array_pad(explode(' - ', $reason, 2), 2, '');
         $key = strtolower(str_replace(' ', '_', trim($rawKey)));
         $label = $this->exemptionReasonLabel($key, trim($rawKey));
+        $details = trim($this->cleanAuditText((string) $details));
 
-        return trim((string) $details) !== ''
-            ? $label . ' - ' . trim((string) $details)
+        return $details !== ''
+            ? $label . ' - ' . $details
             : $label;
     }
 
@@ -665,8 +666,10 @@ if (! $dateFrom || ! $dateTo) {
             return $labels[$key][$isArabic ? 'ar' : 'en'];
         }
 
+        $fallback = trim($this->cleanAuditText($fallback));
+
         return $fallback !== ''
-            ? tr(ucwords(str_replace('_', ' ', $fallback)))
+            ? $this->humanizeAuditToken($fallback)
             : '-';
     }
 
@@ -789,11 +792,12 @@ if (! $dateFrom || ! $dateTo) {
     private function parseExemptionHistoryDetails(string $details): array
     {
         $parsed = [];
+        $details = $this->cleanAuditText($details);
 
         foreach (preg_split('/,\s*/', trim($details)) ?: [] as $part) {
             [$key, $value] = array_pad(explode('=', $part, 2), 2, '');
-            $key = trim((string) $key);
-            $value = trim((string) $value);
+            $key = trim($this->cleanAuditText((string) $key));
+            $value = trim($this->cleanAuditText((string) $value));
 
             if ($key === '') {
                 continue;
@@ -816,12 +820,14 @@ if (! $dateFrom || ! $dateTo) {
             'net', 'previous_net' => $this->penaltyUiText('المبلغ الصافي', 'Net Amount'),
             'reason', 'previous_reason' => $this->penaltyUiText('السبب', 'Reason'),
             'exempted_at' => $this->penaltyUiText('تاريخ الإعفاء', 'Exempted At'),
-            default => tr(ucwords(str_replace('_', ' ', $key))),
+            default => $this->humanizeAuditToken($key),
         };
     }
 
     private function formatExemptionHistoryValue(string $key, string $value): string
     {
+        $value = trim($this->cleanAuditText($value));
+
         if (in_array($key, ['amount', 'previous_amount', 'net', 'previous_net'], true) && is_numeric($value)) {
             return number_format((float) $value, 2);
         }
@@ -840,6 +846,53 @@ if (! $dateFrom || ! $dateTo) {
         }
 
         return $value !== '' ? $value : '-';
+    }
+
+    private function humanizeAuditToken(string $value): string
+    {
+        $value = trim($this->cleanAuditText($value));
+
+        if ($value === '') {
+            return '-';
+        }
+
+        $value = str_replace(['_', '-'], ' ', $value);
+        $value = preg_replace('/\s+/', ' ', $value) ?? $value;
+
+        return ucwords($value);
+    }
+
+    private function cleanAuditText(string $value): string
+    {
+        if ($value === '') {
+            return '';
+        }
+
+        if (function_exists('mb_check_encoding') && mb_check_encoding($value, 'UTF-8')) {
+            return $value;
+        }
+
+        foreach (['Windows-1256', 'ISO-8859-6', 'Windows-1252', 'ISO-8859-1'] as $encoding) {
+            if (! function_exists('mb_convert_encoding')) {
+                break;
+            }
+
+            $converted = @mb_convert_encoding($value, 'UTF-8', $encoding);
+
+            if (is_string($converted) && $converted !== '' && mb_check_encoding($converted, 'UTF-8')) {
+                return $converted;
+            }
+        }
+
+        if (function_exists('iconv')) {
+            $converted = @iconv('UTF-8', 'UTF-8//IGNORE', $value);
+
+            if (is_string($converted)) {
+                return $converted;
+            }
+        }
+
+        return preg_replace('/[^\x09\x0A\x0D\x20-\x7E]/', '', $value) ?? '';
     }
 
     private function formatSkippedReasons(array $skipped): string
