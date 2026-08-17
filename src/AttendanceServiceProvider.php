@@ -45,7 +45,11 @@ class AttendanceServiceProvider extends ServiceProvider
     protected function registerApiRoutes(): void
     {
         if (file_exists(__DIR__ . '/Routes/api.php')) {
-            Route::middleware(['api', 'auth:sanctum'])
+            Route::middleware([
+                'api',
+                'auth:sanctum',
+                \Athka\Saas\Http\Middleware\SetCompanyTimezone::class,
+            ])
                 ->prefix('api/offline-attendance')
                 ->group(__DIR__ . '/Routes/api.php');
         }
@@ -55,6 +59,7 @@ class AttendanceServiceProvider extends ServiceProvider
     {
         Livewire::component('attendance.work-schedules.index', \Athka\Attendance\Http\Livewire\WorkSchedules\Index::class);
         Livewire::component('attendance.daily-attendance.index', \Athka\Attendance\Http\Livewire\DailyAttendance\Index::class);
+        Livewire::component('attendance.employee-tracking.index', \Athka\Attendance\Http\Livewire\EmployeeTracking\Index::class);
         Livewire::component('attendance.daily-penalties.index', \Athka\Attendance\Http\Livewire\DailyPenalties\Index::class);
         Livewire::component('attendance.leaves-permissions.index', \Athka\Attendance\Http\Livewire\LeavesPermissions\Index::class);
     }
