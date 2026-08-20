@@ -26,23 +26,13 @@ final class TrackingDashboardService
                 'geofenceEvents',
             ]);
 
-        /*
-         * Use time-range overlap instead of whereDate(started_at)
-         * so overnight work sessions are not lost.
-         */
         if (filled($dateFrom)) {
             $from = CarbonImmutable::parse($dateFrom)->startOfDay();
-
-            $query->where(function (Builder $query) use ($from): void {
-                $query
-                    ->whereNull('ended_at')
-                    ->orWhere('ended_at', '>=', $from);
-            });
+            $query->where('started_at', '>=', $from);
         }
 
         if (filled($dateTo)) {
             $to = CarbonImmutable::parse($dateTo)->endOfDay();
-
             $query->where('started_at', '<=', $to);
         }
 
