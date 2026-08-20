@@ -148,23 +148,45 @@ trait WithScheduleExceptions
             $rules['exceptionForm.end_time'] = 'required|date_format:H:i|after:exceptionForm.start_time';
         }
 
-
         $this->validate($rules);
-        $assignment = EmployeeWorkSchedule::where('saas_company_id', $companyId)
+
+        $exceptionDate = Carbon::parse($this->exceptionForm['exception_date'])->toDateString();
+        $existingException = EmployeeWorkScheduleException::query()
+            ->where('saas_company_id', $companyId)
             ->where('employee_id', $this->exceptionsEmployeeId)
-            ->where('is_active', true)
-            ->latest('id')
+            ->whereDate('exception_date', $exceptionDate)
+            ->when($this->exceptionEditId, fn ($q) => $q->where('id', '!=', (int) $this->exceptionEditId))
             ->first();
 
+        if ($existingException) {
+            $this->dispatch('toast', [
+                'type' => 'warning',
+                'message' => tr('An exception already exists for this employee on this date. Edit the existing exception instead.'),
+            ]);
+            return;
+        }
+
+        $assignment = $this->resolveExceptionAssignment($companyId, $exceptionDate);
+
+        if (!$assignment) {
+            $this->dispatch('toast', [
+                'type' => 'error',
+                'message' => tr('This employee has no schedule for the selected exception date.'),
+            ]);
+            return;
+        }
+
+        $hasTimes = in_array($type, ['time_override', 'work_day'], true);
 
         $payload = [
             'saas_company_id' => $companyId,
             'employee_id' => $this->exceptionsEmployeeId,
             'employee_work_schedule_id' => $assignment->id,
-            'exception_date' => $this->exceptionForm['exception_date'],
+            'work_schedule_id' => $assignment->work_schedule_id,
+            'exception_date' => $exceptionDate,
             'exception_type' => $this->exceptionForm['exception_type'],
-            'start_time' => $this->exceptionForm['start_time'] ?: null,
-            'end_time' => $this->exceptionForm['end_time'] ?: null,
+            'start_time' => $hasTimes ? ($this->exceptionForm['start_time'] ?: null) : null,
+            'end_time' => $hasTimes ? ($this->exceptionForm['end_time'] ?: null) : null,
             'notes' => $this->exceptionForm['notes'],
         ];
 
@@ -181,6 +203,43 @@ trait WithScheduleExceptions
         $this->resetExceptionForm();
         $this->refreshExceptionsList();
         $this->dispatch('toast', ['type' => 'success', 'message' => tr('Exception saved')]);
+    }
+
+    private function resolveExceptionAssignment(int $companyId, string $exceptionDate): ?EmployeeWorkSchedule
+    {
+        $baseQuery = EmployeeWorkSchedule::query()
+            ->where('employee_work_schedules.saas_company_id', $companyId)
+            ->where('employee_id', $this->exceptionsEmployeeId)
+            ->where('start_date', '<=', $exceptionDate)
+            ->where(function ($q) use ($exceptionDate) {
+                $q->whereNull('end_date')
+                    ->orWhere('end_date', '>=', $exceptionDate);
+            })
+            ->whereExists(function ($q) use ($companyId) {
+                $q->selectRaw('1')
+                    ->from('work_schedules')
+                    ->whereColumn('work_schedules.id', 'employee_work_schedules.work_schedule_id')
+                    ->where('work_schedules.saas_company_id', $companyId)
+                    ->where(function ($scheduleQuery) {
+                        $scheduleQuery->where('work_schedules.is_active', true)
+                            ->orWhereNull('work_schedules.is_active');
+                    });
+            });
+
+        if ($this->exceptionsAssignmentId) {
+            $assignment = (clone $baseQuery)
+                ->whereKey($this->exceptionsAssignmentId)
+                ->first();
+
+            if ($assignment) {
+                return $assignment;
+            }
+        }
+
+        return $baseQuery
+            ->orderByDesc('start_date')
+            ->orderByDesc('id')
+            ->first();
     }
 
     public function editException($exceptionId): void

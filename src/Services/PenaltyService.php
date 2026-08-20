@@ -149,6 +149,14 @@ class PenaltyService
             return false;
         }
 
+        $calendarSkipReason = $this->calendarPenaltySkipReason($log);
+        if ($calendarSkipReason !== null) {
+            $this->deleteUnconfirmedPenaltiesForLog($log);
+            $this->markSkipped($calendarSkipReason);
+
+            return false;
+        }
+
         $group = DB::table('employee_group_members')
             ->join('employee_groups', 'employee_group_members.group_id', '=', 'employee_groups.id')
             ->where('employee_group_members.employee_id', $employee->id)
@@ -196,15 +204,7 @@ class PenaltyService
 
         $targetViolationTypes = array_values(array_unique($targetViolationTypes));
 
-        AttendanceDailyPenalty::where('saas_company_id', $log->saas_company_id)
-            ->where('employee_id', $log->employee_id)
-            ->where('attendance_date', $log->attendance_date)
-            ->where('status', '!=', 'confirmed')
-            ->when(
-                ! empty($targetViolationTypes),
-                fn ($query) => $query->whereNotIn('violation_type', $targetViolationTypes)
-            )
-            ->delete();
+        $this->deletePenaltiesOutsideResolvedTarget($log, $targetViolationTypes);
 
         if (empty($targetViolationTypes)) {
             $this->markSkipped('no_billable_violation');
@@ -267,19 +267,31 @@ class PenaltyService
             'violation_type' => $violationType,
         ])->first();
 
+        if (
+            in_array($violationType, ['delay', 'early_departure', 'auto_checkout'], true)
+            && $this->hasAbsencePenaltyForLog($log)
+        ) {
+            if ($existing && $existing->status !== 'confirmed') {
+                $existing->delete();
+            }
+
+            $this->markSkipped('covered_by_absence');
+
+            return false;
+        }
+
         if ($existing && $existing->status === 'confirmed') {
             return false;
         }
 
-        $hasPermission = \Athka\Attendance\Models\AttendancePermissionRequest::where('employee_id', $log->employee_id)
-            ->where('permission_date', $log->attendance_date)
-            ->where('status', 'approved')
-            ->exists();
+        $hasPermission = $this->hasApprovedPermissionForViolation($log, $violationType);
 
         if ($hasPermission) {
             if ($existing && $existing->status !== 'confirmed') {
                 $existing->delete();
             }
+            $this->markSkipped('approved_permission');
+
             return false;
         }
 
@@ -381,6 +393,18 @@ class PenaltyService
             $amount = ($dailyRate * (((float) $penaltyPolicy->deduction_value) / 100)) * $units;
         }
 
+        $exceptionalMultiplier = $this->exceptionalDayMultiplierForViolation($log, $violationType);
+        $amount *= $exceptionalMultiplier;
+
+        if ($amount <= 0) {
+            if ($existing && $existing->status !== 'confirmed') {
+                $existing->delete();
+            }
+            $this->markSkipped('exceptional_day');
+
+            return false;
+        }
+
         $recalculatedState = $this->resolveRecalculatedPenaltyState($existing, (float) $amount);
 
         AttendanceDailyPenalty::updateOrCreate(
@@ -401,11 +425,12 @@ class PenaltyService
                 'notes' => ($existing ? $existing->notes : '')
                     . "\n[System] Calculated/Recalculated at " . now()
                     . sprintf(
-                        ' | grace daily=%d, monthly_before=%d, monthly_applied=%d, billable=%d',
+                        ' | grace daily=%d, monthly_before=%d, monthly_applied=%d, billable=%d, exceptional_multiplier=%.2f',
                         $threshold,
                         $monthlyGraceUsedBefore,
                         $monthlyGraceApplied,
-                        $billableMinutes
+                        $billableMinutes,
+                        $exceptionalMultiplier
                     ),
             ]
         );
@@ -715,6 +740,18 @@ class PenaltyService
             (float) $absencePolicy->deduction_value
         );
 
+        $exceptionalMultiplier = $this->exceptionalDayMultiplierForViolation($log, 'absent');
+        $amount *= $exceptionalMultiplier;
+
+        if ($amount <= 0) {
+            if ($existing && $existing->status !== 'confirmed') {
+                $existing->delete();
+            }
+            $this->markSkipped('exceptional_day');
+
+            return false;
+        }
+
         $recalculatedState = $this->resolveRecalculatedPenaltyState($existing, (float) $amount);
 
         AttendanceDailyPenalty::updateOrCreate(
@@ -732,7 +769,8 @@ class PenaltyService
                 'exemption_amount' => $recalculatedState['exemption_amount'],
                 'net_amount' => $recalculatedState['net_amount'],
                 'status' => $recalculatedState['status'],
-                'notes' => ($existing ? $existing->notes : '') . "\n[System] Calculated/Recalculated absence penalty at " . now(),
+                'notes' => ($existing ? $existing->notes : '') . "\n[System] Calculated/Recalculated absence penalty at " . now()
+                    . sprintf(' | exceptional_multiplier=%.2f', $exceptionalMultiplier),
             ]
         );
 
@@ -769,6 +807,25 @@ class PenaltyService
             'status' => $netAmount <= 0 ? 'waived' : 'pending',
         ];
     }
+
+    private function hasApprovedPermissionForViolation(AttendanceDailyLog $log, string $violationType): bool
+    {
+        if ($violationType === 'absent' && ! $this->hasAnyActualAttendance($log)) {
+            return false;
+        }
+
+        return \Athka\Attendance\Models\AttendancePermissionRequest::where('company_id', $log->saas_company_id)
+            ->where('employee_id', $log->employee_id)
+            ->where('permission_date', $log->attendance_date)
+            ->where('status', 'approved')
+            ->exists();
+    }
+
+    private function hasAnyActualAttendance(AttendanceDailyLog $log): bool
+    {
+        return ! empty($log->check_in_time) || ! empty($log->check_out_time);
+    }
+
     private function calculateDeductionAmount(AttendanceDailyLog $log, string $type, float $value, int $units = 1): float
     {
         $type = strtolower($type);
@@ -903,6 +960,111 @@ class PenaltyService
         }
 
         return $total;
+    }
+
+    private function calendarPenaltySkipReason(AttendanceDailyLog $log): ?string
+    {
+        $employee = $log->employee;
+        if (! $employee) {
+            return null;
+        }
+
+        $dateStr = $log->attendance_date instanceof \DateTimeInterface
+            ? Carbon::instance($log->attendance_date)->toDateString()
+            : Carbon::parse($log->attendance_date)->toDateString();
+
+        $scheduleService = app(WorkScheduleService::class);
+        $exceptionalDay = $scheduleService->getExceptionalDay((int) $log->saas_company_id, $dateStr, $employee);
+
+        if ($exceptionalDay) {
+            $isHoliday = isset($exceptionalDay->is_holiday)
+                ? (bool) $exceptionalDay->is_holiday
+                : ((float) ($exceptionalDay->absence_multiplier ?? 1) <= 0);
+
+            if ($isHoliday) {
+                return (bool) ($exceptionalDay->is_official_holiday ?? false)
+                    ? 'official_holiday'
+                    : 'exceptional_day';
+            }
+        }
+
+        $schedule = $scheduleService->getEffectiveSchedule((int) $log->saas_company_id, $employee, $dateStr);
+        $holidays = $scheduleService->getHolidays((int) $log->saas_company_id, $dateStr, $dateStr);
+        $metrics = $scheduleService->getMetricsForDate($dateStr, $schedule, $holidays, $employee);
+
+        if (($metrics['status'] ?? null) !== 'holiday' && ! (bool) ($metrics['is_holiday'] ?? false)) {
+            return null;
+        }
+
+        return $holidays->isNotEmpty() ? 'official_holiday' : 'exceptional_day';
+    }
+
+    private function deleteUnconfirmedPenaltiesForLog(AttendanceDailyLog $log): void
+    {
+        AttendanceDailyPenalty::where('saas_company_id', $log->saas_company_id)
+            ->where('employee_id', $log->employee_id)
+            ->where('attendance_date', $log->attendance_date)
+            ->where('status', '!=', 'confirmed')
+            ->delete();
+    }
+
+    private function deletePenaltiesOutsideResolvedTarget(AttendanceDailyLog $log, array $targetViolationTypes): void
+    {
+        $query = AttendanceDailyPenalty::where('saas_company_id', $log->saas_company_id)
+            ->where('employee_id', $log->employee_id)
+            ->where('attendance_date', $log->attendance_date);
+
+        if (empty($targetViolationTypes)) {
+            $query->where('status', '!=', 'confirmed')->delete();
+
+            return;
+        }
+
+        $query->whereNotIn('violation_type', $targetViolationTypes);
+
+        if (in_array('absent', $targetViolationTypes, true)) {
+            $query->whereIn('violation_type', ['delay', 'early_departure', 'auto_checkout'])->delete();
+
+            return;
+        }
+
+        $query->where('status', '!=', 'confirmed')->delete();
+    }
+
+    private function hasAbsencePenaltyForLog(AttendanceDailyLog $log): bool
+    {
+        return AttendanceDailyPenalty::where('saas_company_id', $log->saas_company_id)
+            ->where('employee_id', $log->employee_id)
+            ->where('attendance_date', $log->attendance_date)
+            ->where('violation_type', 'absent')
+            ->exists();
+    }
+
+    private function exceptionalDayMultiplierForViolation(AttendanceDailyLog $log, string $violationType): float
+    {
+        $employee = $log->employee;
+        if (! $employee) {
+            return 1.0;
+        }
+
+        $dateStr = $log->attendance_date instanceof \DateTimeInterface
+            ? Carbon::instance($log->attendance_date)->toDateString()
+            : Carbon::parse($log->attendance_date)->toDateString();
+
+        $exceptionalDay = app(WorkScheduleService::class)
+            ->getExceptionalDay((int) $log->saas_company_id, $dateStr, $employee);
+
+        if (! $exceptionalDay) {
+            return 1.0;
+        }
+
+        $multiplier = match ($violationType) {
+            'absent' => $exceptionalDay->absence_multiplier ?? 1,
+            'delay', 'early_departure', 'auto_checkout' => $exceptionalDay->late_multiplier ?? 1,
+            default => 1,
+        };
+
+        return max(0.0, (float) $multiplier);
     }
 
     private function markSkipped(string $reason): void

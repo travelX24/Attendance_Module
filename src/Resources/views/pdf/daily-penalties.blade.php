@@ -1,19 +1,77 @@
+@php
+    $isRtl = $isRtl ?? in_array(substr(app()->getLocale(), 0, 2), ['ar', 'fa', 'ur', 'he'], true);
+    $dir = $isRtl ? 'rtl' : 'ltr';
+    $startAlign = $isRtl ? 'right' : 'left';
+    $currencyLabel = $currency['label'] ?? ($isRtl ? "\u{0631}.\u{064A}" : 'YER');
+    $columnCount = count($headers ?? []);
+@endphp
 <!doctype html>
-<html lang="{{ app()->getLocale() }}" dir="{{ in_array(substr(app()->getLocale(), 0, 2), ['ar', 'fa', 'ur', 'he']) ? 'rtl' : 'ltr' }}">
+<html lang="{{ app()->getLocale() }}" dir="{{ $dir }}">
 <head>
     <meta charset="utf-8">
     <title>{{ $reshaper(tr('Daily Penalties Report')) }}</title>
     <style>
-        body { font-family: DejaVu Sans, sans-serif; font-size: 10px; color: #2B2B2B; }
-        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-        th, td { border: 1px solid #E8DED8; padding: 8px; text-align: center; vertical-align: middle; }
-        th { background-color: #FDFBF7; color: #581845; font-weight: bold; }
-        .header { text-align: center; margin-bottom: 30px; }
-        .header h1 { color: #903749; margin: 0 0 10px; }
-        .stats { margin-bottom: 20px; text-align: center; }
-        .stats strong { color: #903749; }
-        .employee { text-align: {{ in_array(substr(app()->getLocale(), 0, 2), ['ar', 'fa', 'ur', 'he']) ? 'right' : 'left' }}; }
-        .footer { position: fixed; bottom: 0; width: 100%; text-align: center; font-size: 8px; color: #666; }
+        body {
+            direction: {{ $dir }};
+            font-family: DejaVu Sans, sans-serif;
+            font-size: 9px;
+            color: #2B2B2B;
+            text-align: {{ $startAlign }};
+        }
+
+        table {
+            direction: {{ $dir }};
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 18px;
+        }
+
+        th,
+        td {
+            border: 1px solid #E8DED8;
+            padding: 7px 5px;
+            text-align: center;
+            vertical-align: middle;
+            unicode-bidi: plaintext;
+        }
+
+        th {
+            background-color: #FDFBF7;
+            color: #581845;
+            font-weight: bold;
+        }
+
+        .header {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .header h1 {
+            color: #903749;
+            margin: 0 0 10px;
+        }
+
+        .stats {
+            margin-bottom: 18px;
+            text-align: center;
+        }
+
+        .stats strong {
+            color: #903749;
+        }
+
+        .text-start {
+            text-align: {{ $startAlign }};
+        }
+
+        .footer {
+            position: fixed;
+            bottom: 0;
+            width: 100%;
+            text-align: center;
+            font-size: 8px;
+            color: #666;
+        }
     </style>
 </head>
 <body>
@@ -23,39 +81,34 @@
     </div>
 
     <div class="stats">
-        <strong>{{ $reshaper(tr('Total Calculated')) }}:</strong> {{ number_format((float) ($stats['total_calculated'] ?? 0), 2) }} SAR |
-        <strong>{{ $reshaper(tr('Total Waived')) }}:</strong> {{ number_format((float) ($stats['total_exempted'] ?? 0), 2) }} SAR |
-        <strong>{{ $reshaper(tr('Net Total')) }}:</strong> {{ number_format((float) ($stats['total_net'] ?? 0), 2) }} SAR
+        <strong>{{ $reshaper(tr('Total Calculated')) }}:</strong>
+        {{ number_format((float) ($stats['total_calculated'] ?? 0), 2) }} {{ $reshaper($currencyLabel) }}
+        |
+        <strong>{{ $reshaper(tr('Total Waived')) }}:</strong>
+        {{ number_format((float) ($stats['total_exempted'] ?? 0), 2) }} {{ $reshaper($currencyLabel) }}
+        |
+        <strong>{{ $reshaper(tr('Net Total')) }}:</strong>
+        {{ number_format((float) ($stats['total_net'] ?? 0), 2) }} {{ $reshaper($currencyLabel) }}
     </div>
 
     <table>
         <thead>
             <tr>
-                <th>{{ $reshaper(tr('Employee')) }}</th>
-                <th>{{ $reshaper(tr('No')) }}</th>
-                <th>{{ $reshaper(tr('Date')) }}</th>
-                <th>{{ $reshaper(tr('Violation')) }}</th>
-                <th>{{ $reshaper(tr('Min')) }}</th>
-                <th>{{ $reshaper(tr('Amount')) }}</th>
-                <th>{{ $reshaper(tr('Net')) }}</th>
-                <th>{{ $reshaper(tr('Status')) }}</th>
+                @foreach($headers as $header)
+                    <th>{{ $reshaper($header) }}</th>
+                @endforeach
             </tr>
         </thead>
         <tbody>
-            @forelse($penalties as $p)
+            @forelse($rows as $row)
                 <tr>
-                    <td class="employee">{{ $p->pdf_employee_name }}</td>
-                    <td>{{ $p->employee?->employee_no ?? '-' }}</td>
-                    <td>{{ $p->attendance_date instanceof \DateTimeInterface ? $p->attendance_date->format('Y-m-d') : substr((string) $p->attendance_date, 0, 10) }}</td>
-                    <td>{{ $p->pdf_violation }}</td>
-                    <td>{{ (int) $p->violation_minutes }}</td>
-                    <td>{{ number_format((float) $p->calculated_amount, 2) }}</td>
-                    <td>{{ number_format((float) $p->net_amount, 2) }}</td>
-                    <td>{{ $p->pdf_status }}</td>
+                    @foreach($row as $index => $cell)
+                        <td class="{{ $index < 2 ? 'text-start' : '' }}">{{ $reshaper($cell) }}</td>
+                    @endforeach
                 </tr>
             @empty
                 <tr>
-                    <td colspan="8">{{ $reshaper(tr('No data available')) }}</td>
+                    <td colspan="{{ max($columnCount, 1) }}">{{ $reshaper(tr('No data available')) }}</td>
                 </tr>
             @endforelse
         </tbody>

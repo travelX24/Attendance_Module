@@ -1109,7 +1109,7 @@ private function buildSchedulePreview($employeeOrId, int $companyId, Carbon $fro
         if ($except) {
             $type = 'exception';
             $typeLabel = match($except->exception_type) {
-                'off_day' => tr('Off Day'),
+                'off_day', 'day_off' => tr('Off Day'),
                 'work_day' => tr('Work Day'),
                 'overtime' => tr('Overtime'),
                 default => tr('Exception'),

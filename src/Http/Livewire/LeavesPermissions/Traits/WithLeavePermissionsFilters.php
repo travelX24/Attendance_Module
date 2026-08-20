@@ -206,26 +206,79 @@ trait WithLeavePermissionsFilters
     {
         $hasWorkSchedules = Schema::hasTable('employee_work_schedules');
         $hasShiftRotations = Schema::hasTable('employee_shift_rotations');
+        $hasSchedulesTable = Schema::hasTable('work_schedules');
+        $today = now()->toDateString();
+
+        $workScheduleHasCompany = $hasSchedulesTable && Schema::hasColumn('work_schedules', 'saas_company_id');
+        $employeeWorkScheduleHasCompany = $hasWorkSchedules && Schema::hasColumn('employee_work_schedules', 'saas_company_id');
+        $employeeWorkScheduleHasScheduleId = $hasWorkSchedules && Schema::hasColumn('employee_work_schedules', 'work_schedule_id');
+        $employeeWorkScheduleHasStartDate = $hasWorkSchedules && Schema::hasColumn('employee_work_schedules', 'start_date');
+        $employeeWorkScheduleHasEndDate = $hasWorkSchedules && Schema::hasColumn('employee_work_schedules', 'end_date');
+        $shiftRotationHasCompany = $hasShiftRotations && Schema::hasColumn('employee_shift_rotations', 'saas_company_id');
+        $shiftRotationHasStartDate = $hasShiftRotations && Schema::hasColumn('employee_shift_rotations', 'start_date');
+        $shiftRotationHasEndDate = $hasShiftRotations && Schema::hasColumn('employee_shift_rotations', 'end_date');
+        $shiftRotationHasScheduleA = $hasShiftRotations && Schema::hasColumn('employee_shift_rotations', 'work_schedule_id_a');
+        $shiftRotationHasScheduleB = $hasShiftRotations && Schema::hasColumn('employee_shift_rotations', 'work_schedule_id_b');
 
         if (!$hasWorkSchedules && !$hasShiftRotations) {
             return $q;
         }
 
-        return $q->where(function ($scheduleQuery) use ($employeeTable, $hasWorkSchedules, $hasShiftRotations) {
+        return $q->where(function ($scheduleQuery) use (
+            $employeeTable,
+            $hasWorkSchedules,
+            $hasShiftRotations,
+            $hasSchedulesTable,
+            $today,
+            $workScheduleHasCompany,
+            $employeeWorkScheduleHasCompany,
+            $employeeWorkScheduleHasScheduleId,
+            $employeeWorkScheduleHasStartDate,
+            $employeeWorkScheduleHasEndDate,
+            $shiftRotationHasCompany,
+            $shiftRotationHasStartDate,
+            $shiftRotationHasEndDate,
+            $shiftRotationHasScheduleA,
+            $shiftRotationHasScheduleB
+        ) {
             $hasCondition = false;
 
             if ($hasWorkSchedules) {
-                $scheduleQuery->whereExists(function ($sub) use ($employeeTable) {
+                $scheduleQuery->whereExists(function ($sub) use (
+                    $employeeTable,
+                    $hasSchedulesTable,
+                    $today,
+                    $workScheduleHasCompany,
+                    $employeeWorkScheduleHasCompany,
+                    $employeeWorkScheduleHasScheduleId,
+                    $employeeWorkScheduleHasStartDate,
+                    $employeeWorkScheduleHasEndDate
+                ) {
                     $sub->selectRaw('1')
                         ->from('employee_work_schedules as ews')
                         ->whereColumn('ews.employee_id', $employeeTable . '.id');
 
-                    if (Schema::hasColumn('employee_work_schedules', 'saas_company_id')) {
+                    if ($hasSchedulesTable && $employeeWorkScheduleHasScheduleId) {
+                        $sub->join('work_schedules as ws', 'ws.id', '=', 'ews.work_schedule_id');
+
+                        if ($workScheduleHasCompany) {
+                            $sub->where('ws.saas_company_id', $this->companyId);
+                        }
+                    }
+
+                    if ($employeeWorkScheduleHasCompany) {
                         $sub->where('ews.saas_company_id', $this->companyId);
                     }
 
-                    if (Schema::hasColumn('employee_work_schedules', 'is_active')) {
-                        $sub->where('ews.is_active', 1);
+                    if ($employeeWorkScheduleHasStartDate) {
+                        $sub->where('ews.start_date', '<=', $today);
+                    }
+
+                    if ($employeeWorkScheduleHasEndDate) {
+                        $sub->where(function ($dateQuery) use ($today) {
+                            $dateQuery->whereNull('ews.end_date')
+                                ->orWhere('ews.end_date', '>=', $today);
+                        });
                     }
                 });
 
@@ -235,17 +288,54 @@ trait WithLeavePermissionsFilters
             if ($hasShiftRotations) {
                 $method = $hasCondition ? 'orWhereExists' : 'whereExists';
 
-                $scheduleQuery->{$method}(function ($sub) use ($employeeTable) {
+                $scheduleQuery->{$method}(function ($sub) use (
+                    $employeeTable,
+                    $hasSchedulesTable,
+                    $today,
+                    $workScheduleHasCompany,
+                    $shiftRotationHasCompany,
+                    $shiftRotationHasStartDate,
+                    $shiftRotationHasEndDate,
+                    $shiftRotationHasScheduleA,
+                    $shiftRotationHasScheduleB
+                ) {
                     $sub->selectRaw('1')
                         ->from('employee_shift_rotations as esr')
                         ->whereColumn('esr.employee_id', $employeeTable . '.id');
 
-                    if (Schema::hasColumn('employee_shift_rotations', 'saas_company_id')) {
+                    if ($shiftRotationHasCompany) {
                         $sub->where('esr.saas_company_id', $this->companyId);
                     }
 
-                    if (Schema::hasColumn('employee_shift_rotations', 'is_active')) {
-                        $sub->where('esr.is_active', 1);
+                    if ($shiftRotationHasStartDate) {
+                        $sub->where('esr.start_date', '<=', $today);
+                    }
+
+                    if ($shiftRotationHasEndDate) {
+                        $sub->where(function ($dateQuery) use ($today) {
+                            $dateQuery->whereNull('esr.end_date')
+                                ->orWhere('esr.end_date', '>=', $today);
+                        });
+                    }
+
+                    if ($hasSchedulesTable && ($shiftRotationHasScheduleA || $shiftRotationHasScheduleB)) {
+                        $sub->whereExists(function ($scheduleSub) use ($workScheduleHasCompany, $shiftRotationHasScheduleA, $shiftRotationHasScheduleB) {
+                            $scheduleSub->selectRaw('1')
+                                ->from('work_schedules as ws')
+                                ->where(function ($idQuery) use ($shiftRotationHasScheduleA, $shiftRotationHasScheduleB) {
+                                    if ($shiftRotationHasScheduleA) {
+                                        $idQuery->orWhereColumn('ws.id', 'esr.work_schedule_id_a');
+                                    }
+
+                                    if ($shiftRotationHasScheduleB) {
+                                        $idQuery->orWhereColumn('ws.id', 'esr.work_schedule_id_b');
+                                    }
+                                });
+
+                            if ($workScheduleHasCompany) {
+                                $scheduleSub->where('ws.saas_company_id', $this->companyId);
+                            }
+                        });
                     }
                 });
             }

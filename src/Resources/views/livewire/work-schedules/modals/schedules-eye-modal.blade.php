@@ -90,7 +90,6 @@
                                         <div>
                                             <div class="mb-1 flex items-center gap-1 text-[10px] font-black text-[color:var(--accent-orange)]">
                                                 <span class="w-4 h-4 rounded-md bg-[color:var(--accent-orange)]/10 border border-[color:var(--accent-orange)]/20 flex items-center justify-center">A</span>
-                                                <span>{{ $r['rotation_info']['name_a'] ?? '-' }}</span>
                                             </div>
                                             <div class="space-y-0.5">
                                                 @foreach(($r['rotation_info']['periods_a'] ?? []) as $periodIndex => $period)
@@ -105,7 +104,6 @@
                                         <div>
                                             <div class="mb-1 flex items-center gap-1 text-[10px] font-black text-[color:var(--warning)]">
                                                 <span class="w-4 h-4 rounded-md bg-[color:var(--warning)]/10 border border-[color:var(--warning)]/25 flex items-center justify-center">B</span>
-                                                <span>{{ $r['rotation_info']['name_b'] ?? '-' }}</span>
                                             </div>
                                             <div class="space-y-0.5">
                                                 @foreach(($r['rotation_info']['periods_b'] ?? []) as $periodIndex => $period)

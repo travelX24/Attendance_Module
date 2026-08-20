@@ -126,7 +126,7 @@ class OfflineAttendanceController extends Controller
         $schedule = null;
         if ($exception) {
             $typeLabel = match($exception->exception_type) {
-                'off_day' => tr('Off Day'),
+                'off_day', 'day_off' => tr('Off Day'),
                 'work_day' => tr('Work Day'),
                 'overtime' => tr('Overtime'),
                 default => tr('Exception'),

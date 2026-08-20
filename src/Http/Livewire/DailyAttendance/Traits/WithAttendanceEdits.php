@@ -396,7 +396,7 @@ trait WithAttendanceEdits
                   $compEx = $this->checkCompanyException($current, $employee, $companyExceptions, $officialHolidays);
                   $isException = (bool)$ex || (bool)$compEx;
                   $exceptionName = $ex ? match($ex->exception_type){
-                      'off_day' => tr('Off Day'),
+                      'off_day', 'day_off' => tr('Off Day'),
                       'work_day' => tr('Work Day'),
                       'overtime' => tr('Overtime'),
                       default => tr('Exception'),
@@ -409,7 +409,7 @@ trait WithAttendanceEdits
                   $dayName = strtolower($current->format('l'));
 
                   // Only fetch schedule if it's NOT an "Off Day" exception
-                  $isOffDay = ($ex && $ex->exception_type === 'off_day') || ($compEx);
+                  $isOffDay = ($ex && in_array($ex->exception_type, ['off_day', 'day_off'], true)) || ($compEx);
 
                   if (!$isOffDay) {
                       $ws = app(\Athka\SystemSettings\Services\WorkScheduleService::class)->getEffectiveSchedule($companyId, $employee, $current->toDateString());
@@ -428,7 +428,7 @@ trait WithAttendanceEdits
 
                   // Default status for no-work days
                   $dayOffStatus = 'absent';
-                  if ($ex && $ex->exception_type === 'off_day') {
+                  if ($ex && in_array($ex->exception_type, ['off_day', 'day_off'], true)) {
                       $dayOffStatus = 'day_off';
                   } elseif ($compEx) {
                       $dayOffStatus = 'holiday';
@@ -444,7 +444,7 @@ trait WithAttendanceEdits
                       
                       // If it's an exception day but log says absent, force it to show exception status
                       if ($displayStatus === 'absent' && $isException && empty($log->check_in_time)) {
-                           $displayStatus = ($compEx) ? 'holiday' : (($ex && $ex->exception_type === 'off_day') ? 'day_off' : 'absent');
+                           $displayStatus = ($compEx) ? 'holiday' : (($ex && in_array($ex->exception_type, ['off_day', 'day_off'], true)) ? 'day_off' : 'absent');
                       }
 
                       $day = [

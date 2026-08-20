@@ -307,16 +307,6 @@
                                     <i class="fas fa-circle-notch fa-spin" wire:loading wire:target="bulkConfirm"></i>
                                     {{ tr('Confirm All') }}
                                 </button>
-                                <button
-                                    wire:click="bulkDelete"
-                                    wire:loading.attr="disabled"
-                                    wire:target="bulkDelete"
-                                    class="text-xs font-bold text-[color:var(--error)] hover:brightness-90 flex items-center gap-1 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    <i class="fas fa-trash-alt" wire:loading.remove wire:target="bulkDelete"></i>
-                                    <i class="fas fa-circle-notch fa-spin" wire:loading wire:target="bulkDelete"></i>
-                                    {{ tr('Delete') }}
-                                </button>
                             @endif
                         </div>
                     @else
@@ -339,9 +329,17 @@
                     </div>
 
                     <div class="flex items-center justify-center gap-2 w-full sm:w-auto">
-                        <x-ui.secondary-button wire:click="refreshData" size="sm" class="!rounded-xl gap-2 flex-1 sm:flex-none justify-center">
-                            <i class="fas fa-sync text-xs"></i>
-                            <span class="font-bold">{{ tr('Refresh') }}</span>
+                        <x-ui.secondary-button
+                            wire:click="manualRefreshData"
+                            wire:loading.attr="disabled"
+                            wire:target="manualRefreshData"
+                            size="sm"
+                            class="!rounded-xl gap-2 flex-1 sm:flex-none justify-center disabled:opacity-60 disabled:cursor-not-allowed"
+                        >
+                            <i class="fas fa-sync text-xs" wire:loading.remove wire:target="manualRefreshData"></i>
+                            <i class="fas fa-circle-notch fa-spin text-xs" wire:loading wire:target="manualRefreshData"></i>
+                            <span class="font-bold" wire:loading.remove wire:target="manualRefreshData">{{ tr('Refresh') }}</span>
+                            <span class="font-bold" wire:loading wire:target="manualRefreshData">{{ tr('Refreshing...') }}</span>
                         </x-ui.secondary-button>
 
                         @if($canExportPenalties)
@@ -535,7 +533,7 @@
                         <td class="px-6 py-4 text-center whitespace-nowrap">
                             <x-ui.badge :type="$statusBadge['type']">{{ $statusBadge['label'] }}</x-ui.badge>
                             @if($penalty->exemption_attachment)
-                                <a href="{{ \Illuminate\Support\Facades\Storage::url($penalty->exemption_attachment) }}" target="_blank" class="mt-1 block text-[10px] text-[color:var(--accent-orange)] hover:underline whitespace-nowrap">
+                                <a href="{{ route('secure.attendance.attachments.penalty', ['penalty' => $penalty->id]) }}" target="_blank" class="mt-1 block text-[10px] text-[color:var(--accent-orange)] hover:underline whitespace-nowrap">
                                     <i class="fas fa-paperclip me-1"></i> {{ tr('Attachment') }}
                                 </a>
                             @endif
@@ -543,30 +541,45 @@
                         <td class="px-6 py-4 text-center">
                             <x-ui.actions-menu>
                                 @if($canManagePenalties || $canWaivePenalties || $hasExemptionHistory)
-                                    @if($canWaivePenalties)
-                                        @if($hasActiveExemption)
-                                            <x-ui.dropdown-item wire:click="cancelExemption({{ $penalty->id }})" :disabled="$penalty->status === 'confirmed' || $outsideEditableWindow">
-                                                <i class="fas fa-undo me-2 text-[color:var(--error)]"></i>
-                                                <span>{{ tr('Cancel Exemption') }}</span>
-                                            </x-ui.dropdown-item>
-                                        @else
-                                            <x-ui.dropdown-item wire:click="openExemptionModal({{ $penalty->id }})" :disabled="$penalty->status === 'confirmed' || $outsideEditableWindow">
-                                                <i class="fas fa-gift me-2 text-[color:var(--warning)]"></i>
-                                                <span>{{ tr('Exempt/Waive') }}</span>
+                                    @if($penalty->status === 'confirmed')
+                                        @if($canManagePenalties)
+                                            <x-ui.dropdown-item wire:click="cancelConfirmation({{ $penalty->id }})">
+                                                <i class="fas fa-rotate-left me-2 text-[color:var(--warning)]"></i>
+                                                <span>{{ $this->penaltyUiText('', 'Cancel Confirmation') }}</span>
                                             </x-ui.dropdown-item>
                                         @endif
-                                    @endif
-                                    @if($hasExemptionHistory)
-                                        <x-ui.dropdown-item wire:click="openExemptionHistoryModal({{ $penalty->id }})">
-                                            <i class="fas fa-history me-2 text-[color:var(--text-secondary)]"></i>
-                                            <span>{{ $this->penaltyUiText('', 'Exemption History') }}</span>
-                                        </x-ui.dropdown-item>
-                                    @endif
-                                    @if($canManagePenalties)
-                                        <x-ui.dropdown-item wire:click="openConfirmModal({{ $penalty->id }})" :disabled="$penalty->status !== 'pending'">
-                                            <i class="fas fa-check-circle me-2 text-[color:var(--success)]"></i>
-                                            <span>{{ tr('Confirm for Payroll') }}</span>
-                                        </x-ui.dropdown-item>
+                                        @if($hasExemptionHistory)
+                                            <x-ui.dropdown-item wire:click="openExemptionHistoryModal({{ $penalty->id }})">
+                                                <i class="fas fa-history me-2 text-[color:var(--text-secondary)]"></i>
+                                                <span>{{ $this->penaltyUiText('', 'Exemption History') }}</span>
+                                            </x-ui.dropdown-item>
+                                        @endif
+                                    @else
+                                        @if($canWaivePenalties)
+                                            @if($hasActiveExemption)
+                                                <x-ui.dropdown-item wire:click="cancelExemption({{ $penalty->id }})" :disabled="$outsideEditableWindow">
+                                                    <i class="fas fa-undo me-2 text-[color:var(--error)]"></i>
+                                                    <span>{{ tr('Cancel Exemption') }}</span>
+                                                </x-ui.dropdown-item>
+                                            @else
+                                                <x-ui.dropdown-item wire:click="openExemptionModal({{ $penalty->id }})" :disabled="$outsideEditableWindow">
+                                                    <i class="fas fa-gift me-2 text-[color:var(--warning)]"></i>
+                                                    <span>{{ tr('Exempt/Waive') }}</span>
+                                                </x-ui.dropdown-item>
+                                            @endif
+                                        @endif
+                                        @if($hasExemptionHistory)
+                                            <x-ui.dropdown-item wire:click="openExemptionHistoryModal({{ $penalty->id }})">
+                                                <i class="fas fa-history me-2 text-[color:var(--text-secondary)]"></i>
+                                                <span>{{ $this->penaltyUiText('', 'Exemption History') }}</span>
+                                            </x-ui.dropdown-item>
+                                        @endif
+                                        @if($canManagePenalties && $penalty->status === 'pending')
+                                            <x-ui.dropdown-item wire:click="openConfirmModal({{ $penalty->id }})">
+                                                <i class="fas fa-check-circle me-2 text-[color:var(--success)]"></i>
+                                                <span>{{ tr('Confirm for Payroll') }}</span>
+                                            </x-ui.dropdown-item>
+                                        @endif
                                     @endif
                                 @else
                                     <span class="text-gray-400 p-2 italic whitespace-nowrap"><i class="fas fa-lock text-[10px] me-1"></i> {{ tr('Read Only') }}</span>
@@ -717,7 +730,13 @@
                                     @foreach($entry['details'] as $detail)
                                         <div class="rounded-md bg-gray-50 px-3 py-2">
                                             <div class="text-[10px] font-semibold text-gray-400">{{ $detail['label'] }}</div>
-                                            <div class="text-xs font-semibold text-gray-700 break-words">{{ $detail['value'] }}</div>
+                                            @if(!empty($detail['url']))
+                                                <a href="{{ $detail['url'] }}" target="_blank" class="text-xs font-semibold text-[color:var(--accent-orange)] hover:underline break-words">
+                                                    <i class="fas fa-paperclip me-1"></i> {{ $detail['value'] }}
+                                                </a>
+                                            @else
+                                                <div class="text-xs font-semibold text-gray-700 break-words">{{ $detail['value'] }}</div>
+                                            @endif
                                         </div>
                                     @endforeach
                                 </div>
@@ -765,29 +784,33 @@
         </x-slot>
 
         <x-slot name="footer">
-            <x-ui.secondary-button
-                wire:click="closeConfirmModal"
-                wire:loading.attr="disabled"
-                wire:target="confirmPenalty"
-            >
-                {{ tr('Cancel') }}
-            </x-ui.secondary-button>
-            @if($canManagePenalties)
-                <x-ui.primary-button
-                    wire:click="confirmPenalty"
+            <div class="w-full flex flex-col-reverse sm:flex-row sm:items-center sm:justify-end gap-3">
+                <x-ui.secondary-button
+                    wire:click="closeConfirmModal"
                     wire:loading.attr="disabled"
                     wire:target="confirmPenalty"
-                    class="disabled:opacity-60 disabled:cursor-not-allowed"
+                    class="w-full sm:w-auto"
                 >
-                    <span wire:loading.remove wire:target="confirmPenalty">
-                        {{ tr('Confirm & Send to Payroll') }}
-                    </span>
-                    <span wire:loading wire:target="confirmPenalty" class="inline-flex items-center gap-2">
-                        <i class="fas fa-circle-notch fa-spin"></i>
-                        {{ tr('Confirming...') }}
-                    </span>
-                </x-ui.primary-button>
-            @endif
+                    {{ tr('Cancel') }}
+                </x-ui.secondary-button>
+                @if($canManagePenalties)
+                    <x-ui.primary-button
+                        :full-width="false"
+                        wire:click="confirmPenalty"
+                        wire:loading.attr="disabled"
+                        wire:target="confirmPenalty"
+                        class="w-full sm:w-auto disabled:opacity-60 disabled:cursor-not-allowed"
+                    >
+                        <span wire:loading.remove wire:target="confirmPenalty">
+                            {{ tr('Confirm & Send to Payroll') }}
+                        </span>
+                        <span wire:loading wire:target="confirmPenalty" class="inline-flex items-center gap-2">
+                            <i class="fas fa-circle-notch fa-spin"></i>
+                            {{ tr('Confirming...') }}
+                        </span>
+                    </x-ui.primary-button>
+                @endif
+            </div>
         </x-slot>
     </x-ui.modal>
 </div>

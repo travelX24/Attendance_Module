@@ -183,33 +183,18 @@ trait WithLeaveRequests
         $employee = Employee::find($empId);
         if (!$employee) return collect();
 
-        $q = Employee::query()
+        $employeeTable = (new Employee())->getTable();
+
+        $q = Employee::withoutGlobalScope('active_only')
             ->where('id', '!=', $empId);
 
         if ($this->employeeCompanyColumn) {
             $q->where($this->employeeCompanyColumn, $this->companyId);
         }
 
-        // --- Smart Filtering ---
-        $deptCol = $this->employeeDepartmentColumn;
-        $titleCol = $this->employeeJobTitleColumn;
-
-        $q->where(function ($sub) use ($employee, $deptCol, $titleCol) {
-            $hasCondition = false;
-            if ($deptCol && $deptValue = $employee->getAttribute($deptCol)) {
-                $sub->orWhere($deptCol, $deptValue);
-                $hasCondition = true;
-            }
-            if ($titleCol && $titleValue = $employee->getAttribute($titleCol)) {
-                $sub->orWhere($titleCol, $titleValue);
-                $hasCondition = true;
-            }
-
-            // If no department or title is set for the employee, we don't restrict (to keep it flexible)
-            if (!$hasCondition) {
-                $sub->whereRaw('1=1');
-            }
-        });
+        if ($this->status !== 'all') {
+            $q->where('status', (string) $this->status);
+        }
 
         // Apply same branch restriction if exists
         $allowed = $this->lpAllowedBranchIdsSafe();
@@ -217,6 +202,8 @@ trait WithLeaveRequests
         if ($branchCol && !empty($allowed)) {
             $q->whereIn($branchCol, $allowed);
         }
+
+        $this->applyEmployeesWithAssignedScheduleFilter($q, $employeeTable);
 
         return $q->orderBy('id', 'desc')->limit(50)->get();
     }

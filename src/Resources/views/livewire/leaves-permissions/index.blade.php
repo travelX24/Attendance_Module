@@ -1827,7 +1827,7 @@
     @if($createLeaveOpen)
 
     {{-- Create Leave Modal --}}
-    <x-ui.modal wire:model="createLeaveOpen" max-width="3xl" content-overflow="visible">
+    <x-ui.modal wire:model="createLeaveOpen" max-width="3xl">
         <x-slot name="title">
             <div class="flex items-center gap-3">
                 <div class="p-2 bg-[color:var(--accent-orange)]/10 text-[color:var(--accent-orange)] rounded-lg">

@@ -12,6 +12,7 @@ use Athka\SystemSettings\Models\Department;
 use Athka\SystemSettings\Models\JobTitle;
 use Athka\SystemSettings\Models\AttendancePolicy;
 use Athka\SystemSettings\Models\AttendancePenaltyPolicy;
+use Athka\SystemSettings\Models\Currency;
 use Illuminate\Support\Facades\DB;
 use Livewire\WithFileUploads;
 use Illuminate\Support\Facades\Storage;
@@ -248,6 +249,16 @@ class Index extends Component
         $this->resetBulkSelection();
         $this->resetPage();
         $this->loadStats();
+    }
+
+    public function manualRefreshData()
+    {
+        $this->refreshData();
+
+        $this->dispatch('toast', [
+            'type' => 'success',
+            'message' => $this->penaltyUiText('', 'Penalty results refreshed.'),
+        ]);
     }
 
     public function clearAllFilters()
@@ -681,7 +692,8 @@ if (! $dateFrom || ! $dateTo) {
 
     public function hasExemptionHistory(AttendanceDailyPenalty $penalty): bool
     {
-        return ! empty($this->parseExemptionHistory((string) $penalty->notes));
+        return $this->hasActiveExemption($penalty)
+            || ! empty($this->parseExemptionHistory((string) $penalty->notes, $penalty));
     }
 
     public function penaltyUiText(string $ar, string $en): string
@@ -704,7 +716,32 @@ if (! $dateFrom || ! $dateTo) {
             'None' => "\u{0644}\u{0627} \u{064A}\u{0648}\u{062C}\u{062F}",
             'Cancel the current exemption before creating a new one.' => "\u{0642}\u{0645} \u{0628}\u{0625}\u{0644}\u{063A}\u{0627}\u{0621} \u{0627}\u{0644}\u{0625}\u{0639}\u{0641}\u{0627}\u{0621} \u{0627}\u{0644}\u{062D}\u{0627}\u{0644}\u{064A} \u{0642}\u{0628}\u{0644} \u{0625}\u{0646}\u{0634}\u{0627}\u{0621} \u{0625}\u{0639}\u{0641}\u{0627}\u{0621} \u{062C}\u{062F}\u{064A}\u{062F}.",
             'Exemption History' => "\u{0633}\u{062C}\u{0644} \u{0627}\u{0644}\u{0625}\u{0639}\u{0641}\u{0627}\u{0621}\u{0627}\u{062A}",
+            'Cancel Confirmation' => "\u{0625}\u{0644}\u{063A}\u{0627}\u{0621} \u{0627}\u{0644}\u{0627}\u{0639}\u{062A}\u{0645}\u{0627}\u{062F}",
+            'Only confirmed penalties can be unconfirmed.' => "\u{064A}\u{0645}\u{0643}\u{0646} \u{0625}\u{0644}\u{063A}\u{0627}\u{0621} \u{0627}\u{0639}\u{062A}\u{0645}\u{0627}\u{062F} \u{0627}\u{0644}\u{062C}\u{0632}\u{0627}\u{0621}\u{0627}\u{062A} \u{0627}\u{0644}\u{0645}\u{0639}\u{062A}\u{0645}\u{062F}\u{0629} \u{0641}\u{0642}\u{0637}.",
+            'Penalty confirmation cancelled.' => "\u{062A}\u{0645} \u{0625}\u{0644}\u{063A}\u{0627}\u{0621} \u{0627}\u{0639}\u{062A}\u{0645}\u{0627}\u{062F} \u{0627}\u{0644}\u{062C}\u{0632}\u{0627}\u{0621}.",
+            'Penalties cannot be deleted. Use exemption or update attendance then recalculate.' => "\u{0644}\u{0627} \u{064A}\u{0645}\u{0643}\u{0646} \u{062D}\u{0630}\u{0641} \u{0627}\u{0644}\u{062C}\u{0632}\u{0627}\u{0621}\u{0627}\u{062A}. \u{0627}\u{0633}\u{062A}\u{062E}\u{062F}\u{0645} \u{0627}\u{0644}\u{0625}\u{0639}\u{0641}\u{0627}\u{0621} \u{0623}\u{0648} \u{0639}\u{062F}\u{0644} \u{0633}\u{062C}\u{0644} \u{0627}\u{0644}\u{062D}\u{0636}\u{0648}\u{0631} \u{062B}\u{0645} \u{0623}\u{0639}\u{062F} \u{0627}\u{0644}\u{0627}\u{062D}\u{062A}\u{0633}\u{0627}\u{0628}.",
+            'Penalty results refreshed.' => "\u{062A}\u{0645} \u{062A}\u{062D}\u{062F}\u{064A}\u{062B} \u{0646}\u{062A}\u{0627}\u{0626}\u{062C} \u{0627}\u{0644}\u{062C}\u{0632}\u{0627}\u{0621}\u{0627}\u{062A}.",
+            'Employee' => "\u{0627}\u{0644}\u{0645}\u{0648}\u{0638}\u{0641}",
+            'Dept/Job' => "\u{0627}\u{0644}\u{0642}\u{0633}\u{0645}/\u{0627}\u{0644}\u{0648}\u{0638}\u{064A}\u{0641}\u{0629}",
+            'Schedule Time' => "\u{062C}\u{062F}\u{0648}\u{0644}\u{0629} \u{0627}\u{0644}\u{0648}\u{0642}\u{062A}",
+            'Actual Time' => "\u{0627}\u{0644}\u{0648}\u{0642}\u{062A} \u{0627}\u{0644}\u{0641}\u{0639}\u{0644}\u{064A}",
+            'Violation' => "\u{0627}\u{0644}\u{0645}\u{062E}\u{0627}\u{0644}\u{0641}\u{0629}",
+            'Duration' => "\u{0627}\u{0644}\u{0645}\u{062F}\u{0629}",
+            'Calculated' => "\u{0645}\u{062D}\u{0633}\u{0648}\u{0628}",
+            'Exemption' => "\u{0627}\u{0644}\u{0625}\u{0639}\u{0641}\u{0627}\u{0621}",
+            'Status' => "\u{0627}\u{0644}\u{062D}\u{0627}\u{0644}\u{0629}",
+            'Delay' => "\u{062A}\u{0623}\u{062E}\u{064A}\u{0631}",
+            'Early Departure' => "\u{0627}\u{0644}\u{0645}\u{063A}\u{0627}\u{062F}\u{0631}\u{0629} \u{0627}\u{0644}\u{0645}\u{0628}\u{0643}\u{0631}\u{0629}",
+            'Absent' => "\u{063A}\u{0627}\u{0626}\u{0628}",
+            'Auto Checkout' => "\u{0627}\u{0644}\u{0627}\u{0646}\u{0635}\u{0631}\u{0627}\u{0641} \u{0627}\u{0644}\u{062A}\u{0644}\u{0642}\u{0627}\u{0626}\u{064A}",
+            'Pending' => "\u{0642}\u{064A}\u{062F} \u{0627}\u{0644}\u{0627}\u{0646}\u{062A}\u{0638}\u{0627}\u{0631}",
+            'Confirmed' => "\u{062A}\u{0645} \u{0627}\u{0644}\u{0627}\u{0639}\u{062A}\u{0645}\u{0627}\u{062F}",
+            'Waived' => "\u{062A}\u{0646}\u{0627}\u{0632}\u{0644}",
+            'min' => "\u{062F}\u{0642}\u{064A}\u{0642}\u{0629}",
+            'YER' => "\u{0631}.\u{064A}",
             'By' => "\u{0628}\u{0648}\u{0627}\u{0633}\u{0637}\u{0629}",
+            'Attachment' => "\u{0627}\u{0644}\u{0645}\u{0631}\u{0641}\u{0642}",
+            'View Attachment' => "\u{0639}\u{0631}\u{0636} \u{0627}\u{0644}\u{0645}\u{0631}\u{0641}\u{0642}",
             'No exemption history found.' => "\u{0644}\u{0627} \u{064A}\u{0648}\u{062C}\u{062F} \u{0633}\u{062C}\u{0644} \u{0625}\u{0639}\u{0641}\u{0627}\u{0621}\u{0627}\u{062A}.",
             'Close' => "\u{0625}\u{063A}\u{0644}\u{0627}\u{0642}",
             default => $ar,
@@ -727,7 +764,23 @@ if (! $dateFrom || ! $dateTo) {
             'employee_no' => $penalty->employee?->employee_no ?: '-',
             'attendance_date' => $penalty->attendance_date,
         ];
-        $this->exemptionHistory = $this->parseExemptionHistory((string) $penalty->notes);
+        $this->exemptionHistory = $this->parseExemptionHistory((string) $penalty->notes, $penalty);
+
+        if (empty($this->exemptionHistory) && $this->hasActiveExemption($penalty)) {
+            $this->exemptionHistory = [$this->buildCurrentExemptionHistoryEntry($penalty)];
+        }
+
+        if (
+            $penalty->exemption_attachment
+            && ! empty($this->exemptionHistory)
+            && ! $this->historyContainsAttachment($this->exemptionHistory)
+        ) {
+            $this->exemptionHistory[0]['details'][] = $this->exemptionAttachmentHistoryDetail(
+                $penalty,
+                (string) $penalty->exemption_attachment
+            );
+        }
+
         $this->showExemptionHistoryModal = true;
     }
 
@@ -738,7 +791,7 @@ if (! $dateFrom || ! $dateTo) {
         $this->exemptionHistory = [];
     }
 
-    private function parseExemptionHistory(string $notes): array
+    private function parseExemptionHistory(string $notes, ?AttendanceDailyPenalty $penalty = null): array
     {
         $history = [];
 
@@ -759,7 +812,7 @@ if (! $dateFrom || ! $dateTo) {
                     'date' => $matches[2] ?: '-',
                     'icon' => 'fa-gift',
                     'badge' => 'success',
-                    'details' => $this->parseExemptionHistoryDetails($matches[3] ?? ''),
+                    'details' => $this->parseExemptionHistoryDetails($matches[3] ?? '', $penalty),
                 ];
             } elseif (preg_match('/^Exemption cancelled by (.*?) at (.*?) \| (.*)$/', $body, $matches)) {
                 $entry = [
@@ -768,7 +821,7 @@ if (! $dateFrom || ! $dateTo) {
                     'date' => $matches[2] ?: '-',
                     'icon' => 'fa-undo',
                     'badge' => 'danger',
-                    'details' => $this->parseExemptionHistoryDetails($matches[3] ?? ''),
+                    'details' => $this->parseExemptionHistoryDetails($matches[3] ?? '', $penalty),
                 ];
             } elseif (preg_match('/^Previous exemption archived before replacement at (.*?) \| (.*)$/', $body, $matches)) {
                 $entry = [
@@ -777,7 +830,7 @@ if (! $dateFrom || ! $dateTo) {
                     'date' => $matches[1] ?: '-',
                     'icon' => 'fa-archive',
                     'badge' => 'warning',
-                    'details' => $this->parseExemptionHistoryDetails($matches[2] ?? ''),
+                    'details' => $this->parseExemptionHistoryDetails($matches[2] ?? '', $penalty),
                 ];
             }
 
@@ -789,7 +842,29 @@ if (! $dateFrom || ! $dateTo) {
         return array_reverse($history);
     }
 
-    private function parseExemptionHistoryDetails(string $details): array
+    private function buildCurrentExemptionHistoryEntry(AttendanceDailyPenalty $penalty): array
+    {
+        $details = sprintf(
+            'type=%s, amount=%.2f, net=%.2f, reason=%s, exempted_at=%s%s',
+            (string) ($penalty->exemption_type ?? '-'),
+            (float) $penalty->exemption_amount,
+            (float) $penalty->net_amount,
+            $this->formatExemptionReason($penalty->exemption_reason),
+            $penalty->exempted_at ? (string) $penalty->exempted_at : '-',
+            $penalty->exemption_attachment ? ', attachment=' . $penalty->exemption_attachment : ''
+        );
+
+        return [
+            'title' => $this->penaltyUiText('', 'Exemption applied'),
+            'actor' => $penalty->exemptedBy?->name ?: '-',
+            'date' => $penalty->exempted_at ? (string) $penalty->exempted_at : '-',
+            'icon' => 'fa-gift',
+            'badge' => 'success',
+            'details' => $this->parseExemptionHistoryDetails($details, $penalty),
+        ];
+    }
+
+    private function parseExemptionHistoryDetails(string $details, ?AttendanceDailyPenalty $penalty = null): array
     {
         $parsed = [];
         $details = $this->cleanAuditText($details);
@@ -803,13 +878,49 @@ if (! $dateFrom || ! $dateTo) {
                 continue;
             }
 
-            $parsed[] = [
+            $detail = [
+                'key' => $key,
                 'label' => $this->exemptionHistoryDetailLabel($key),
                 'value' => $this->formatExemptionHistoryValue($key, $value),
             ];
+
+            $url = $this->exemptionHistoryAttachmentUrl($key, $value, $penalty);
+
+            if ($url) {
+                $detail['url'] = $url;
+                $detail['value'] = $this->penaltyUiText('', 'View Attachment');
+            }
+
+            $parsed[] = $detail;
         }
 
         return $parsed;
+    }
+
+    private function historyContainsAttachment(array $history): bool
+    {
+        foreach ($history as $entry) {
+            foreach (($entry['details'] ?? []) as $detail) {
+                if (in_array($detail['key'] ?? '', ['attachment', 'previous_attachment'], true)) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
+    }
+
+    private function exemptionAttachmentHistoryDetail(AttendanceDailyPenalty $penalty, string $path): array
+    {
+        return [
+            'key' => 'attachment',
+            'label' => $this->penaltyUiText('', 'Attachment'),
+            'value' => $this->penaltyUiText('', 'View Attachment'),
+            'url' => route('secure.attendance.attachments.penalty', [
+                'penalty' => $penalty->id,
+                'path' => $path,
+            ]),
+        ];
     }
 
     private function exemptionHistoryDetailLabel(string $key): string
@@ -820,8 +931,27 @@ if (! $dateFrom || ! $dateTo) {
             'net', 'previous_net' => $this->penaltyUiText('المبلغ الصافي', 'Net Amount'),
             'reason', 'previous_reason' => $this->penaltyUiText('السبب', 'Reason'),
             'exempted_at' => $this->penaltyUiText('تاريخ الإعفاء', 'Exempted At'),
+            'attachment', 'previous_attachment' => $this->penaltyUiText('', 'Attachment'),
             default => $this->humanizeAuditToken($key),
         };
+    }
+
+    private function exemptionHistoryAttachmentUrl(string $key, string $value, ?AttendanceDailyPenalty $penalty): ?string
+    {
+        if (! $penalty || ! in_array($key, ['attachment', 'previous_attachment'], true)) {
+            return null;
+        }
+
+        $path = trim($this->cleanAuditText($value));
+
+        if ($path === '' || $path === '-') {
+            return null;
+        }
+
+        return route('secure.attendance.attachments.penalty', [
+            'penalty' => $penalty->id,
+            'path' => $path,
+        ]);
     }
 
     private function formatExemptionHistoryValue(string $key, string $value): string
@@ -1033,7 +1163,7 @@ if (! $dateFrom || ! $dateTo) {
 
                 $exceptionalDay = $scheduleService->getExceptionalDay($companyId, $dateStr, $employee);
 
-                if ($exceptionalDay && (bool) ($exceptionalDay->is_holiday ?? true)) {
+                if ($exceptionalDay && $this->exceptionalDayStopsPenalties($exceptionalDay)) {
                     $dayReasons[] = (bool) ($exceptionalDay->is_official_holiday ?? false)
                         ? 'official_holiday'
                         : 'exceptional_day';
@@ -1081,6 +1211,22 @@ if (! $dateFrom || ! $dateTo) {
         }
 
         return $summary;
+    }
+
+    private function exceptionalDayStopsPenalties($exceptionalDay): bool
+    {
+        if (! $exceptionalDay) {
+            return false;
+        }
+
+        if (isset($exceptionalDay->is_holiday)) {
+            return (bool) $exceptionalDay->is_holiday;
+        }
+
+        $absenceMultiplier = (float) ($exceptionalDay->absence_multiplier ?? 1);
+        $lateMultiplier = (float) ($exceptionalDay->late_multiplier ?? 1);
+
+        return $absenceMultiplier <= 0 || $lateMultiplier <= 0;
     }
     public function openExemptionModal($id)
     {
@@ -1206,6 +1352,14 @@ if (! $dateFrom || ! $dateTo) {
         );
 
         $localizedReason = $this->formatExemptionReason($reason);
+        $attachmentPath = $penalty->exemption_attachment ?: null;
+
+        if ($this->exemptionForm['attachment']) {
+            $attachmentPath = $this->exemptionForm['attachment']->store(
+                'attendance/exemptions',
+                'public'
+            );
+        }
 
         $notes = trim((string) $penalty->notes);
 
@@ -1218,12 +1372,13 @@ if (! $dateFrom || ! $dateTo) {
                 . "\n[Audit] Previous exemption archived before replacement at "
                 . now()
                 . sprintf(
-                    ' | type=%s, amount=%.2f, net=%.2f, reason=%s, exempted_at=%s',
+                    ' | type=%s, amount=%.2f, net=%.2f, reason=%s, exempted_at=%s%s',
                     (string) ($penalty->exemption_type ?? '-'),
                     (float) $penalty->exemption_amount,
                     (float) $penalty->net_amount,
                     $this->formatExemptionReason($penalty->exemption_reason),
-                    $penalty->exempted_at ? (string) $penalty->exempted_at : '-'
+                    $penalty->exempted_at ? (string) $penalty->exempted_at : '-',
+                    $penalty->exemption_attachment ? ', previous_attachment=' . $penalty->exemption_attachment : ''
                 )
             );
         }
@@ -1235,11 +1390,12 @@ if (! $dateFrom || ! $dateTo) {
             . ' at '
             . now()
             . sprintf(
-                ' | type=%s, amount=%.2f, net=%.2f, reason=%s',
+                ' | type=%s, amount=%.2f, net=%.2f, reason=%s%s',
                 (string) $this->exemptionForm['type'],
                 (float) $exemptAmount,
                 max(0, $maximumAmount - $exemptAmount),
-                $localizedReason
+                $localizedReason,
+                $attachmentPath ? ', attachment=' . $attachmentPath : ''
             )
         );
         $updateData = [
@@ -1256,12 +1412,8 @@ if (! $dateFrom || ! $dateTo) {
             'notes' => $notes,
         ];
 
-        if ($this->exemptionForm['attachment']) {
-            $updateData['exemption_attachment'] =
-                $this->exemptionForm['attachment']->store(
-                    'attendance/exemptions',
-                    'public'
-                );
+        if ($attachmentPath) {
+            $updateData['exemption_attachment'] = $attachmentPath;
         }
 
         $penalty->update($updateData);
@@ -1322,11 +1474,12 @@ if (! $dateFrom || ! $dateTo) {
             . ' at '
             . now()
             . sprintf(
-                ' | previous_type=%s, previous_amount=%.2f, previous_net=%.2f, previous_reason=%s',
+                ' | previous_type=%s, previous_amount=%.2f, previous_net=%.2f, previous_reason=%s%s',
                 (string) ($penalty->exemption_type ?? '-'),
                 (float) $penalty->exemption_amount,
                 (float) $penalty->net_amount,
-                $this->formatExemptionReason($penalty->exemption_reason)
+                $this->formatExemptionReason($penalty->exemption_reason),
+                $penalty->exemption_attachment ? ', previous_attachment=' . $penalty->exemption_attachment : ''
             )
         );
 
@@ -1419,6 +1572,42 @@ if (! $dateFrom || ! $dateTo) {
         ]);
     }
 
+    public function cancelConfirmation($id)
+    {
+        $this->requireAttendanceAny('attendance.penalties.manage');
+
+        $penalty = $this->findPenaltyOrFail((int) $id);
+
+        if ($penalty->status !== 'confirmed') {
+            $this->dispatch('toast', [
+                'type' => 'error',
+                'message' => $this->penaltyUiText('', 'Only confirmed penalties can be unconfirmed.')
+            ]);
+
+            return;
+        }
+
+        $penalty->update([
+            'status' => 'pending',
+            'confirmed_by' => null,
+            'confirmed_at' => null,
+            'notes' => trim(
+                (string) $penalty->notes
+                . "\n[Audit] Penalty confirmation cancelled by "
+                . auth()->user()->name
+                . ' at '
+                . now()
+            ),
+        ]);
+
+        $this->refreshData();
+
+        $this->dispatch('toast', [
+            'type' => 'success',
+            'message' => $this->penaltyUiText('', 'Penalty confirmation cancelled.')
+        ]);
+    }
+
     public function closeConfirmModal()
     {
         $this->showConfirmModal = false;
@@ -1498,27 +1687,9 @@ if (! $dateFrom || ! $dateTo) {
     {
         $this->requireAttendanceAny('attendance.penalties.manage');
 
-        if (empty($this->selectedPenalties)) {
-            return;
-        }
-
-        $sevenDaysAgo = now()->subDays(7)->toDateString();
-
-        $query = $this->buildPenaltiesQuery(false)
-            ->whereIn('id', array_map('intval', $this->selectedPenalties))
-            ->where('status', '!=', 'confirmed')
-            ->whereDate('attendance_date', '>=', $sevenDaysAgo);
-
-        $deleted = (clone $query)->count();
-        $query->delete();
-
-        $this->refreshData();
-
         $this->dispatch('toast', [
-            'type' => $deleted > 0 ? 'info' : 'warning',
-            'message' => $deleted > 0
-                ? tr('Selected penalties removed (excluding confirmed or >7 days).')
-                : tr('No eligible penalties were found in the current view.'),
+            'type' => 'warning',
+            'message' => $this->penaltyUiText('', 'Penalties cannot be deleted. Use exemption or update attendance then recalculate.'),
         ]);
     }
 
@@ -1545,51 +1716,187 @@ if (! $dateFrom || ! $dateTo) {
     {
         $this->requireAttendanceAny('attendance.penalties.export');
         $penalties = $this->getPenaltiesQuery()->get();
+        $currency = $this->exportCurrency();
         $filename = "daily_penalties_" . now()->format('YmdHis');
 
-        $headers = [tr('Employee'), tr('Employee No'), tr('Date'), tr('Violation'), tr('Minutes'), tr('Amount'), tr('Net'), tr('Status')];
-
-        $data = $penalties->map(function ($p) {
-            return [
-                $p->employee->name_ar ?? $p->employee->name_en,
-                $p->employee->employee_no,
-                $p->attendance_date->format('Y-m-d'),
-                tr(ucfirst($p->violation_type)),
-                $p->violation_minutes,
-                $p->calculated_amount,
-                $p->net_amount,
-                tr(ucfirst($p->status)),
-            ];
-        })->toArray();
-
-        return $exporter->export($filename, $headers, $data);
+        return $exporter->export(
+            $filename,
+            $this->exportHeaders(),
+            $this->exportRows($penalties, $currency),
+            ['rtl' => $this->isRtlLocale()]
+        );
     }
 
     public function exportPdf()
     {
         $this->requireAttendanceAny('attendance.penalties.export');
         $penalties = $this->getPenaltiesQuery()->get();
+        $currency = $this->exportCurrency();
         $stats = $this->stats;
         [$dateFrom, $dateTo] = $this->getEffectiveDateRange();
 
-        $penalties->each(function ($penalty) {
-            $employee = $penalty->employee;
-            $penalty->pdf_employee_name = $this->pdfReshape($employee?->name_ar ?? $employee?->name_en ?? '-');
-            $penalty->pdf_violation = $this->pdfReshape(tr(ucfirst((string) $penalty->violation_type)));
-            $penalty->pdf_status = $this->pdfReshape(tr(ucfirst((string) $penalty->status)));
-        });
-
         $pdf = Pdf::loadView('attendance::pdf.daily-penalties', [
-            'penalties' => $penalties,
+            'headers' => $this->exportHeaders(),
+            'rows' => $this->exportRows($penalties, $currency),
             'stats' => $stats,
             'date_from' => $dateFrom,
             'date_to' => $dateTo,
+            'currency' => $currency,
+            'isRtl' => $this->isRtlLocale(),
             'reshaper' => fn ($text) => $this->pdfReshape($text),
         ])->setPaper('a4', 'landscape');
 
         return response()->streamDownload(function () use ($pdf) {
             echo $pdf->stream();
         }, "daily_penalties_" . now()->format('YmdHis') . ".pdf");
+    }
+
+    private function exportHeaders(): array
+    {
+        return [
+            $this->penaltyUiText('', 'Employee'),
+            $this->penaltyUiText('', 'Dept/Job'),
+            $this->penaltyUiText('', 'Schedule Time'),
+            $this->penaltyUiText('', 'Actual Time'),
+            $this->penaltyUiText('', 'Violation'),
+            $this->penaltyUiText('', 'Duration'),
+            $this->penaltyUiText('', 'Calculated'),
+            $this->penaltyUiText('', 'Exemption'),
+            $this->penaltyUiText('', 'Net Amount'),
+            $this->penaltyUiText('', 'Status'),
+        ];
+    }
+
+    private function exportRows($penalties, array $currency): array
+    {
+        return $penalties->map(function (AttendanceDailyPenalty $penalty) use ($currency) {
+            $employee = $penalty->employee;
+            $times = $this->penaltyTimeColumns($penalty);
+            $department = trim((string) ($employee?->department?->name ?? ''));
+            $jobTitle = trim((string) ($employee?->jobTitle?->name ?? ''));
+            $deptJob = trim(implode(' / ', array_filter([$department, $jobTitle])));
+            $employeeName = $this->employeeDisplayName($employee);
+            $employeeNo = trim((string) ($employee?->employee_no ?? ''));
+            $employeeText = $employeeNo !== '' ? "{$employeeName} #{$employeeNo}" : $employeeName;
+
+            return [
+                $employeeText,
+                $deptJob !== '' ? $deptJob : '-',
+                $times['scheduled'],
+                $times['actual'],
+                $this->violationLabel((string) $penalty->violation_type),
+                ((int) $penalty->violation_minutes) . ' ' . $this->penaltyUiText('', 'min'),
+                $this->formatMoneyForExport($penalty->calculated_amount, $currency),
+                $this->formatExemptionForExport($penalty, $currency),
+                $this->formatMoneyForExport($penalty->net_amount, $currency),
+                $this->statusLabel((string) $penalty->status),
+            ];
+        })->all();
+    }
+
+    private function employeeDisplayName($employee): string
+    {
+        if (! $employee) {
+            return '-';
+        }
+
+        $isArabic = $this->isRtlLocale();
+
+        return (string) (
+            $isArabic
+                ? ($employee->name_ar ?: $employee->name_en ?: $employee->name ?? '-')
+                : ($employee->name_en ?: $employee->name_ar ?: $employee->name ?? '-')
+        );
+    }
+
+    private function penaltyTimeColumns(AttendanceDailyPenalty $penalty): array
+    {
+        $attendanceLog = $penalty->attendanceLog;
+        $scheduledIn = $this->formatPenaltyTime($attendanceLog?->scheduled_check_in);
+        $scheduledOut = $this->formatPenaltyTime($attendanceLog?->scheduled_check_out);
+        $actualIn = $this->formatPenaltyTime($attendanceLog?->check_in_time);
+        $actualOut = $this->formatPenaltyTime($attendanceLog?->check_out_time);
+
+        return [
+            'scheduled' => "{$scheduledIn} - {$scheduledOut}",
+            'actual' => "{$actualIn} - {$actualOut}",
+        ];
+    }
+
+    private function formatPenaltyTime($time): string
+    {
+        if (empty($time)) {
+            return '-';
+        }
+
+        try {
+            return Carbon::parse($time)->format('H:i');
+        } catch (\Throwable $e) {
+            return '-';
+        }
+    }
+
+    private function violationLabel(string $type): string
+    {
+        return match ($type) {
+            'delay' => $this->penaltyUiText('', 'Delay'),
+            'early_departure' => $this->penaltyUiText('', 'Early Departure'),
+            'absent' => $this->penaltyUiText('', 'Absent'),
+            'auto_checkout' => $this->penaltyUiText('', 'Auto Checkout'),
+            default => $type !== '' ? $type : '-',
+        };
+    }
+
+    private function statusLabel(string $status): string
+    {
+        return match ($status) {
+            'pending' => $this->penaltyUiText('', 'Pending'),
+            'confirmed' => $this->penaltyUiText('', 'Confirmed'),
+            'waived' => $this->penaltyUiText('', 'Waived'),
+            default => $status !== '' ? $status : '-',
+        };
+    }
+
+    private function formatExemptionForExport(AttendanceDailyPenalty $penalty, array $currency): string
+    {
+        if ((float) $penalty->exemption_amount <= 0) {
+            return '-';
+        }
+
+        $reason = $this->formatExemptionReason((string) $penalty->exemption_reason);
+
+        return '-' . $this->formatMoneyForExport($penalty->exemption_amount, $currency)
+            . ($reason !== '-' ? ' - ' . $reason : '');
+    }
+
+    private function formatMoneyForExport($amount, array $currency): string
+    {
+        return number_format((float) $amount, 2) . ' ' . ($currency['label'] ?? $this->penaltyUiText('', 'YER'));
+    }
+
+    private function exportCurrency(): array
+    {
+        $companyId = (int) (auth()->user()?->saas_company_id ?? 0);
+        $fallback = $this->penaltyUiText('', 'YER');
+
+        $currency = Currency::withoutGlobalScopes()
+            ->where('company_id', $companyId)
+            ->orderByDesc('is_default')
+            ->orderBy('id')
+            ->first(['code', 'symbol', 'name']);
+
+        $label = trim((string) ($currency?->symbol ?: $currency?->code ?: $fallback));
+
+        return [
+            'code' => (string) ($currency?->code ?: 'YER'),
+            'symbol' => $label,
+            'label' => $label !== '' ? $label : $fallback,
+        ];
+    }
+
+    private function isRtlLocale(): bool
+    {
+        return in_array(substr((string) app()->getLocale(), 0, 2), ['ar', 'fa', 'ur', 'he'], true);
     }
 
     private function pdfReshape($text)
@@ -1620,9 +1927,26 @@ if (! $dateFrom || ! $dateTo) {
         $query = $this->applyDataScoping($query, 'attendance.penalties.view', 'attendance.penalties.view-subordinates');
         $query = $this->applyBranchScopeToPenaltiesQuery($query);
         $query = $this->applyPenaltyDateFilters($query);
+        $query = $this->excludePenaltiesCoveredByAbsence($query);
         $query = $this->applyPenaltyFilters($query);
 
         return $query;
+    }
+
+    private function excludePenaltiesCoveredByAbsence($query)
+    {
+        return $query->where(function ($outer) {
+            $outer->where('violation_type', 'absent')
+                ->orWhereNotIn('violation_type', ['delay', 'early_departure', 'auto_checkout'])
+                ->orWhereNotExists(function ($subQuery) {
+                    $subQuery->selectRaw('1')
+                        ->from('attendance_daily_penalties as absence_penalties')
+                        ->whereColumn('absence_penalties.saas_company_id', 'attendance_daily_penalties.saas_company_id')
+                        ->whereColumn('absence_penalties.employee_id', 'attendance_daily_penalties.employee_id')
+                        ->whereColumn('absence_penalties.attendance_date', 'attendance_daily_penalties.attendance_date')
+                        ->where('absence_penalties.violation_type', 'absent');
+                });
+        });
     }
 
     private function applyPenaltyFilters($query)
