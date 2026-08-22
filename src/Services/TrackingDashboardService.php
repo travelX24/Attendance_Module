@@ -28,7 +28,12 @@ final class TrackingDashboardService
 
         if (filled($dateFrom)) {
             $from = CarbonImmutable::parse($dateFrom)->startOfDay();
-            $query->where('started_at', '>=', $from);
+
+            $query->where(function (Builder $query) use ($from): void {
+                $query
+                    ->whereNull('ended_at')
+                    ->orWhere('ended_at', '>=', $from);
+            });
         }
 
         if (filled($dateTo)) {
