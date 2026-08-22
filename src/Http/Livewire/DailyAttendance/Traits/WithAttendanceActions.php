@@ -379,55 +379,56 @@ trait WithAttendanceActions
              return;
         }
 
-        // 2. Sync Existing Logs in range (to fix any inconsistencies)
-        $existingQ = AttendanceDailyLog::forCompany($companyId)
-             ->whereBetween('attendance_date', [$start->toDateString(), $end->toDateString()]);
+        // 2. Only sync logs that genuinely have open periods needing auto-checkout
+        $openLogs = AttendanceDailyLog::forCompany($companyId)
+             ->whereBetween('attendance_date', [$start->toDateString(), $end->toDateString()])
+             ->whereIn('employee_id', $employeeIds)
+             ->whereHas('details', fn ($q) => $q->whereNull('check_out_time'))
+             ->limit(100)
+             ->get();
 
-        if (!empty($employeeIds)) {
-            $existingQ->whereIn('employee_id', $employeeIds);
+        foreach ($openLogs as $log) {
+            $log->save();
         }
 
-        $existingLogs = $existingQ->withCount([
-            'details as open_periods_count' => fn ($q) => $q->whereNull('check_out_time'),
-        ])->get();
-        
-        foreach ($existingLogs as $log) {
-            // Trigger save to run our model's auto-checkout and status logic
-            // We do this for logs that look incomplete or have open periods
-            $hasOpenPeriod = ((int) ($log->open_periods_count ?? 0)) > 0;
-            if ($log->scheduled_hours <= 0 || $hasOpenPeriod || $log->attendance_status === 'absent' || $log->attendance_status === 'on_leave' || $log->attendance_status === 'auto_checkout') {
-                $log->save();
-            }
-        }
-
-        // 3. Generate Missing Logs
+        // 3. Generate Missing Logs in fast bulk chunks (Zero N+1 queries)
         $count = 0;
         $period = \Carbon\CarbonPeriod::create($start, $end);
 
         foreach ($period as $date) {
             $dateStr = $date->format('Y-m-d');
-            
-            $existingQ = AttendanceDailyLog::forCompany($companyId)
-                    ->where('attendance_date', $dateStr);
 
-                if (!empty($allowed)) {
-                    $existingQ->whereIn('employee_id', $employeeIds);
+            $existingIds = DB::table('attendance_daily_logs')
+                ->where('saas_company_id', $companyId)
+                ->where('attendance_date', $dateStr)
+                ->whereIn('employee_id', $employeeIds)
+                ->pluck('employee_id')
+                ->all();
+
+            $missingIds = array_diff($employeeIds, $existingIds);
+
+            if (!empty($missingIds)) {
+                $now = now();
+                $insertData = [];
+                foreach ($missingIds as $empId) {
+                    $insertData[] = [
+                        'saas_company_id'       => $companyId,
+                        'employee_id'           => $empId,
+                        'attendance_date'       => $dateStr,
+                        'attendance_status'     => 'absent',
+                        'approval_status'       => 'pending',
+                        'compliance_percentage' => 0,
+                        'actual_hours'          => 0,
+                        'scheduled_hours'       => 0,
+                        'created_at'            => $now,
+                        'updated_at'            => $now,
+                    ];
+                    $count++;
                 }
 
-                $existingIds = $existingQ->pluck('employee_id')->toArray();
-
-            $missingIds = $employees->diff($existingIds);
-
-            foreach ($missingIds as $empId) {
-                // Creating via model also triggers booted logic to find schedule
-                AttendanceDailyLog::create([
-                    'saas_company_id' => $companyId,
-                    'employee_id' => $empId,
-                    'attendance_date' => $dateStr,
-                    'attendance_status' => 'absent', 
-                    'approval_status' => 'pending',
-                ]);
-                $count++;
+                foreach (array_chunk($insertData, 200) as $chunk) {
+                    DB::table('attendance_daily_logs')->insertOrIgnore($chunk);
+                }
             }
         }
 
@@ -439,5 +440,3 @@ trait WithAttendanceActions
         }
     }
 }
-
-

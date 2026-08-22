@@ -1,121 +1,294 @@
 @php
     $isRtl = $isRtl ?? in_array(substr(app()->getLocale(), 0, 2), ['ar', 'fa', 'ur', 'he'], true);
     $dir = $isRtl ? 'rtl' : 'ltr';
-    $startAlign = $isRtl ? 'right' : 'left';
+    $textAlign = $isRtl ? 'right' : 'left';
     $currencyLabel = $currency['label'] ?? ($isRtl ? "\u{0631}.\u{064A}" : 'YER');
-    $columnCount = count($headers ?? []);
+    
+    // In DomPDF, table columns are rendered Left-to-Right.
+    // To match the RTL UI layout (Employee on the right, Status on the left), reverse columns for RTL.
+    $displayHeaders = $isRtl ? array_reverse($headers ?? []) : ($headers ?? []);
+    $displayRows = $isRtl ? array_map(fn($row) => array_reverse($row), $rows ?? []) : ($rows ?? []);
+    $columnCount = count($displayHeaders);
 @endphp
-<!doctype html>
+<!DOCTYPE html>
 <html lang="{{ app()->getLocale() }}" dir="{{ $dir }}">
 <head>
-    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
     <title>{{ $reshaper(tr('Daily Penalties Report')) }}</title>
     <style>
-        body {
-            direction: {{ $dir }};
-            font-family: DejaVu Sans, sans-serif;
-            font-size: 9px;
-            color: #2B2B2B;
-            text-align: {{ $startAlign }};
+        @page {
+            margin: 15px;
         }
-
-        table {
+        body {
+            font-family: 'DejaVu Sans', sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #fff;
+            color: #1e293b;
+            font-size: 8px;
+            line-height: 1.2;
             direction: {{ $dir }};
+            text-align: {{ $textAlign }};
+        }
+        .header {
+            padding-bottom: 12px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .header-table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 18px;
         }
-
-        th,
-        td {
-            border: 1px solid #E8DED8;
-            padding: 7px 5px;
+        .system-logo {
+            width: 28px;
+            height: 28px;
+            background: #903749;
+            border-radius: 6px;
+            text-align: center;
+            line-height: 28px;
+            color: white;
+            font-size: 14px;
+            font-weight: bold;
+            display: inline-block;
+        }
+        .system-name {
+            font-size: 13px;
+            font-weight: 800;
+            color: #1e293b;
+            margin-right: 6px;
+            margin-left: 6px;
+            display: inline-block;
+            vertical-align: middle;
+        }
+        .company-name {
+            font-size: 13px;
+            font-weight: 700;
+            color: #903749;
+        }
+        .company-details {
+            font-size: 8px;
+            color: #64748b;
+            margin-top: 2px;
+        }
+        .report-info {
+            padding: 10px 0;
+            border-bottom: 1px solid #e2e8f0;
+            text-align: {{ $textAlign }};
+        }
+        .report-title {
+            font-size: 14px;
+            font-weight: 800;
+            color: #0f172a;
+            margin: 0 0 6px 0;
+        }
+        .meta-container {
+            font-size: 8px;
+            color: #64748b;
+        }
+        .meta-item {
+            display: inline-block;
+            margin-right: 12px;
+            margin-left: 12px;
+        }
+        .stats-cards {
+            margin: 10px 0;
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .stat-card {
+            border: 1px solid #e2e8f0;
+            background: #f8fafc;
+            border-radius: 6px;
+            padding: 6px 10px;
+            text-align: center;
+        }
+        .stat-card strong {
+            color: #903749;
+            font-size: 8px;
+            display: block;
+            margin-bottom: 2px;
+        }
+        .stat-card span {
+            font-size: 9px;
+            font-weight: bold;
+            color: #1e293b;
+        }
+        .main-content {
+            padding-top: 10px;
+        }
+        .data-table {
+            width: 100%;
+            border-collapse: collapse;
+            table-layout: fixed;
+        }
+        .data-table th {
+            background-color: #f1f5f9;
+            color: #475569;
+            font-size: 8px;
+            font-weight: 800;
+            padding: 6px 4px;
+            text-align: center;
+            border: 1px solid #cbd5e1;
+        }
+        .data-table td {
+            padding: 5px 4px;
+            font-size: 7.5px;
+            color: #334155;
+            border: 1px solid #e2e8f0;
             text-align: center;
             vertical-align: middle;
-            unicode-bidi: plaintext;
+            word-wrap: break-word;
         }
-
-        th {
-            background-color: #FDFBF7;
-            color: #581845;
-            font-weight: bold;
+        .data-table tr:nth-child(even) {
+            background-color: #f8fafc;
         }
-
-        .header {
-            text-align: center;
-            margin-bottom: 24px;
-        }
-
-        .header h1 {
-            color: #903749;
-            margin: 0 0 10px;
-        }
-
-        .stats {
-            margin-bottom: 18px;
-            text-align: center;
-        }
-
-        .stats strong {
-            color: #903749;
-        }
-
         .text-start {
-            text-align: {{ $startAlign }};
+            text-align: {{ $textAlign }} !important;
         }
-
         .footer {
             position: fixed;
             bottom: 0;
             width: 100%;
-            text-align: center;
-            font-size: 8px;
-            color: #666;
+            padding: 6px 0;
+            border-top: 1px solid #f1f5f9;
+            font-size: 7px;
+            color: #94a3b8;
+        }
+        .page-number:after {
+            content: " - " counter(page);
         }
     </style>
 </head>
 <body>
     <div class="header">
-        <h1>{{ $reshaper(tr('Daily Penalties Report')) }}</h1>
-        <p>{{ $reshaper(tr('Period')) }}: {{ $date_from }} - {{ $date_to }}</p>
-    </div>
-
-    <div class="stats">
-        <strong>{{ $reshaper(tr('Total Calculated')) }}:</strong>
-        {{ number_format((float) ($stats['total_calculated'] ?? 0), 2) }} {{ $reshaper($currencyLabel) }}
-        |
-        <strong>{{ $reshaper(tr('Total Waived')) }}:</strong>
-        {{ number_format((float) ($stats['total_exempted'] ?? 0), 2) }} {{ $reshaper($currencyLabel) }}
-        |
-        <strong>{{ $reshaper(tr('Net Total')) }}:</strong>
-        {{ number_format((float) ($stats['total_net'] ?? 0), 2) }} {{ $reshaper($currencyLabel) }}
-    </div>
-
-    <table>
-        <thead>
+        <table class="header-table">
             <tr>
-                @foreach($headers as $header)
-                    <th>{{ $reshaper($header) }}</th>
-                @endforeach
+                @if($isRtl)
+                    {{-- Arabic Header: Company on Left, System Logo on Right --}}
+                    <td style="width: 50%; text-align: left;">
+                        <div class="company-name">{{ $reshaper($company->legal_name_ar ?? $company->legal_name_en ?? $company->name ?? tr('Athka Company')) }}</div>
+                        <div class="company-details">
+                            {{ $reshaper($company->address_line ?? '') }}<br>
+                            {{ $company->official_email ?? 'info@company.com' }} | {{ $company->phone_1 ?? '' }}
+                        </div>
+                    </td>
+                    <td style="width: 50%; text-align: right;">
+                        <div class="system-name">ATHKA HR</div>
+                        <div class="system-logo">A</div>
+                    </td>
+                @else
+                    {{-- English Header: System Logo on Left, Company on Right --}}
+                    <td style="width: 50%; text-align: left;">
+                        <div class="system-logo">A</div>
+                        <div class="system-name">ATHKA HR</div>
+                    </td>
+                    <td style="width: 50%; text-align: right;">
+                        <div class="company-name">{{ $company->legal_name_en ?? $company->legal_name_ar ?? $company->name ?? 'Athka Company' }}</div>
+                        <div class="company-details">
+                            {{ $company->address_line ?? '' }}<br>
+                            {{ $company->official_email ?? 'info@company.com' }} | {{ $company->phone_1 ?? '' }}
+                        </div>
+                    </td>
+                @endif
             </tr>
-        </thead>
-        <tbody>
-            @forelse($rows as $row)
-                <tr>
-                    @foreach($row as $index => $cell)
-                        <td class="{{ $index < 2 ? 'text-start' : '' }}">{{ $reshaper($cell) }}</td>
-                    @endforeach
-                </tr>
-            @empty
-                <tr>
-                    <td colspan="{{ max($columnCount, 1) }}">{{ $reshaper(tr('No data available')) }}</td>
-                </tr>
-            @endforelse
-        </tbody>
+        </table>
+    </div>
+
+    <div class="report-info">
+        <h1 class="report-title">{{ $reshaper(tr('Daily Penalties Report')) }}</h1>
+        <div class="meta-container">
+            @php
+                $metaItems = [
+                    ['label' => tr('Period'), 'value' => "{$date_from} - {$date_to}"],
+                    ['label' => tr('Record Count'), 'value' => (string) count($rows ?? [])],
+                    ['label' => tr('Generated By'), 'value' => auth()->user()->name ?? 'Admin'],
+                    ['label' => tr('Generated at'), 'value' => now()->format('Y/m/d H:i')],
+                ];
+                if ($isRtl) $metaItems = array_reverse($metaItems);
+            @endphp
+            @foreach($metaItems as $item)
+                <div class="meta-item">
+                    <strong>{{ $reshaper($item['label']) }}:</strong> {{ $reshaper($item['value']) }}
+                </div>
+            @endforeach
+        </div>
+    </div>
+
+    <table class="stats-cards">
+        <tr>
+            @php
+                $statsCells = [
+                    [
+                        'label' => tr('Total Calculated'),
+                        'value' => number_format((float) ($stats['total_calculated'] ?? 0), 2) . ' ' . $currencyLabel,
+                    ],
+                    [
+                        'label' => tr('Total Waived'),
+                        'value' => number_format((float) ($stats['total_exempted'] ?? 0), 2) . ' ' . $currencyLabel,
+                    ],
+                    [
+                        'label' => tr('Net Total'),
+                        'value' => number_format((float) ($stats['total_net'] ?? 0), 2) . ' ' . $currencyLabel,
+                    ],
+                ];
+                if ($isRtl) $statsCells = array_reverse($statsCells);
+            @endphp
+            @foreach($statsCells as $sc)
+                <td style="width: 33.33%; padding: 0 4px;">
+                    <div class="stat-card">
+                        <strong>{{ $reshaper($sc['label']) }}</strong>
+                        <span>{{ $reshaper($sc['value']) }}</span>
+                    </div>
+                </td>
+            @endforeach
+        </tr>
     </table>
 
+    <div class="main-content">
+        <table class="data-table">
+            <thead>
+                <tr>
+                    @foreach($displayHeaders as $header)
+                        <th>{{ $reshaper($header) }}</th>
+                    @endforeach
+                </tr>
+            </thead>
+            <tbody>
+                @forelse($displayRows as $row)
+                    <tr>
+                        @foreach($row as $index => $cell)
+                            @php
+                                // When RTL: Employee is at index (count - 1), Dept/Job at index (count - 2)
+                                // When LTR: Employee is at index 0, Dept/Job at index 1
+                                $isTextCol = $isRtl ? ($index >= $columnCount - 2) : ($index <= 1);
+                            @endphp
+                            <td class="{{ $isTextCol ? 'text-start' : '' }}">
+                                {{ $reshaper($cell) }}
+                            </td>
+                        @endforeach
+                    </tr>
+                @empty
+                    <tr>
+                        <td colspan="{{ max($columnCount, 1) }}">{{ $reshaper(tr('No data available')) }}</td>
+                    </tr>
+                @endforelse
+            </tbody>
+        </table>
+    </div>
+
     <div class="footer">
-        {{ $reshaper(tr('Generated at')) }}: {{ now()->format('Y-m-d H:i') }}
+        <table style="width: 100%; border: 0;">
+            <tr>
+                @if($isRtl)
+                    <td style="width: 33%; text-align: right; border: 0;"><span class="page-number"></span></td>
+                    <td style="width: 33%; text-align: center; border: 0;">&copy; {{ date('Y') }}</td>
+                    <td style="width: 33%; text-align: left; border: 0;">{{ $reshaper(tr('Athka HR Management System')) }}</td>
+                @else
+                    <td style="width: 33%; text-align: left; border: 0;">{{ tr('Athka HR Management System') }}</td>
+                    <td style="width: 33%; text-align: center; border: 0;">&copy; {{ date('Y') }}</td>
+                    <td style="width: 33%; text-align: right; border: 0;"><span class="page-number"></span></td>
+                @endif
+            </tr>
+        </table>
     </div>
 </body>
 </html>

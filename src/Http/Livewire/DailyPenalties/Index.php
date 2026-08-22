@@ -1734,6 +1734,7 @@ if (! $dateFrom || ! $dateTo) {
         $currency = $this->exportCurrency();
         $stats = $this->stats;
         [$dateFrom, $dateTo] = $this->getEffectiveDateRange();
+        $company = \Athka\Saas\Models\SaasCompany::find(auth()->user()->saas_company_id ?? 0);
 
         $pdf = Pdf::loadView('attendance::pdf.daily-penalties', [
             'headers' => $this->exportHeaders(),
@@ -1742,8 +1743,13 @@ if (! $dateFrom || ! $dateTo) {
             'date_from' => $dateFrom,
             'date_to' => $dateTo,
             'currency' => $currency,
+            'company' => $company,
             'isRtl' => $this->isRtlLocale(),
             'reshaper' => fn ($text) => $this->pdfReshape($text),
+        ])->setOption([
+            'isRemoteEnabled' => true,
+            'defaultFont' => 'DejaVu Sans',
+            'isHtml5ParserEnabled' => true,
         ])->setPaper('a4', 'landscape');
 
         return response()->streamDownload(function () use ($pdf) {

@@ -25,7 +25,7 @@ class Index extends Component
 {
     public function placeholder()
     {
-        return view('attendance::livewire.leaves.placeholder'); // Reuse the same skeleton structure
+        return view('attendance::livewire.leaves.placeholder');
     }
 
     use WithPagination, 
@@ -117,16 +117,16 @@ class Index extends Component
         $companyId = auth()->user()->saas_company_id;
         $query = AttendanceDailyLog::forCompany($companyId);
 
-        // Ã¢Å“â€¦ Data scoping (Admin vs Subordinates)
+        // Data scoping (Admin vs Subordinates)
         $query = $this->applyDataScoping($query, 'attendance.daily.view', 'attendance.daily.view-subordinates');
 
-        // Ã¢Å“â€¦ Allowed branches scope
+        // Allowed branches scope
         $allowed = $this->allowedBranchIds();
         if (!empty($allowed)) {
             $query->whereHas('employee', fn ($q) => $q->whereIn('branch_id', $allowed));
         }
 
-        // Ã¢Å“â€¦ Selected branch filter (if user picked a specific branch)
+        // Selected branch filter
         if ($this->branch_id !== 'all') {
             $query->whereHas('employee', fn ($q) => $q->where('branch_id', (int) $this->branch_id));
         }
@@ -174,12 +174,8 @@ class Index extends Component
                     ->groupBy('attendance_status')
                     ->get();
 
-
         $this->stats['total'] = $data->sum('count');
-        
-        // Ø§Ù„Ø­Ø§Ø¶Ø±ÙˆÙ† Ù‡Ù… ÙÙ‚Ø· Ù…Ù† Ø³Ø¬Ù„ Ø¯Ø®ÙˆÙ„ ÙÙŠ Ù…ÙˆØ¹Ø¯Ù‡ (Ø­Ø§Ø¶Ø±)
         $this->stats['present'] = $data->where('attendance_status', 'present')->sum('count');
-        
         $this->stats['late'] = $data->where('attendance_status', 'late')->first()->count ?? 0;
         $this->stats['absent'] = $data->where('attendance_status', 'absent')->first()->count ?? 0;
         $this->stats['on_leave'] = $data->where('attendance_status', 'on_leave')->first()->count ?? 0;
@@ -192,7 +188,7 @@ class Index extends Component
             ->where('approval_status', 'pending')
             ->whereBetween('attendance_date', [$this->date_from ?: '1900-01-01', $this->date_to ?: '2100-01-01']);
 
-        // Ã¢Å“â€¦ Data scoping
+        // Data scoping
         $pendingQ = $this->applyDataScoping($pendingQ, 'attendance.daily.view', 'attendance.daily.view-subordinates');
 
         if (!empty($allowed)) {
@@ -225,36 +221,34 @@ class Index extends Component
         $threeDaysAgo = now()->subDays(3)->toDateString();
 
         $empQ = Employee::withoutGlobalScope('active_only')->forCompany($companyId)
-            ->when($this->status !== 'all', fn($q) => $q->where('status', (string)$this->status));
+            ->when($this->status !== 'all', fn ($q) => $q->where('status', (string) $this->status));
 
-        // Ã¢Å“â€¦ Data scoping
         $empQ = $this->applyDataScoping($empQ, 'attendance.daily.view', 'attendance.daily.view-subordinates', '');
 
-        // Ã¢Å“â€¦ Allowed branches scope
         $allowed = $this->allowedBranchIds();
         if (!empty($allowed)) {
             $empQ->whereIn('branch_id', $allowed);
         }
 
-        // Ã¢Å“â€¦ Selected branch filter
         if ($this->branch_id !== 'all') {
             $empQ->where('branch_id', (int) $this->branch_id);
         }
 
+        $hasAttendanceIds = DB::table('attendance_daily_logs')
+            ->where('saas_company_id', $companyId)
+            ->where('attendance_date', '>=', $threeDaysAgo)
+            ->distinct()
+            ->pluck('employee_id')
+            ->all();
+
         $this->warningNoAttendanceEmployeeIds = $empQ
-            ->whereNotExists(function($q) use ($threeDaysAgo, $companyId) {
-                $q->select(DB::raw(1))
-                ->from('attendance_daily_logs')
-                ->whereColumn('attendance_daily_logs.employee_id', 'employees.id')
-                // Ã¢Å“â€¦ Ã™â€¦Ã™â€¡Ã™â€¦: Ã˜Â§Ã™â€¦Ã™â€ Ã˜Â¹ Ã˜Â£Ã™Å  Ã˜ÂªÃ˜Â¯Ã˜Â§Ã˜Â®Ã™â€ž multi-tenant
-                ->where('attendance_daily_logs.saas_company_id', $companyId)
-                ->where('attendance_date', '>=', $threeDaysAgo);
-            })
+            ->whereNotIn('id', $hasAttendanceIds)
             ->pluck('id')
             ->toArray();
 
         $this->warnings['no_attendance_3days'] = count($this->warningNoAttendanceEmployeeIds);
     }
+
     // ==================== Helper Methods ====================
     public function auditLog(
         string $action,
@@ -287,7 +281,7 @@ class Index extends Component
 
     public function render()
     {
-     return view('attendance::livewire.daily-attendance.index', [
+        return view('attendance::livewire.daily-attendance.index', [
             'attendanceLogs' => $this->attendanceLogs,
             'departments' => $this->departments,
             'branches' => $this->branches,
@@ -298,5 +292,3 @@ class Index extends Component
         ])->layout('layouts.company-admin');
     }
 }
-
-
