@@ -251,8 +251,16 @@ class PenaltyService
 
                 if ($earlyMinutes > 0) {
                     $query->orWhere(function ($earlyQuery) use ($earlyMinutes) {
-                        $earlyQuery->where('early_leave_minutes', '>', 0)
-                            ->where('early_leave_minutes', '<=', $earlyMinutes);
+                        $earlyQuery->where(function ($q) use ($earlyMinutes) {
+                            $q->where('early_leave_minutes', '>', 0)
+                                ->where('early_leave_minutes', '<=', $earlyMinutes);
+                        })->orWhere(function ($q) use ($earlyMinutes) {
+                            $q->where(function ($eq) {
+                                $eq->whereNull('early_leave_minutes')
+                                    ->orWhere('early_leave_minutes', 0);
+                            })->where('late_minutes', '>', 0)
+                              ->where('late_minutes', '<=', $earlyMinutes);
+                        });
                     });
                 }
             })
@@ -389,8 +397,14 @@ class PenaltyService
         if (in_array($type, ['fixed', 'fixed_amount'], true)) {
             $amount = ((float) $penaltyPolicy->deduction_value) * $units;
         } elseif (in_array($type, ['percentage', 'percent'], true)) {
-            $dailyRate = ((float) ($log->employee->basic_salary ?? 0)) / 30;
-            $amount = ($dailyRate * (((float) $penaltyPolicy->deduction_value) / 100)) * $units;
+            $basicSalary = (float) ($log->employee->basic_salary ?? 0);
+            $dailyRate = $basicSalary / 30;
+            $scheduledHours = (float) ($log->scheduled_hours ?? 0);
+            if ($scheduledHours <= 0) {
+                $scheduledHours = 8.0;
+            }
+            $minuteRate = ($dailyRate / $scheduledHours) / 60;
+            $amount = ($minuteRate * (((float) $penaltyPolicy->deduction_value) / 100)) * $units;
         }
 
         $exceptionalMultiplier = $this->exceptionalDayMultiplierForViolation($log, $violationType);
@@ -662,7 +676,13 @@ class PenaltyService
                 && $earlyMinutes > 0
             )
         ) {
-            return $earlyMinutes > 0 ? 'early_departure' : null;
+            if ($earlyMinutes <= 0) {
+                return null;
+            }
+
+            $convertedToAbsence = $this->shouldConvertLateEarlyToAbsence($log, $policyId, 0, $earlyMinutes);
+
+            return $convertedToAbsence ? null : 'early_departure';
         }
 
         if (
@@ -676,17 +696,7 @@ class PenaltyService
                 return null;
             }
 
-            $convertedToAbsence = UnexcusedAbsencePolicy::query()
-                ->where('saas_company_id', $log->saas_company_id)
-                ->where('policy_id', $policyId)
-                ->where('absence_reason_type', 'late_early')
-                ->where('is_active', true)
-                ->where(function ($query) {
-                    $query->where('is_enabled', true)->orWhereNull('is_enabled');
-                })
-                ->where('late_minutes', '>', 0)
-                ->where('late_minutes', '<=', $lateMinutes)
-                ->exists();
+            $convertedToAbsence = $this->shouldConvertLateEarlyToAbsence($log, $policyId, $lateMinutes, 0);
 
             return $convertedToAbsence ? null : 'delay';
         }
@@ -710,20 +720,39 @@ class PenaltyService
             return false;
         }
 
-        $absencePolicy = UnexcusedAbsencePolicy::query()
-            ->where('saas_company_id', $log->saas_company_id)
-            ->where('policy_id', $policyId)
-            ->where('absence_reason_type', 'no_notice')
-            ->where('is_active', true)
-            ->where(function ($q) {
-                $q->where('is_enabled', true)->orWhereNull('is_enabled');
-            })
-            ->where('day_from', '<=', $recurrenceCount)
-            ->where(function ($q) use ($recurrenceCount) {
-                $q->whereNull('day_to')->orWhere('day_to', '>=', $recurrenceCount);
-            })
-            ->orderByDesc('day_from')
-            ->first();
+        $absencePolicy = null;
+        $lateMinutes = $this->getLateMinutes($log);
+        $earlyMinutes = $this->getEarlyDepartureMinutes($log);
+
+        if ($this->shouldConvertLateEarlyToAbsence($log, $policyId, $lateMinutes, $earlyMinutes)) {
+            $absencePolicy = UnexcusedAbsencePolicy::query()
+                ->where('saas_company_id', $log->saas_company_id)
+                ->where('policy_id', $policyId)
+                ->where('absence_reason_type', 'late_early')
+                ->where('is_active', true)
+                ->where(function ($q) {
+                    $q->where('is_enabled', true)->orWhereNull('is_enabled');
+                })
+                ->orderByDesc('id')
+                ->first();
+        }
+
+        if (! $absencePolicy) {
+            $absencePolicy = UnexcusedAbsencePolicy::query()
+                ->where('saas_company_id', $log->saas_company_id)
+                ->where('policy_id', $policyId)
+                ->where('absence_reason_type', 'no_notice')
+                ->where('is_active', true)
+                ->where(function ($q) {
+                    $q->where('is_enabled', true)->orWhereNull('is_enabled');
+                })
+                ->where('day_from', '<=', $recurrenceCount)
+                ->where(function ($q) use ($recurrenceCount) {
+                    $q->whereNull('day_to')->orWhere('day_to', '>=', $recurrenceCount);
+                })
+                ->orderByDesc('day_from')
+                ->first();
+        }
 
         if (! $absencePolicy) {
             return false;
