@@ -2,7 +2,7 @@
     $isRtl = $isRtl ?? in_array(substr(app()->getLocale(), 0, 2), ['ar', 'fa', 'ur', 'he'], true);
     $dir = $isRtl ? 'rtl' : 'ltr';
     $textAlign = $isRtl ? 'right' : 'left';
-    $currencyLabel = $currency['label'] ?? ($isRtl ? "\u{0631}.\u{064A}" : 'YER');
+    $currencyLabel = $currency['code'] ?? ($currency['label'] ?? 'YER');
     
     // In DomPDF, table columns are rendered Left-to-Right.
     // To match the RTL UI layout (Employee on the right, Status on the left), reverse columns for RTL.
@@ -163,30 +163,54 @@
         <table class="header-table">
             <tr>
                 @if($isRtl)
-                    {{-- Arabic Header: Company on Left, System Logo on Right --}}
-                    <td style="width: 50%; text-align: left;">
-                        <div class="company-name">{{ $reshaper($company->legal_name_ar ?? $company->legal_name_en ?? $company->name ?? tr('Athka Company')) }}</div>
-                        <div class="company-details">
-                            {{ $reshaper($company->address_line ?? '') }}<br>
-                            {{ $company->official_email ?? 'info@company.com' }} | {{ $company->phone_1 ?? '' }}
-                        </div>
+                    {{-- Arabic Header: Company Info with Logo on Right, System reference on Left --}}
+                    <td style="width: 70%; text-align: right; vertical-align: middle;">
+                        <table style="width: 100%; border-collapse: collapse; border: 0;">
+                            <tr>
+                                @if(!empty($companyLogo))
+                                    <td style="width: 65px; text-align: right; vertical-align: middle; border: 0; padding: 0 0 0 10px;">
+                                        <img src="{{ $companyLogo }}" alt="Logo" style="max-height: 48px; max-width: 130px; object-fit: contain;" />
+                                    </td>
+                                @endif
+                                <td style="text-align: right; vertical-align: middle; border: 0; padding: 0;">
+                                    <div class="company-name">{{ $reshaper($company->legal_name_ar ?? $company->legal_name_en ?? $company->name ?? tr('Athka Company')) }}</div>
+                                    <div class="company-details">
+                                        @if(!empty($company?->address_line))
+                                            {{ $reshaper($company->address_line) }}<br>
+                                        @endif
+                                        {{ $company->official_email ?? '' }} {{ (!empty($company->official_email) && !empty($company->phone_1)) ? '|' : '' }} {{ $company->phone_1 ?? '' }}
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
                     </td>
-                    <td style="width: 50%; text-align: right;">
-                        <div class="system-name">ATHKA HR</div>
-                        <div class="system-logo">A</div>
+                    <td style="width: 30%; text-align: left; vertical-align: middle;">
+                        <div class="system-name" style="font-size: 11px; color: #64748b;">ATHKA HR</div>
                     </td>
                 @else
-                    {{-- English Header: System Logo on Left, Company on Right --}}
-                    <td style="width: 50%; text-align: left;">
-                        <div class="system-logo">A</div>
-                        <div class="system-name">ATHKA HR</div>
+                    {{-- English Header: Company Info with Logo on Left, System reference on Right --}}
+                    <td style="width: 70%; text-align: left; vertical-align: middle;">
+                        <table style="width: 100%; border-collapse: collapse; border: 0;">
+                            <tr>
+                                @if(!empty($companyLogo))
+                                    <td style="width: 65px; text-align: left; vertical-align: middle; border: 0; padding: 0 10px 0 0;">
+                                        <img src="{{ $companyLogo }}" alt="Logo" style="max-height: 48px; max-width: 130px; object-fit: contain;" />
+                                    </td>
+                                @endif
+                                <td style="text-align: left; vertical-align: middle; border: 0; padding: 0;">
+                                    <div class="company-name">{{ $company->legal_name_en ?? $company->legal_name_ar ?? $company->name ?? 'Athka Company' }}</div>
+                                    <div class="company-details">
+                                        @if(!empty($company?->address_line))
+                                            {{ $company->address_line }}<br>
+                                        @endif
+                                        {{ $company->official_email ?? '' }} {{ (!empty($company->official_email) && !empty($company->phone_1)) ? '|' : '' }} {{ $company->phone_1 ?? '' }}
+                                    </div>
+                                </td>
+                            </tr>
+                        </table>
                     </td>
-                    <td style="width: 50%; text-align: right;">
-                        <div class="company-name">{{ $company->legal_name_en ?? $company->legal_name_ar ?? $company->name ?? 'Athka Company' }}</div>
-                        <div class="company-details">
-                            {{ $company->address_line ?? '' }}<br>
-                            {{ $company->official_email ?? 'info@company.com' }} | {{ $company->phone_1 ?? '' }}
-                        </div>
+                    <td style="width: 30%; text-align: right; vertical-align: middle;">
+                        <div class="system-name" style="font-size: 11px; color: #64748b;">ATHKA HR</div>
                     </td>
                 @endif
             </tr>

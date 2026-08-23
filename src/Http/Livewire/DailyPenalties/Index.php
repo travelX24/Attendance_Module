@@ -1736,6 +1736,26 @@ if (! $dateFrom || ! $dateTo) {
         [$dateFrom, $dateTo] = $this->getEffectiveDateRange();
         $company = \Athka\Saas\Models\SaasCompany::find(auth()->user()->saas_company_id ?? 0);
 
+        // Convert company logo to base64 for reliable PDF rendering
+        $companyLogoBase64 = null;
+        if (!empty($company?->logo_path)) {
+            $possiblePaths = [
+                \Illuminate\Support\Facades\Storage::disk('public')->path($company->logo_path),
+                public_path('storage/' . ltrim($company->logo_path, '/\\')),
+                storage_path('app/public/' . ltrim($company->logo_path, '/\\')),
+            ];
+            foreach ($possiblePaths as $p) {
+                if (file_exists($p)) {
+                    $mime = mime_content_type($p) ?: 'image/png';
+                    $data = file_get_contents($p);
+                    if ($data) {
+                        $companyLogoBase64 = 'data:' . $mime . ';base64,' . base64_encode($data);
+                    }
+                    break;
+                }
+            }
+        }
+
         $pdf = Pdf::loadView('attendance::pdf.daily-penalties', [
             'headers' => $this->exportHeaders(),
             'rows' => $this->exportRows($penalties, $currency),
@@ -1744,6 +1764,7 @@ if (! $dateFrom || ! $dateTo) {
             'date_to' => $dateTo,
             'currency' => $currency,
             'company' => $company,
+            'companyLogo' => $companyLogoBase64,
             'isRtl' => $this->isRtlLocale(),
             'reshaper' => fn ($text) => $this->pdfReshape($text),
         ])->setOption([
@@ -1877,13 +1898,14 @@ if (! $dateFrom || ! $dateTo) {
 
     private function formatMoneyForExport($amount, array $currency): string
     {
-        return number_format((float) $amount, 2) . ' ' . ($currency['label'] ?? $this->penaltyUiText('', 'YER'));
+        $label = $currency['code'] ?: ($currency['label'] ?? 'YER');
+        return number_format((float) $amount, 2) . ' ' . $label;
     }
 
     private function exportCurrency(): array
     {
         $companyId = (int) (auth()->user()?->saas_company_id ?? 0);
-        $fallback = $this->penaltyUiText('', 'YER');
+        $fallback = 'YER';
 
         $currency = Currency::withoutGlobalScopes()
             ->where('company_id', $companyId)
@@ -1891,12 +1913,15 @@ if (! $dateFrom || ! $dateTo) {
             ->orderBy('id')
             ->first(['code', 'symbol', 'name']);
 
-        $label = trim((string) ($currency?->symbol ?: $currency?->code ?: $fallback));
+        $code = trim((string) ($currency?->code ?: $fallback));
+        $symbol = trim((string) ($currency?->symbol ?: ''));
+        $name = trim((string) ($currency?->name ?: ''));
 
         return [
-            'code' => (string) ($currency?->code ?: 'YER'),
-            'symbol' => $label,
-            'label' => $label !== '' ? $label : $fallback,
+            'code' => $code,
+            'symbol' => $symbol ?: $code,
+            'name' => $name ?: $code,
+            'label' => $code,
         ];
     }
 
