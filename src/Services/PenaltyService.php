@@ -266,14 +266,19 @@ class PenaltyService
             })
             ->exists();
     }
-    private function processViolation(AttendanceDailyLog $log, int $policyId, string $violationType, ?object $group = null): bool
-    {
-        $existing = AttendanceDailyPenalty::where([
-            'saas_company_id' => $log->saas_company_id,
-            'employee_id' => $log->employee_id,
-            'attendance_date' => $log->attendance_date,
-            'violation_type' => $violationType,
-        ])->first();
+    private function processViolation(
+        AttendanceDailyLog $log,
+        int $policyId,
+        string $violationType,
+        ?object $group = null
+    ): bool {
+        return DB::transaction(function () use ($log, $policyId, $violationType, $group) {
+            $existing = AttendanceDailyPenalty::where([
+                'saas_company_id' => $log->saas_company_id,
+                'employee_id'     => $log->employee_id,
+                'attendance_date' => $log->attendance_date,
+                'violation_type'  => $violationType,
+            ])->lockForUpdate()->first();
 
         if (
             in_array($violationType, ['delay', 'early_departure', 'auto_checkout'], true)
@@ -432,9 +437,9 @@ class PenaltyService
                 'attendance_daily_log_id' => $log->id,
                 'violation_minutes' => $minutes,
                 'penalty_policy_id' => $penaltyPolicy->id,
-                'calculated_amount' => $amount,
-                'exemption_amount' => $recalculatedState['exemption_amount'],
-                'net_amount' => $recalculatedState['net_amount'],
+                'calculated_amount' => round(max(0.00, $amount), 2),
+                'exemption_amount' => round(max(0.00, $recalculatedState['exemption_amount']), 2),
+                'net_amount' => round(max(0.00, $recalculatedState['net_amount']), 2),
                 'status' => $recalculatedState['status'],
                 'notes' => ($existing ? $existing->notes : '')
                     . "\n[System] Calculated/Recalculated at " . now()
@@ -449,7 +454,8 @@ class PenaltyService
             ]
         );
 
-        return true;
+            return true;
+        });
     }
 
     /**
@@ -808,7 +814,7 @@ class PenaltyService
 
     private function resolveRecalculatedPenaltyState(?AttendanceDailyPenalty $existing, float $calculatedAmount): array
     {
-        $calculatedAmount = max(0, $calculatedAmount);
+        $calculatedAmount = (float) sprintf('%.2f', max(0.00, $calculatedAmount));
 
         if (
             ! $existing
@@ -816,19 +822,20 @@ class PenaltyService
             || (float) $existing->exemption_amount <= 0
         ) {
             return [
-                'exemption_amount' => 0,
+                'exemption_amount' => 0.00,
                 'net_amount' => $calculatedAmount,
                 'status' => 'pending',
             ];
         }
 
         $exemptionType = strtolower((string) $existing->exemption_type);
-        $existingExemptionAmount = (float) $existing->exemption_amount;
+        $existingExemptionAmount = round(max(0.00, (float) $existing->exemption_amount), 2);
         $exemptionAmount = $exemptionType === 'full'
             || (string) $existing->status === 'waived'
                 ? $calculatedAmount
                 : min($existingExemptionAmount, $calculatedAmount);
-        $netAmount = max(0, $calculatedAmount - $exemptionAmount);
+        $exemptionAmount = round($exemptionAmount, 2);
+        $netAmount = round(max(0.00, $calculatedAmount - $exemptionAmount), 2);
 
         return [
             'exemption_amount' => $exemptionAmount,

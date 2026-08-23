@@ -342,7 +342,6 @@ class OfflineAttendanceController extends Controller
         if ($clientReference !== '') {
             $existingQueueItem = OfflineAttendanceQueue::query()
                 ->where('saas_company_id', $companyId)
-                ->where('submitted_by_user_id', (int) $user->id)
                 ->where('client_reference', $clientReference)
                 ->first();
 
@@ -353,6 +352,25 @@ class OfflineAttendanceController extends Controller
                     $employeeId,
                     $clientReference
                 );
+            }
+
+            // Check if record was already synced into daily log
+            $existingLog = AttendanceDailyLog::where('saas_company_id', $companyId)
+                ->where('employee_id', $employeeId)
+                ->where('date', $rec['attendance_date'] ?? null)
+                ->where('client_reference', $clientReference)
+                ->first();
+
+            if ($existingLog) {
+                return [
+                    'ok'          => true,
+                    'code'        => 'already_synced',
+                    'employee_id' => $employeeId,
+                    'date'        => $rec['attendance_date'] ?? null,
+                    'message'     => tr('Record has already been processed into daily logs.'),
+                    'queue_id'    => null,
+                    'local_id'    => $clientReference,
+                ];
             }
         }
 
