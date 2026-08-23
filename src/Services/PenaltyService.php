@@ -233,9 +233,12 @@ class PenaltyService
             return false;
         }
 
-        return UnexcusedAbsencePolicy::query()
+        // 1. Check explicit UnexcusedAbsencePolicy for 'late_early'
+        $explicitConversion = UnexcusedAbsencePolicy::query()
             ->where('saas_company_id', $log->saas_company_id)
-            ->where('policy_id', $policyId)
+            ->where(function ($q) use ($policyId) {
+                $q->where('policy_id', $policyId)->orWhereNull('policy_id');
+            })
             ->where('absence_reason_type', 'late_early')
             ->where('is_active', true)
             ->where(function ($query) {
@@ -265,6 +268,51 @@ class PenaltyService
                 }
             })
             ->exists();
+
+        if ($explicitConversion) {
+            return true;
+        }
+
+        // 2. Check if lateness/early departure exceeds the maximum defined minutes_to tier in AttendancePenaltyPolicy
+        if ($lateMinutes > 0) {
+            $maxLatePolicyMinutes = (int) AttendancePenaltyPolicy::query()
+                ->where('saas_company_id', $log->saas_company_id)
+                ->where(function ($q) use ($policyId) {
+                    $q->where('policy_id', $policyId)->orWhereNull('policy_id');
+                })
+                ->where('violation_type', 'late_arrival')
+                ->where('is_active', true)
+                ->where(function ($q) {
+                    $q->where('is_enabled', true)->orWhereNull('is_enabled');
+                })
+                ->where('minutes_to', '>', 0)
+                ->max('minutes_to');
+
+            if ($maxLatePolicyMinutes > 0 && $lateMinutes > $maxLatePolicyMinutes) {
+                return true;
+            }
+        }
+
+        if ($earlyMinutes > 0) {
+            $maxEarlyPolicyMinutes = (int) AttendancePenaltyPolicy::query()
+                ->where('saas_company_id', $log->saas_company_id)
+                ->where(function ($q) use ($policyId) {
+                    $q->where('policy_id', $policyId)->orWhereNull('policy_id');
+                })
+                ->where('violation_type', 'early_departure')
+                ->where('is_active', true)
+                ->where(function ($q) {
+                    $q->where('is_enabled', true)->orWhereNull('is_enabled');
+                })
+                ->where('minutes_to', '>', 0)
+                ->max('minutes_to');
+
+            if ($maxEarlyPolicyMinutes > 0 && $earlyMinutes > $maxEarlyPolicyMinutes) {
+                return true;
+            }
+        }
+
+        return false;
     }
     private function processViolation(
         AttendanceDailyLog $log,
@@ -1015,7 +1063,7 @@ class PenaltyService
         if ($exceptionalDay) {
             $isHoliday = isset($exceptionalDay->is_holiday)
                 ? (bool) $exceptionalDay->is_holiday
-                : ((float) ($exceptionalDay->absence_multiplier ?? 1) <= 0);
+                : ((float) ($exceptionalDay->absence_multiplier ?? 1) <= 0 && (float) ($exceptionalDay->late_multiplier ?? 1) <= 0);
 
             if ($isHoliday) {
                 return (bool) ($exceptionalDay->is_official_holiday ?? false)
@@ -1024,8 +1072,12 @@ class PenaltyService
             }
         }
 
-        $schedule = $scheduleService->getEffectiveSchedule((int) $log->saas_company_id, $employee, $dateStr);
         $holidays = $scheduleService->getHolidays((int) $log->saas_company_id, $dateStr, $dateStr);
+        if ($holidays->isNotEmpty()) {
+            return 'official_holiday';
+        }
+
+        $schedule = $scheduleService->getEffectiveSchedule((int) $log->saas_company_id, $employee, $dateStr);
         $metrics = $scheduleService->getMetricsForDate($dateStr, $schedule, $holidays, $employee);
 
         if (($metrics['status'] ?? null) !== 'holiday' && ! (bool) ($metrics['is_holiday'] ?? false)) {

@@ -93,9 +93,9 @@
                                             </div>
                                             <div class="space-y-0.5">
                                                 @foreach(($r['rotation_info']['periods_a'] ?? []) as $periodIndex => $period)
-                                                    <div class="text-[10px] leading-4 font-semibold">
+                                                    <div class="text-[10px] leading-4 font-semibold whitespace-nowrap flex items-center gap-1.5">
                                                         <span class="text-gray-400">{{ tr('Period') }} {{ $periodIndex + 1 }}:</span>
-                                                        <span class="font-mono text-gray-600">{{ $period }}</span>
+                                                        <span class="font-mono text-gray-600 dir-ltr">{{ $period }}</span>
                                                     </div>
                                                 @endforeach
                                             </div>
@@ -107,9 +107,9 @@
                                             </div>
                                             <div class="space-y-0.5">
                                                 @foreach(($r['rotation_info']['periods_b'] ?? []) as $periodIndex => $period)
-                                                    <div class="text-[10px] leading-4 font-semibold">
+                                                    <div class="text-[10px] leading-4 font-semibold whitespace-nowrap flex items-center gap-1.5">
                                                         <span class="text-gray-400">{{ tr('Period') }} {{ $periodIndex + 1 }}:</span>
-                                                        <span class="font-mono text-gray-600">{{ $period }}</span>
+                                                        <span class="font-mono text-gray-600 dir-ltr">{{ $period }}</span>
                                                     </div>
                                                 @endforeach
                                             </div>
@@ -118,9 +118,9 @@
                                 @else
                                     <div class="space-y-0.5">
                                         @foreach(($r['periods'] ?? []) as $periodIndex => $period)
-                                            <div class="text-[10px] leading-4 font-semibold">
+                                            <div class="text-[10px] leading-4 font-semibold whitespace-nowrap flex items-center gap-1.5">
                                                 <span class="text-gray-400">{{ tr('Period') }} {{ $periodIndex + 1 }}:</span>
-                                                <span class="font-mono text-gray-600">{{ $period }}</span>
+                                                <span class="font-mono text-gray-600 dir-ltr">{{ $period }}</span>
                                             </div>
                                         @endforeach
                                     </div>

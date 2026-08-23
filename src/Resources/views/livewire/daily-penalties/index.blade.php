@@ -435,6 +435,9 @@
                         )->startOfDay()->lt(now()->subDays(7)->startOfDay());
 
                         $attendanceLog = $penalty->attendanceLog;
+                        $schedulePeriods = $this->getSchedulePeriodsForPenalty($penalty);
+                        $detailsByPeriod = $attendanceLog ? \Illuminate\Support\Facades\DB::table('attendance_daily_details')->where('daily_log_id', $attendanceLog->id)->whereNotNull('work_schedule_period_id')->get()->keyBy('work_schedule_period_id') : collect();
+
                         $scheduledIn = $attendanceLog?->scheduled_check_in ? \Carbon\Carbon::parse($attendanceLog->scheduled_check_in)->format('H:i') : '-';
                         $scheduledOut = $attendanceLog?->scheduled_check_out ? \Carbon\Carbon::parse($attendanceLog->scheduled_check_out)->format('H:i') : '-';
                         $actualIn = $attendanceLog?->check_in_time ? \Carbon\Carbon::parse($attendanceLog->check_in_time)->format('H:i') : '-';
@@ -495,18 +498,46 @@
                             </div>
                         </td>
                         <td class="px-6 py-4 text-center">
-                            <div class="inline-flex min-w-[110px] items-center justify-center rounded-lg bg-gray-50 px-3 py-1.5">
-                                <span class="text-xs font-bold text-gray-700 whitespace-nowrap">{{ $scheduledIn }} - {{ $scheduledOut }}</span>
-                            </div>
+                            @if($schedulePeriods->count() > 1)
+                                <div class="flex flex-col gap-1 items-center">
+                                    @foreach($schedulePeriods as $idx => $p)
+                                        <div class="inline-flex items-center justify-center rounded-lg bg-gray-50 px-2.5 py-1 text-xs font-bold text-gray-700 whitespace-nowrap">
+                                            <span class="text-[10px] text-gray-400 ml-1">فترة {{ $idx + 1 }}:</span>
+                                            {{ \Carbon\Carbon::parse($p->start_time)->format('H:i') }} - {{ \Carbon\Carbon::parse($p->end_time)->format('H:i') }}
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @else
+                                <div class="inline-flex min-w-[110px] items-center justify-center rounded-lg bg-gray-50 px-3 py-1.5">
+                                    <span class="text-xs font-bold text-gray-700 whitespace-nowrap">{{ $scheduledIn }} - {{ $scheduledOut }}</span>
+                                </div>
+                            @endif
                         </td>
                         <td class="px-6 py-4 text-center">
-                            <div class="inline-flex min-w-[110px] items-center justify-center rounded-lg bg-[color:var(--accent-orange)]/5 px-3 py-1.5">
-                                <span class="text-xs font-bold whitespace-nowrap">
-                                    <span class="text-[color:var(--success)]">{{ $actualIn }}</span>
-                                    <span class="text-gray-400">-</span>
-                                    <span class="text-[color:var(--error)]">{{ $actualOut }}</span>
-                                </span>
-                            </div>
+                            @if($schedulePeriods->count() > 1 && $detailsByPeriod->isNotEmpty())
+                                <div class="flex flex-col gap-1 items-center">
+                                    @foreach($schedulePeriods as $p)
+                                        @php
+                                            $d = $detailsByPeriod->get($p->id);
+                                            $pIn = $d?->check_in_time ? \Carbon\Carbon::parse($d->check_in_time)->format('H:i') : '-';
+                                            $pOut = $d?->check_out_time ? \Carbon\Carbon::parse($d->check_out_time)->format('H:i') : '-';
+                                        @endphp
+                                        <div class="inline-flex items-center justify-center rounded-lg bg-[color:var(--accent-orange)]/5 px-2.5 py-1 text-xs font-bold whitespace-nowrap">
+                                            <span class="text-[color:var(--success)]">{{ $pIn }}</span>
+                                            <span class="text-gray-400 px-0.5">-</span>
+                                            <span class="text-[color:var(--error)]">{{ $pOut }}</span>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @else
+                                <div class="inline-flex min-w-[110px] items-center justify-center rounded-lg bg-[color:var(--accent-orange)]/5 px-3 py-1.5">
+                                    <span class="text-xs font-bold whitespace-nowrap">
+                                        <span class="text-[color:var(--success)]">{{ $actualIn }}</span>
+                                        <span class="text-gray-400">-</span>
+                                        <span class="text-[color:var(--error)]">{{ $actualOut }}</span>
+                                    </span>
+                                </div>
+                            @endif
                         </td>
                         <td class="px-6 py-4 text-center whitespace-nowrap">
                             <x-ui.badge :type="$violationBadge['type']">{{ $violationBadge['label'] }}</x-ui.badge>
@@ -574,7 +605,7 @@
                                                 <span>{{ $this->penaltyUiText('', 'Exemption History') }}</span>
                                             </x-ui.dropdown-item>
                                         @endif
-                                        @if($canManagePenalties && $penalty->status === 'pending')
+                                        @if($canManagePenalties && $penalty->status !== 'confirmed')
                                             <x-ui.dropdown-item wire:click="openConfirmModal({{ $penalty->id }})">
                                                 <i class="fas fa-check-circle me-2 text-[color:var(--success)]"></i>
                                                 <span>{{ tr('Confirm for Payroll') }}</span>
@@ -709,44 +740,63 @@
                     </div>
                 @endif
 
-                <div class="space-y-3">
-                    @forelse($exemptionHistory as $entry)
-                        <div class="rounded-lg border border-gray-100 bg-white p-3 shadow-sm">
-                            <div class="flex items-start justify-between gap-3">
-                                <div class="flex items-center gap-2">
-                                    <span class="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-[color:var(--app-soft-bg)] text-[color:var(--brand-via)]">
-                                        <i class="fas {{ $entry['icon'] }} text-xs"></i>
-                                    </span>
-                                    <div>
-                                        <div class="text-sm font-bold text-gray-900">{{ $entry['title'] }}</div>
-                                        <div class="text-xs text-gray-500">{{ $this->penaltyUiText('', 'By') }}: {{ $entry['actor'] }}</div>
-                                    </div>
-                                </div>
-                                <span class="text-xs text-gray-400 whitespace-nowrap">{{ $entry['date'] }}</span>
-                            </div>
-
-                            @if(!empty($entry['details']))
-                                <div class="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                    @foreach($entry['details'] as $detail)
-                                        <div class="rounded-md bg-gray-50 px-3 py-2">
-                                            <div class="text-[10px] font-semibold text-gray-400">{{ $detail['label'] }}</div>
-                                            @if(!empty($detail['url']))
-                                                <a href="{{ $detail['url'] }}" target="_blank" class="text-xs font-semibold text-[color:var(--accent-orange)] hover:underline break-words">
-                                                    <i class="fas fa-paperclip me-1"></i> {{ $detail['value'] }}
-                                                </a>
-                                            @else
-                                                <div class="text-xs font-semibold text-gray-700 break-words">{{ $detail['value'] }}</div>
-                                            @endif
+                <div class="overflow-x-auto rounded-xl border border-gray-200">
+                    <table class="w-full text-end text-sm text-gray-600 border-collapse">
+                        <thead class="bg-gray-50 text-xs font-semibold text-gray-700 uppercase border-b border-gray-200">
+                            <tr>
+                                <th class="px-4 py-3 text-start">{{ tr('Event') }}</th>
+                                <th class="px-4 py-3 text-start">{{ $this->penaltyUiText('', 'By') }}</th>
+                                <th class="px-4 py-3 text-center">{{ tr('Date & Time') }}</th>
+                                <th class="px-4 py-3 text-start">{{ tr('Details') }}</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-200 bg-white">
+                            @forelse($exemptionHistory as $entry)
+                                <tr class="hover:bg-gray-50/80 transition-colors">
+                                    <td class="px-4 py-3 text-start font-medium text-gray-900 whitespace-nowrap">
+                                        <div class="flex items-center gap-2">
+                                            <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[color:var(--app-soft-bg)] text-[color:var(--brand-via)]">
+                                                <i class="fas {{ $entry['icon'] }} text-xs"></i>
+                                            </span>
+                                            <span>{{ $entry['title'] }}</span>
                                         </div>
-                                    @endforeach
-                                </div>
-                            @endif
-                        </div>
-                    @empty
-                        <div class="rounded-lg border border-dashed border-gray-200 p-6 text-center text-sm text-gray-500">
-                            {{ $this->penaltyUiText('', 'No exemption history found.') }}
-                        </div>
-                    @endforelse
+                                    </td>
+                                    <td class="px-4 py-3 text-start whitespace-nowrap text-xs font-semibold text-gray-700">
+                                        {{ $entry['actor'] }}
+                                    </td>
+                                    <td class="px-4 py-3 text-center whitespace-nowrap text-xs text-gray-500">
+                                        {{ $entry['date'] }}
+                                    </td>
+                                    <td class="px-4 py-3 text-start">
+                                        @if(!empty($entry['details']))
+                                            <div class="flex flex-wrap gap-1.5 text-xs">
+                                                @foreach($entry['details'] as $detail)
+                                                    <div class="inline-flex items-center gap-1 rounded bg-gray-100 px-2 py-0.5 text-[11px]">
+                                                        <span class="text-gray-500 font-semibold">{{ $detail['label'] }}:</span>
+                                                        @if(!empty($detail['url']))
+                                                            <a href="{{ $detail['url'] }}" target="_blank" class="text-[color:var(--accent-orange)] hover:underline font-bold">
+                                                                <i class="fas fa-paperclip me-0.5"></i> {{ $detail['value'] }}
+                                                            </a>
+                                                        @else
+                                                            <span class="text-gray-800 font-bold">{{ $detail['value'] }}</span>
+                                                        @endif
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        @else
+                                            <span class="text-gray-400 italic text-xs">-</span>
+                                        @endif
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="4" class="px-6 py-8 text-center text-sm text-gray-500 italic">
+                                        {{ $this->penaltyUiText('', 'No exemption history found.') }}
+                                    </td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </x-slot>

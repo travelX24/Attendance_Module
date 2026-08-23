@@ -693,7 +693,10 @@ if (! $dateFrom || ! $dateTo) {
     public function hasExemptionHistory(AttendanceDailyPenalty $penalty): bool
     {
         return $this->hasActiveExemption($penalty)
-            || ! empty($this->parseExemptionHistory((string) $penalty->notes, $penalty));
+            || ! empty($this->parseExemptionHistory((string) $penalty->notes, $penalty))
+            || str_contains((string) $penalty->notes, '[Audit]')
+            || str_contains((string) $penalty->notes, 'Exemption')
+            || ! empty($penalty->exempted_by);
     }
 
     public function penaltyUiText(string $ar, string $en): string
@@ -719,6 +722,7 @@ if (! $dateFrom || ! $dateTo) {
             'Cancel Confirmation' => "\u{0625}\u{0644}\u{063A}\u{0627}\u{0621} \u{0627}\u{0644}\u{0627}\u{0639}\u{062A}\u{0645}\u{0627}\u{062F}",
             'Only confirmed penalties can be unconfirmed.' => "\u{064A}\u{0645}\u{0643}\u{0646} \u{0625}\u{0644}\u{063A}\u{0627}\u{0621} \u{0627}\u{0639}\u{062A}\u{0645}\u{0627}\u{062F} \u{0627}\u{0644}\u{062C}\u{0632}\u{0627}\u{0621}\u{0627}\u{062A} \u{0627}\u{0644}\u{0645}\u{0639}\u{062A}\u{0645}\u{062F}\u{0629} \u{0641}\u{0642}\u{0637}.",
             'Penalty confirmation cancelled.' => "\u{062A}\u{0645} \u{0625}\u{0644}\u{063A}\u{0627}\u{0621} \u{0627}\u{0639}\u{062A}\u{0645}\u{0627}\u{062F} \u{0627}\u{0644}\u{062C}\u{0632}\u{0627}\u{0621}.",
+            'Only pending or waived penalties can be confirmed.' => "\u{064A}\u{0645}\u{0643}\u{0646} \u{0627}\u{0639}\u{062A}\u{0645}\u{0627}\u{062F} \u{0627}\u{0644}\u{062C}\u{0632}\u{0627}\u{0621}\u{0627}\u{062A} \u{0642}\u{064A}\u{062F} \u{0627}\u{0644}\u{0627}\u{0646}\u{062A}\u{0638}\u{0627}\u{0631} \u{0623}\u{0648} \u{0627}\u{0644}\u{0645}\u{062A}\u{0646}\u{0627}\u{0632}\u{0644} \u{0639}\u{0646}\u{0647}\u{0627} \u{0641}\u{0642}\u{0637}.",
             'Penalties cannot be deleted. Use exemption or update attendance then recalculate.' => "\u{0644}\u{0627} \u{064A}\u{0645}\u{0643}\u{0646} \u{062D}\u{0630}\u{0641} \u{0627}\u{0644}\u{062C}\u{0632}\u{0627}\u{0621}\u{0627}\u{062A}. \u{0627}\u{0633}\u{062A}\u{062E}\u{062F}\u{0645} \u{0627}\u{0644}\u{0625}\u{0639}\u{0641}\u{0627}\u{0621} \u{0623}\u{0648} \u{0639}\u{062F}\u{0644} \u{0633}\u{062C}\u{0644} \u{0627}\u{0644}\u{062D}\u{0636}\u{0648}\u{0631} \u{062B}\u{0645} \u{0623}\u{0639}\u{062F} \u{0627}\u{0644}\u{0627}\u{062D}\u{062A}\u{0633}\u{0627}\u{0628}.",
             'Penalty results refreshed.' => "\u{062A}\u{0645} \u{062A}\u{062D}\u{062F}\u{064A}\u{062B} \u{0646}\u{062A}\u{0627}\u{0626}\u{062C} \u{0627}\u{0644}\u{062C}\u{0632}\u{0627}\u{0621}\u{0627}\u{062A}.",
             'Employee' => "\u{0627}\u{0644}\u{0645}\u{0648}\u{0638}\u{0641}",
@@ -1170,6 +1174,11 @@ if (! $dateFrom || ! $dateTo) {
                     continue;
                 }
 
+                if ($holidays->isNotEmpty()) {
+                    $dayReasons[] = 'official_holiday';
+                    continue;
+                }
+
                 $schedule = $scheduleService->getEffectiveSchedule($companyId, $employee, $dateStr);
                 $metrics = $scheduleService->getMetricsForDate($dateStr, $schedule, $holidays, $employee);
                 $status = (string) ($metrics['status'] ?? '');
@@ -1508,10 +1517,13 @@ if (! $dateFrom || ! $dateTo) {
         $this->requireAttendanceAny('attendance.penalties.manage');
         $penalty = $this->findPenaltyOrFail((int) $id);
 
-        if ($penalty->status !== 'pending') {
+        if (! $this->isConfirmablePenaltyStatus((string) $penalty->status)) {
             $this->dispatch('toast', [
                 'type' => 'error',
-                'message' => tr('Only pending penalties can be confirmed.')
+                'message' => $this->penaltyUiText(
+                    'يمكن اعتماد الجزاءات قيد الانتظار أو المتنازل عنها فقط.',
+                    'Only pending or waived penalties can be confirmed.'
+                )
             ]);
 
             return;
@@ -1540,11 +1552,14 @@ if (! $dateFrom || ! $dateTo) {
 
         $penalty = $this->findPenaltyOrFail((int) $this->confirmPenaltyId);
 
-        if ($penalty->status !== 'pending') {
+        if (! $this->isConfirmablePenaltyStatus((string) $penalty->status)) {
             $this->closeConfirmModal();
             $this->dispatch('toast', [
                 'type' => 'error',
-                'message' => tr('Only pending penalties can be confirmed.')
+                'message' => $this->penaltyUiText(
+                    'يمكن اعتماد الجزاءات قيد الانتظار أو المتنازل عنها فقط.',
+                    'Only pending or waived penalties can be confirmed.'
+                )
             ]);
 
             return;
@@ -1587,8 +1602,12 @@ if (! $dateFrom || ! $dateTo) {
             return;
         }
 
+        $nextStatus = $this->hasActiveExemption($penalty) && (float) $penalty->net_amount <= 0
+            ? 'waived'
+            : 'pending';
+
         $penalty->update([
-            'status' => 'pending',
+            'status' => $nextStatus,
             'confirmed_by' => null,
             'confirmed_at' => null,
             'notes' => trim(
@@ -1606,6 +1625,11 @@ if (! $dateFrom || ! $dateTo) {
             'type' => 'success',
             'message' => $this->penaltyUiText('', 'Penalty confirmation cancelled.')
         ]);
+    }
+
+    private function isConfirmablePenaltyStatus(string $status): bool
+    {
+        return in_array($status, ['pending', 'waived'], true);
     }
 
     public function closeConfirmModal()
@@ -1803,8 +1827,7 @@ if (! $dateFrom || ! $dateTo) {
             $jobTitle = trim((string) ($employee?->jobTitle?->name ?? ''));
             $deptJob = trim(implode(' / ', array_filter([$department, $jobTitle])));
             $employeeName = $this->employeeDisplayName($employee);
-            $employeeNo = trim((string) ($employee?->employee_no ?? ''));
-            $employeeText = $employeeNo !== '' ? "{$employeeName} #{$employeeNo}" : $employeeName;
+            $employeeText = $employeeName;
 
             return [
                 $employeeText,
@@ -1836,9 +1859,70 @@ if (! $dateFrom || ! $dateTo) {
         );
     }
 
+    public function getSchedulePeriodsForPenalty(AttendanceDailyPenalty $penalty)
+    {
+        $attendanceLog = $penalty->attendanceLog;
+        $workScheduleId = $attendanceLog?->work_schedule_id;
+
+        if (!$workScheduleId && $penalty->employee_id) {
+            $ews = DB::table('employee_work_schedules')
+                ->where('employee_id', $penalty->employee_id)
+                ->where('is_active', true)
+                ->where('start_date', '<=', $penalty->attendance_date)
+                ->where(function ($q) use ($penalty) {
+                    $q->whereNull('end_date')->orWhere('end_date', '>=', $penalty->attendance_date);
+                })
+                ->orderByDesc('id')
+                ->first();
+
+            $workScheduleId = $ews?->work_schedule_id;
+        }
+
+        if ($workScheduleId) {
+            return DB::table('work_schedule_periods')
+                ->where('work_schedule_id', $workScheduleId)
+                ->orderBy('sort_order')
+                ->get();
+        }
+
+        return collect();
+    }
+
     private function penaltyTimeColumns(AttendanceDailyPenalty $penalty): array
     {
         $attendanceLog = $penalty->attendanceLog;
+        $schedulePeriods = $this->getSchedulePeriodsForPenalty($penalty);
+
+        if ($schedulePeriods->count() > 1) {
+            $scheduledFormatted = $schedulePeriods->map(fn($p) => 
+                $this->formatPenaltyTime($p->start_time) . ' - ' . $this->formatPenaltyTime($p->end_time)
+            )->implode(' | ');
+
+            $details = DB::table('attendance_daily_details')
+                ->where('daily_log_id', $attendanceLog?->id)
+                ->whereNotNull('work_schedule_period_id')
+                ->get()
+                ->keyBy('work_schedule_period_id');
+
+            if ($details->isNotEmpty()) {
+                $actualFormatted = $schedulePeriods->map(function ($p) use ($details) {
+                    $d = $details->get($p->id);
+                    $in = $this->formatPenaltyTime($d?->check_in_time);
+                    $out = $this->formatPenaltyTime($d?->check_out_time);
+                    return "{$in} - {$out}";
+                })->implode(' | ');
+            } else {
+                $actualIn = $this->formatPenaltyTime($attendanceLog?->check_in_time);
+                $actualOut = $this->formatPenaltyTime($attendanceLog?->check_out_time);
+                $actualFormatted = "{$actualIn} - {$actualOut}";
+            }
+
+            return [
+                'scheduled' => $scheduledFormatted,
+                'actual' => $actualFormatted,
+            ];
+        }
+
         $scheduledIn = $this->formatPenaltyTime($attendanceLog?->scheduled_check_in);
         $scheduledOut = $this->formatPenaltyTime($attendanceLog?->scheduled_check_out);
         $actualIn = $this->formatPenaltyTime($attendanceLog?->check_in_time);
@@ -1932,12 +2016,24 @@ if (! $dateFrom || ! $dateTo) {
 
     private function pdfReshape($text)
     {
-        if (class_exists('\Athka\Employees\Support\ArabicHelper')) {
-            return \Athka\Employees\Support\ArabicHelper::prepareForPdf((string) $text);
+        if ($text === null || $text === '') {
+            return '';
         }
 
-        return $text;
+        $str = (string) $text;
+
+        // Do not reshape pure numbers, dates, times, amounts, or time ranges
+        if (preg_match('/^[\d\s\.\,\:\/\-\+]+$/u', $str) || preg_match('/^[\d\.\,\s]+(YER|SAR|USD|ر\.ي|ر\.س|\$)?$/u', $str)) {
+            return $str;
+        }
+
+        if (class_exists('\Athka\Employees\Support\ArabicHelper')) {
+            return \Athka\Employees\Support\ArabicHelper::prepareForPdf($str);
+        }
+
+        return $str;
     }
+
     private function getPenaltiesQuery()
     {
         return $this->buildPenaltiesQuery(true)->orderByDesc('attendance_date');

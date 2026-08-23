@@ -231,7 +231,7 @@
             @endphp
             @foreach($metaItems as $item)
                 <div class="meta-item">
-                    <strong>{{ $reshaper($item['label']) }}:</strong> {{ $reshaper($item['value']) }}
+                    <span dir="{{ $dir }}"><strong>{{ $reshaper($item['label']) }}:</strong> {{ $item['value'] }}</span>
                 </div>
             @endforeach
         </div>
@@ -260,7 +260,7 @@
                 <td style="width: 33.33%; padding: 0 4px;">
                     <div class="stat-card">
                         <strong>{{ $reshaper($sc['label']) }}</strong>
-                        <span>{{ $reshaper($sc['value']) }}</span>
+                        <span dir="ltr">{{ $sc['value'] }}</span>
                     </div>
                 </td>
             @endforeach

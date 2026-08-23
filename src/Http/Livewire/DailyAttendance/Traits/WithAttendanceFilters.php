@@ -254,8 +254,8 @@ trait WithAttendanceFilters
                 });
             }
 
-            if ($this->department_id !== 'all') {
-                $employeeQuery->where('department_id', $this->department_id);
+            if ($this->job_title_id !== 'all') {
+                $employeeQuery->where('job_title_id', $this->job_title_id);
             }
 
             if ($this->job_title_id !== 'all') {
@@ -271,7 +271,17 @@ trait WithAttendanceFilters
                       ->whereBetween('attendance_date', [$this->date_from, $this->date_to]);
 
                     if ($this->attendance_status_filter !== 'all') $q->where('attendance_status', $this->attendance_status_filter);
-                    if ($this->work_schedule_id !== 'all') $q->where('work_schedule_id', $this->work_schedule_id);
+                    if ($this->work_schedule_id !== 'all' && $this->work_schedule_id !== '' && $this->work_schedule_id !== null) {
+                        $schId = (int) $this->work_schedule_id;
+                        $q->where(function ($sq) use ($schId) {
+                            $sq->where('work_schedule_id', $schId)
+                               ->orWhereIn('employee_id', function ($ewsQ) use ($schId) {
+                                   $ewsQ->select('employee_id')
+                                        ->from('employee_work_schedules')
+                                        ->where('work_schedule_id', $schId);
+                               });
+                        });
+                    }
                     if ($this->approval_status_filter !== 'all') $q->where('approval_status', $this->approval_status_filter);
                 });
             }
@@ -298,8 +308,16 @@ trait WithAttendanceFilters
                     $logs->where('attendance_status', $this->attendance_status_filter);
                 }
 
-                if ($this->work_schedule_id !== 'all') {
-                    $logs->where('work_schedule_id', $this->work_schedule_id);
+                if ($this->work_schedule_id !== 'all' && $this->work_schedule_id !== '' && $this->work_schedule_id !== null) {
+                    $schId = (int) $this->work_schedule_id;
+                    $logs->where(function ($sq) use ($schId) {
+                        $sq->where('work_schedule_id', $schId)
+                           ->orWhereIn('employee_id', function ($ewsQ) use ($schId) {
+                               $ewsQ->select('employee_id')
+                                    ->from('employee_work_schedules')
+                                    ->where('work_schedule_id', $schId);
+                           });
+                    });
                 }
 
                 $summaryByEmployee = $logs
@@ -402,7 +420,7 @@ trait WithAttendanceFilters
         }
 
         // ==================== DAILY VIEW (Standard Log List) ====================
-    $query = AttendanceDailyLog::forCompany($companyId)
+        $query = AttendanceDailyLog::forCompany($companyId)
             ->with([
                 'employee' => fn ($q) => $q->withoutGlobalScope('active_only')->with('branch'),
                 'workSchedule',
@@ -451,8 +469,16 @@ trait WithAttendanceFilters
             $query->where('approval_status', $this->approval_status_filter);
         }
 
-        if ($this->work_schedule_id !== 'all') {
-            $query->where('work_schedule_id', $this->work_schedule_id);
+        if ($this->work_schedule_id !== 'all' && $this->work_schedule_id !== '' && $this->work_schedule_id !== null) {
+            $schId = (int) $this->work_schedule_id;
+            $query->where(function ($q) use ($schId) {
+                $q->where('work_schedule_id', $schId)
+                  ->orWhereIn('employee_id', function ($ewsQ) use ($schId) {
+                      $ewsQ->select('employee_id')
+                           ->from('employee_work_schedules')
+                           ->where('work_schedule_id', $schId);
+                  });
+            });
         }
 
         if ($this->compliance_from !== '') {
