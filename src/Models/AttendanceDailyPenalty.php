@@ -8,6 +8,7 @@ use Athka\Employees\Models\Employee;
 use Athka\SystemSettings\Models\AttendancePenaltyPolicy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AttendanceDailyPenalty extends Model
 {
@@ -71,6 +72,11 @@ class AttendanceDailyPenalty extends Model
     public function confirmedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'confirmed_by');
+    }
+
+    public function exemptionHistories(): HasMany
+    {
+        return $this->hasMany(AttendancePenaltyExemptionHistory::class, 'attendance_daily_penalty_id');
     }
 
     // Scopes

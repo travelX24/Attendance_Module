@@ -233,44 +233,33 @@ class PenaltyService
             return false;
         }
 
-        // 1. Check explicit UnexcusedAbsencePolicy for 'late_early'
-        $explicitConversion = UnexcusedAbsencePolicy::query()
+        // 1. Check UnexcusedAbsencePolicy for company-configured absence threshold (late_minutes / early_leave_minutes)
+        $absencePolicies = UnexcusedAbsencePolicy::query()
             ->where('saas_company_id', $log->saas_company_id)
             ->where(function ($q) use ($policyId) {
                 $q->where('policy_id', $policyId)->orWhereNull('policy_id');
             })
-            ->where('absence_reason_type', 'late_early')
             ->where('is_active', true)
             ->where(function ($query) {
                 $query->where('is_enabled', true)->orWhereNull('is_enabled');
             })
-            ->where(function ($query) use ($lateMinutes, $earlyMinutes) {
-                if ($lateMinutes > 0) {
-                    $query->orWhere(function ($lateQuery) use ($lateMinutes) {
-                        $lateQuery->where('late_minutes', '>', 0)
-                            ->where('late_minutes', '<=', $lateMinutes);
-                    });
-                }
+            ->get();
 
-                if ($earlyMinutes > 0) {
-                    $query->orWhere(function ($earlyQuery) use ($earlyMinutes) {
-                        $earlyQuery->where(function ($q) use ($earlyMinutes) {
-                            $q->where('early_leave_minutes', '>', 0)
-                                ->where('early_leave_minutes', '<=', $earlyMinutes);
-                        })->orWhere(function ($q) use ($earlyMinutes) {
-                            $q->where(function ($eq) {
-                                $eq->whereNull('early_leave_minutes')
-                                    ->orWhere('early_leave_minutes', 0);
-                            })->where('late_minutes', '>', 0)
-                              ->where('late_minutes', '<=', $earlyMinutes);
-                        });
-                    });
-                }
-            })
-            ->exists();
+        foreach ($absencePolicies as $policy) {
+            $thresholdLate = (int) ($policy->late_minutes ?? 0);
+            $thresholdEarly = (int) ($policy->early_leave_minutes ?? 0);
 
-        if ($explicitConversion) {
-            return true;
+            if ($thresholdEarly <= 0 && $thresholdLate > 0) {
+                $thresholdEarly = $thresholdLate;
+            }
+
+            if ($lateMinutes > 0 && $thresholdLate > 0 && $lateMinutes >= $thresholdLate) {
+                return true;
+            }
+
+            if ($earlyMinutes > 0 && $thresholdEarly > 0 && $earlyMinutes >= $thresholdEarly) {
+                return true;
+            }
         }
 
         // 2. Check if lateness/early departure exceeds the maximum defined minutes_to tier in AttendancePenaltyPolicy
@@ -286,6 +275,7 @@ class PenaltyService
                     $q->where('is_enabled', true)->orWhereNull('is_enabled');
                 })
                 ->where('minutes_to', '>', 0)
+                ->where('minutes_to', '<', 1440)
                 ->max('minutes_to');
 
             if ($maxLatePolicyMinutes > 0 && $lateMinutes > $maxLatePolicyMinutes) {
@@ -305,6 +295,7 @@ class PenaltyService
                     $q->where('is_enabled', true)->orWhereNull('is_enabled');
                 })
                 ->where('minutes_to', '>', 0)
+                ->where('minutes_to', '<', 1440)
                 ->max('minutes_to');
 
             if ($maxEarlyPolicyMinutes > 0 && $earlyMinutes > $maxEarlyPolicyMinutes) {
@@ -1078,6 +1069,10 @@ class PenaltyService
         }
 
         $schedule = $scheduleService->getEffectiveSchedule((int) $log->saas_company_id, $employee, $dateStr);
+        if (! $schedule) {
+            return 'no_effective_schedule';
+        }
+
         $metrics = $scheduleService->getMetricsForDate($dateStr, $schedule, $holidays, $employee);
 
         if (($metrics['status'] ?? null) !== 'holiday' && ! (bool) ($metrics['is_holiday'] ?? false)) {

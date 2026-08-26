@@ -7,6 +7,7 @@ use Livewire\WithPagination;
 use App\Services\ExcelExportService;
 use Athka\Attendance\Models\AttendanceDailyLog;
 use Athka\Attendance\Models\AttendanceDailyPenalty;
+use Athka\Attendance\Models\AttendancePenaltyExemptionHistory;
 use Athka\Employees\Models\Employee;
 use Athka\SystemSettings\Models\Department;
 use Athka\SystemSettings\Models\JobTitle;
@@ -14,6 +15,7 @@ use Athka\SystemSettings\Models\AttendancePolicy;
 use Athka\SystemSettings\Models\AttendancePenaltyPolicy;
 use Athka\SystemSettings\Models\Currency;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Livewire\WithFileUploads;
 use Illuminate\Support\Facades\Storage;
 use Athka\Attendance\Services\PenaltyService;
@@ -768,21 +770,69 @@ if (! $dateFrom || ! $dateTo) {
             'employee_no' => $penalty->employee?->employee_no ?: '-',
             'attendance_date' => $penalty->attendance_date,
         ];
-        $this->exemptionHistory = $this->parseExemptionHistory((string) $penalty->notes, $penalty);
 
-        if (empty($this->exemptionHistory) && $this->hasActiveExemption($penalty)) {
-            $this->exemptionHistory = [$this->buildCurrentExemptionHistoryEntry($penalty)];
-        }
+        $dbRecords = AttendancePenaltyExemptionHistory::with(['appliedBy', 'cancelledBy'])
+            ->where('attendance_daily_penalty_id', $penalty->id)
+            ->orderBy('id', 'desc')
+            ->get();
 
-        if (
-            $penalty->exemption_attachment
-            && ! empty($this->exemptionHistory)
-            && ! $this->historyContainsAttachment($this->exemptionHistory)
-        ) {
-            $this->exemptionHistory[0]['details'][] = $this->exemptionAttachmentHistoryDetail(
-                $penalty,
-                (string) $penalty->exemption_attachment
-            );
+        if ($dbRecords->isNotEmpty()) {
+            $this->exemptionHistory = $dbRecords->map(function ($record) use ($penalty) {
+                $isApplied = $record->action === 'applied';
+                $actorUser = $isApplied ? $record->appliedBy : $record->cancelledBy;
+                $actorName = $actorUser ? $actorUser->name : '-';
+                $eventDate = $isApplied ? $record->applied_at : ($record->cancelled_at ?: $record->created_at);
+
+                $attachmentUrl = null;
+                if ($record->attachment_path) {
+                    $attachmentUrl = route('secure.attendance.attachments.penalty', [
+                        'penalty' => $penalty->id,
+                        'path' => $record->attachment_path,
+                    ]);
+                }
+
+                return [
+                    'id' => $record->id,
+                    'action' => $record->action,
+                    'status' => $record->status,
+                    'status_label' => $record->status === 'active'
+                        ? $this->penaltyUiText('فعال', 'Active')
+                        : $this->penaltyUiText('تم الإلغاء', 'Cancelled'),
+                    'title' => $isApplied
+                        ? $this->penaltyUiText('تم تطبيق الإعفاء', 'Exemption applied')
+                        : $this->penaltyUiText('تم إلغاء الإعفاء', 'Exemption cancelled'),
+                    'icon' => $isApplied ? 'fa-gift' : 'fa-ban',
+                    'actor' => $actorName,
+                    'date' => $eventDate ? company_date($eventDate, 'Y-m-d H:i:s') : '-',
+                    'exemption_type' => match ($record->exemption_type) {
+                        'full' => $this->penaltyUiText('التنازل الكامل (100%)', 'Full Waiver (100%)'),
+                        'partial' => $this->penaltyUiText('إعفاء جزئي', 'Partial Exemption'),
+                        default => $record->exemption_type ?: '-',
+                    },
+                    'exemption_amount' => number_format((float) $record->exemption_amount, 2) . ' ' . $this->penaltyUiText('ر.ي', 'YER'),
+                    'net_amount' => number_format((float) $record->net_amount, 2) . ' ' . $this->penaltyUiText('ر.ي', 'YER'),
+                    'reason' => $this->formatExemptionReason($record->reason),
+                    'attachment_url' => $attachmentUrl,
+                    'attachment_name' => $record->attachment_path ? basename($record->attachment_path) : null,
+                ];
+            })->toArray();
+        } else {
+            $this->exemptionHistory = $this->parseExemptionHistory((string) $penalty->notes, $penalty);
+
+            if (empty($this->exemptionHistory) && $this->hasActiveExemption($penalty)) {
+                $this->exemptionHistory = [$this->buildCurrentExemptionHistoryEntry($penalty)];
+            }
+
+            if (
+                $penalty->exemption_attachment
+                && ! empty($this->exemptionHistory)
+                && ! $this->historyContainsAttachment($this->exemptionHistory)
+            ) {
+                $this->exemptionHistory[0]['details'][] = $this->exemptionAttachmentHistoryDetail(
+                    $penalty,
+                    (string) $penalty->exemption_attachment
+                );
+            }
         }
 
         $this->showExemptionHistoryModal = true;
@@ -1427,6 +1477,23 @@ if (! $dateFrom || ! $dateTo) {
 
         $penalty->update($updateData);
 
+        AttendancePenaltyExemptionHistory::create([
+            'saas_company_id' => (int) $penalty->saas_company_id,
+            'attendance_daily_penalty_id' => (int) $penalty->id,
+            'employee_id' => (int) $penalty->employee_id,
+            'attendance_date' => $penalty->attendance_date,
+            'violation_type' => $penalty->violation_type,
+            'action' => 'applied',
+            'status' => 'active',
+            'exemption_type' => $this->exemptionForm['type'],
+            'exemption_amount' => $exemptAmount,
+            'net_amount' => max(0, $maximumAmount - $exemptAmount),
+            'reason' => $reason,
+            'attachment_path' => $attachmentPath ?: $penalty->exemption_attachment,
+            'applied_by' => auth()->id(),
+            'applied_at' => now(),
+        ]);
+
         $this->closeExemptionModal();
         $this->refreshData();
 
@@ -1476,6 +1543,14 @@ if (! $dateFrom || ! $dateTo) {
             return;
         }
 
+        $prevType = (string) ($penalty->exemption_type ?? '-');
+        $prevAmount = (float) $penalty->exemption_amount;
+        $prevNet = (float) $penalty->net_amount;
+        $prevReason = $penalty->exemption_reason;
+        $prevAttachment = $penalty->exemption_attachment;
+        $prevAppliedBy = $penalty->exempted_by;
+        $prevAppliedAt = $penalty->exempted_at;
+
         $notes = trim(
             (string) $penalty->notes
             . "\n[Audit] Exemption cancelled by "
@@ -1484,13 +1559,40 @@ if (! $dateFrom || ! $dateTo) {
             . now()
             . sprintf(
                 ' | previous_type=%s, previous_amount=%.2f, previous_net=%.2f, previous_reason=%s%s',
-                (string) ($penalty->exemption_type ?? '-'),
-                (float) $penalty->exemption_amount,
-                (float) $penalty->net_amount,
-                $this->formatExemptionReason($penalty->exemption_reason),
-                $penalty->exemption_attachment ? ', previous_attachment=' . $penalty->exemption_attachment : ''
+                $prevType,
+                $prevAmount,
+                $prevNet,
+                $this->formatExemptionReason($prevReason),
+                $prevAttachment ? ', previous_attachment=' . $prevAttachment : ''
             )
         );
+
+        AttendancePenaltyExemptionHistory::where('attendance_daily_penalty_id', $penalty->id)
+            ->where('status', 'active')
+            ->update([
+                'status' => 'cancelled',
+                'cancelled_by' => auth()->id(),
+                'cancelled_at' => now(),
+            ]);
+
+        AttendancePenaltyExemptionHistory::create([
+            'saas_company_id' => (int) $penalty->saas_company_id,
+            'attendance_daily_penalty_id' => (int) $penalty->id,
+            'employee_id' => (int) $penalty->employee_id,
+            'attendance_date' => $penalty->attendance_date,
+            'violation_type' => $penalty->violation_type,
+            'action' => 'cancelled',
+            'status' => 'cancelled',
+            'exemption_type' => $prevType,
+            'exemption_amount' => $prevAmount,
+            'net_amount' => $prevNet,
+            'reason' => $prevReason,
+            'attachment_path' => $prevAttachment,
+            'applied_by' => $prevAppliedBy,
+            'applied_at' => $prevAppliedAt,
+            'cancelled_by' => auth()->id(),
+            'cancelled_at' => now(),
+        ]);
 
         $penalty->update([
             'exemption_type' => 'none',

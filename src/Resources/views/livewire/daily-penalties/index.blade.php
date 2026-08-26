@@ -744,53 +744,73 @@
                     <table class="w-full text-end text-sm text-gray-600 border-collapse">
                         <thead class="bg-gray-50 text-xs font-semibold text-gray-700 uppercase border-b border-gray-200">
                             <tr>
-                                <th class="px-4 py-3 text-start">{{ tr('Event') }}</th>
-                                <th class="px-4 py-3 text-start">{{ $this->penaltyUiText('', 'By') }}</th>
-                                <th class="px-4 py-3 text-center">{{ tr('Date & Time') }}</th>
-                                <th class="px-4 py-3 text-start">{{ tr('Details') }}</th>
+                                <th class="px-3 py-3 text-start whitespace-nowrap">{{ tr('Event') }}</th>
+                                <th class="px-3 py-3 text-center whitespace-nowrap">{{ tr('Status') }}</th>
+                                <th class="px-3 py-3 text-center whitespace-nowrap">{{ $this->penaltyUiText('', 'Exemption Type') }}</th>
+                                <th class="px-3 py-3 text-center whitespace-nowrap">{{ $this->penaltyUiText('', 'Exempt Amount') }}</th>
+                                <th class="px-3 py-3 text-center whitespace-nowrap">{{ $this->penaltyUiText('', 'Net Amount') }}</th>
+                                <th class="px-3 py-3 text-start">{{ $this->penaltyUiText('', 'Reason') }}</th>
+                                <th class="px-3 py-3 text-center whitespace-nowrap">{{ $this->penaltyUiText('', 'Attachment') }}</th>
+                                <th class="px-3 py-3 text-start whitespace-nowrap">{{ $this->penaltyUiText('', 'By') }}</th>
+                                <th class="px-3 py-3 text-center whitespace-nowrap">{{ tr('Date & Time') }}</th>
                             </tr>
                         </thead>
                         <tbody class="divide-y divide-gray-200 bg-white">
                             @forelse($exemptionHistory as $entry)
                                 <tr class="hover:bg-gray-50/80 transition-colors">
-                                    <td class="px-4 py-3 text-start font-medium text-gray-900 whitespace-nowrap">
+                                    <td class="px-3 py-3 text-start font-medium text-gray-900 whitespace-nowrap">
                                         <div class="flex items-center gap-2">
-                                            <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-[color:var(--app-soft-bg)] text-[color:var(--brand-via)]">
-                                                <i class="fas {{ $entry['icon'] }} text-xs"></i>
+                                            <span class="inline-flex h-7 w-7 items-center justify-center rounded-lg {{ ($entry['action'] ?? '') === 'cancelled' ? 'bg-red-50 text-red-600' : 'bg-[color:var(--app-soft-bg)] text-[color:var(--brand-via)]' }}">
+                                                <i class="fas {{ $entry['icon'] ?? 'fa-gift' }} text-xs"></i>
                                             </span>
-                                            <span>{{ $entry['title'] }}</span>
+                                            <span>{{ $entry['title'] ?? '-' }}</span>
                                         </div>
                                     </td>
-                                    <td class="px-4 py-3 text-start whitespace-nowrap text-xs font-semibold text-gray-700">
-                                        {{ $entry['actor'] }}
-                                    </td>
-                                    <td class="px-4 py-3 text-center whitespace-nowrap text-xs text-gray-500">
-                                        {{ $entry['date'] }}
-                                    </td>
-                                    <td class="px-4 py-3 text-start">
-                                        @if(!empty($entry['details']))
-                                            <div class="flex flex-wrap gap-1.5 text-xs">
-                                                @foreach($entry['details'] as $detail)
-                                                    <div class="inline-flex items-center gap-1 rounded bg-gray-100 px-2 py-0.5 text-[11px]">
-                                                        <span class="text-gray-500 font-semibold">{{ $detail['label'] }}:</span>
-                                                        @if(!empty($detail['url']))
-                                                            <a href="{{ $detail['url'] }}" target="_blank" class="text-[color:var(--accent-orange)] hover:underline font-bold">
-                                                                <i class="fas fa-paperclip me-0.5"></i> {{ $detail['value'] }}
-                                                            </a>
-                                                        @else
-                                                            <span class="text-gray-800 font-bold">{{ $detail['value'] }}</span>
-                                                        @endif
-                                                    </div>
-                                                @endforeach
-                                            </div>
+                                    <td class="px-3 py-3 text-center whitespace-nowrap text-xs font-semibold">
+                                        @if(($entry['status'] ?? '') === 'active')
+                                            <span class="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700">
+                                                {{ $entry['status_label'] ?? tr('Active') }}
+                                            </span>
+                                        @elseif(($entry['status'] ?? '') === 'cancelled')
+                                            <span class="inline-flex items-center rounded-full bg-rose-50 px-2 py-0.5 text-xs font-medium text-rose-700">
+                                                {{ $entry['status_label'] ?? tr('Cancelled') }}
+                                            </span>
                                         @else
-                                            <span class="text-gray-400 italic text-xs">-</span>
+                                            <span class="text-gray-400">-</span>
                                         @endif
+                                    </td>
+                                    <td class="px-3 py-3 text-center whitespace-nowrap text-xs font-medium text-gray-800">
+                                        {{ $entry['exemption_type'] ?? '-' }}
+                                    </td>
+                                    <td class="px-3 py-3 text-center whitespace-nowrap text-xs font-bold text-gray-900">
+                                        {{ $entry['exemption_amount'] ?? '-' }}
+                                    </td>
+                                    <td class="px-3 py-3 text-center whitespace-nowrap text-xs font-bold text-gray-900">
+                                        {{ $entry['net_amount'] ?? '-' }}
+                                    </td>
+                                    <td class="px-3 py-3 text-start text-xs text-gray-700 max-w-[200px] truncate" title="{{ $entry['reason'] ?? '' }}">
+                                        {{ $entry['reason'] ?? '-' }}
+                                    </td>
+                                    <td class="px-3 py-3 text-center whitespace-nowrap text-xs">
+                                        @if(!empty($entry['attachment_url']))
+                                            <a href="{{ $entry['attachment_url'] }}" target="_blank" class="inline-flex items-center gap-1 rounded bg-amber-50 px-2 py-1 text-xs font-medium text-amber-700 hover:bg-amber-100 transition-colors">
+                                                <i class="fas fa-paperclip"></i>
+                                                <span>{{ $this->penaltyUiText('', 'View Attachment') }}</span>
+                                            </a>
+                                        @else
+                                            <span class="text-gray-400 italic">-</span>
+                                        @endif
+                                    </td>
+                                    <td class="px-3 py-3 text-start whitespace-nowrap text-xs font-semibold text-gray-700">
+                                        {{ $entry['actor'] ?? '-' }}
+                                    </td>
+                                    <td class="px-3 py-3 text-center whitespace-nowrap text-xs text-gray-500">
+                                        {{ $entry['date'] ?? '-' }}
                                     </td>
                                 </tr>
                             @empty
                                 <tr>
-                                    <td colspan="4" class="px-6 py-8 text-center text-sm text-gray-500 italic">
+                                    <td colspan="9" class="px-6 py-8 text-center text-sm text-gray-500 italic">
                                         {{ $this->penaltyUiText('', 'No exemption history found.') }}
                                     </td>
                                 </tr>
