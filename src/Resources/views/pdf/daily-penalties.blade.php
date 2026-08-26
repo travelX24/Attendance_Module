@@ -160,21 +160,21 @@
 </head>
 <body>
     <div class="header">
-        <table class="header-table">
+        <table class="header-table" style="width: 100%; border-collapse: collapse; border: 0;">
             <tr>
                 @if($isRtl)
-                    {{-- Arabic Header: Company Info with Logo on Right, System reference on Left --}}
-                    <td style="width: 70%; text-align: right; vertical-align: middle;">
-                        <table style="width: 100%; border-collapse: collapse; border: 0;">
+                    {{-- Arabic Header: Company Info on Right, ATHKA HR System Title on Left --}}
+                    <td style="width: 65%; text-align: right; vertical-align: middle; border: 0;">
+                        <table style="border-collapse: collapse; border: 0;">
                             <tr>
                                 @if(!empty($companyLogo))
-                                    <td style="width: 65px; text-align: right; vertical-align: middle; border: 0; padding: 0 0 0 10px;">
-                                        <img src="{{ $companyLogo }}" alt="Logo" style="max-height: 48px; max-width: 130px; object-fit: contain;" />
+                                    <td style="vertical-align: middle; border: 0; padding-left: 10px;">
+                                        <img src="{{ $companyLogo }}" alt="Logo" style="max-height: 46px; max-width: 120px; object-fit: contain;" />
                                     </td>
                                 @endif
-                                <td style="text-align: right; vertical-align: middle; border: 0; padding: 0;">
-                                    <div class="company-name">{{ $reshaper($company->legal_name_ar ?? $company->legal_name_en ?? $company->name ?? tr('Athka Company')) }}</div>
-                                    <div class="company-details">
+                                <td style="vertical-align: middle; border: 0; text-align: right;">
+                                    <div class="company-name" style="font-size: 13px; font-weight: 700; color: #903749;">{{ $reshaper($company->legal_name_ar ?? $company->legal_name_en ?? $company->name ?? tr('Athka Company')) }}</div>
+                                    <div class="company-details" style="font-size: 8px; color: #64748b; margin-top: 2px;">
                                         @if(!empty($company?->address_line))
                                             {{ $reshaper($company->address_line) }}<br>
                                         @endif
@@ -184,22 +184,23 @@
                             </tr>
                         </table>
                     </td>
-                    <td style="width: 30%; text-align: left; vertical-align: middle;">
-                        <div class="system-name" style="font-size: 11px; color: #64748b;">ATHKA HR</div>
+                    <td style="width: 35%; text-align: left; vertical-align: middle; border: 0; padding: 0;">
+                        <div style="font-size: 14px; font-weight: 800; color: #903749; letter-spacing: 0.5px;">ATHKA HR</div>
+                        <div style="font-size: 7.5px; color: #64748b; margin-top: 1px;">{{ $reshaper(tr('Athka HR Management System')) }}</div>
                     </td>
                 @else
-                    {{-- English Header: Company Info with Logo on Left, System reference on Right --}}
-                    <td style="width: 70%; text-align: left; vertical-align: middle;">
-                        <table style="width: 100%; border-collapse: collapse; border: 0;">
+                    {{-- English Header: Company Info on Left, ATHKA HR System Title on Right --}}
+                    <td style="width: 65%; text-align: left; vertical-align: middle; border: 0;">
+                        <table style="border-collapse: collapse; border: 0;">
                             <tr>
                                 @if(!empty($companyLogo))
-                                    <td style="width: 65px; text-align: left; vertical-align: middle; border: 0; padding: 0 10px 0 0;">
-                                        <img src="{{ $companyLogo }}" alt="Logo" style="max-height: 48px; max-width: 130px; object-fit: contain;" />
+                                    <td style="vertical-align: middle; border: 0; padding-right: 10px;">
+                                        <img src="{{ $companyLogo }}" alt="Logo" style="max-height: 46px; max-width: 120px; object-fit: contain;" />
                                     </td>
                                 @endif
-                                <td style="text-align: left; vertical-align: middle; border: 0; padding: 0;">
-                                    <div class="company-name">{{ $company->legal_name_en ?? $company->legal_name_ar ?? $company->name ?? 'Athka Company' }}</div>
-                                    <div class="company-details">
+                                <td style="vertical-align: middle; border: 0; text-align: left;">
+                                    <div class="company-name" style="font-size: 13px; font-weight: 700; color: #903749;">{{ $company->legal_name_en ?? $company->legal_name_ar ?? $company->name ?? 'Athka Company' }}</div>
+                                    <div class="company-details" style="font-size: 8px; color: #64748b; margin-top: 2px;">
                                         @if(!empty($company?->address_line))
                                             {{ $company->address_line }}<br>
                                         @endif
@@ -209,32 +210,48 @@
                             </tr>
                         </table>
                     </td>
-                    <td style="width: 30%; text-align: right; vertical-align: middle;">
-                        <div class="system-name" style="font-size: 11px; color: #64748b;">ATHKA HR</div>
+                    <td style="width: 35%; text-align: right; vertical-align: middle; border: 0; padding: 0;">
+                        <div style="font-size: 14px; font-weight: 800; color: #903749; letter-spacing: 0.5px;">ATHKA HR</div>
+                        <div style="font-size: 7.5px; color: #64748b; margin-top: 1px;">Athka HR Management System</div>
                     </td>
                 @endif
             </tr>
         </table>
     </div>
 
-    <div class="report-info">
-        <h1 class="report-title">{{ $reshaper(tr('Daily Penalties Report')) }}</h1>
-        <div class="meta-container">
-            @php
-                $metaItems = [
-                    ['label' => tr('Period'), 'value' => "{$date_from} - {$date_to}"],
-                    ['label' => tr('Record Count'), 'value' => (string) count($rows ?? [])],
-                    ['label' => tr('Generated By'), 'value' => auth()->user()->name ?? 'Admin'],
-                    ['label' => tr('Generated at'), 'value' => now()->format('Y/m/d H:i')],
-                ];
-            @endphp
-            @foreach($metaItems as $item)
-                <div class="meta-item">
-                    <span style="font-weight: bold;">{{ $reshaper($item['label']) }}:</span>
-                    <span>{{ $item['value'] }}</span>
-                </div>
-            @endforeach
-        </div>
+    <div class="report-info" style="padding: 8px 0; border-bottom: 1px solid #e2e8f0;">
+        <h1 class="report-title" style="font-size: 14px; font-weight: 800; color: #0f172a; margin: 0 0 6px 0; text-align: center;">{{ $reshaper(tr('Daily Penalties Report')) }}</h1>
+        <table style="width: 100%; border-collapse: collapse; border: 0; margin-top: 2px;">
+            <tr>
+                @php
+                    $generatedAtText = $isRtl 
+                        ? ($reshaper(tr('Generated at')) . ': <span dir="ltr" style="unicode-bidi: embed;">' . now()->format('Y/m/d H:i') . '</span>')
+                        : (tr('Generated at') . ': ' . now()->format('Y/m/d H:i'));
+
+                    $generatedByText = $isRtl 
+                        ? ($reshaper(tr('Generated By')) . ': ' . $reshaper(auth()->user()->name ?? 'Admin'))
+                        : (tr('Generated By') . ': ' . (auth()->user()->name ?? 'Admin'));
+
+                    $countText = $isRtl 
+                        ? ($reshaper(tr('Record Count')) . ': ' . count($rows ?? []))
+                        : (tr('Record Count') . ': ' . count($rows ?? []));
+
+                    $periodText = $isRtl 
+                        ? ($reshaper(tr('Period')) . ': <span dir="ltr" style="unicode-bidi: embed;">' . "{$date_from} - {$date_to}" . '</span>')
+                        : (tr('Period') . ': ' . "{$date_from} - {$date_to}");
+
+                    $metaList = [$generatedAtText, $generatedByText, $countText, $periodText];
+                    if (!$isRtl) {
+                        $metaList = array_reverse($metaList);
+                    }
+                @endphp
+                @foreach($metaList as $itemHtml)
+                    <td style="text-align: center; font-size: 8px; color: #475569; white-space: nowrap; border: 0; padding: 0 4px;">
+                        {!! $itemHtml !!}
+                    </td>
+                @endforeach
+            </tr>
+        </table>
     </div>
 
     <table class="stats-cards">
