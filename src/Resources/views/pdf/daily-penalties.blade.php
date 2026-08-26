@@ -225,7 +225,7 @@
             <tr>
                 @php
                     $generatedAtText = $isRtl 
-                        ? ($reshaper(tr('Generated at')) . ': <span dir="ltr" style="unicode-bidi: embed;">' . now()->format('Y/m/d H:i') . '</span>')
+                        ? ($reshaper(tr('Generated at')) . ': ' . now()->format('Y/m/d H:i'))
                         : (tr('Generated at') . ': ' . now()->format('Y/m/d H:i'));
 
                     $generatedByText = $isRtl 
@@ -237,13 +237,12 @@
                         : (tr('Record Count') . ': ' . count($rows ?? []));
 
                     $periodText = $isRtl 
-                        ? ($reshaper(tr('Period')) . ': <span dir="ltr" style="unicode-bidi: embed;">' . "{$date_from} - {$date_to}" . '</span>')
+                        ? ($reshaper(tr('Period')) . ': ' . "{$date_from} - {$date_to}")
                         : (tr('Period') . ': ' . "{$date_from} - {$date_to}");
 
-                    $metaList = [$generatedAtText, $generatedByText, $countText, $periodText];
-                    if (!$isRtl) {
-                        $metaList = array_reverse($metaList);
-                    }
+                    $metaList = $isRtl 
+                        ? [$periodText, $countText, $generatedByText, $generatedAtText]
+                        : [$periodText, $countText, $generatedByText, $generatedAtText];
                 @endphp
                 @foreach($metaList as $itemHtml)
                     <td style="text-align: center; font-size: 8px; color: #475569; white-space: nowrap; border: 0; padding: 0 4px;">
