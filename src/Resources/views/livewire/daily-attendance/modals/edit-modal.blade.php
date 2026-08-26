@@ -23,6 +23,16 @@
                     </div>
                 </div>
 
+                @if(!$canManageDaily)
+                    <div class="flex items-center gap-3 p-3.5 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-xs font-medium shadow-sm">
+                        <i class="fas fa-lock text-amber-600 text-base shrink-0"></i>
+                        <div>
+                            <span class="font-bold text-amber-950">{{ tr('Read-Only Mode') }}:</span>
+                            {{ tr('You do not have permission to edit this attendance record.') }}
+                        </div>
+                    </div>
+                @endif
+
                 <div class="flex items-center gap-3 p-3 bg-[color:var(--warning)]/10 rounded-xl border border-[color:var(--warning)]/25">
                     <i class="fas fa-exclamation-triangle text-[color:var(--warning)]"></i>
                     <p class="text-xs text-[color:var(--text-primary)] font-medium">

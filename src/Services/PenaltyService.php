@@ -889,6 +889,14 @@ class PenaltyService
             return false;
         }
 
+        if ($violationType === 'delay' && $this->getLateMinutes($log) > 0) {
+            return false;
+        }
+
+        if ($violationType === 'early_departure' && $this->getEarlyDepartureMinutes($log) > 0) {
+            return false;
+        }
+
         return \Athka\Attendance\Models\AttendancePermissionRequest::where('company_id', $log->saas_company_id)
             ->where('employee_id', $log->employee_id)
             ->where('permission_date', $log->attendance_date)
@@ -920,35 +928,106 @@ class PenaltyService
     private function getLateMinutes(AttendanceDailyLog $log): int
     {
         $detailMinutes = $this->sumDetailLateMinutes($log);
+        $totalLateMinutes = 0;
+
         if ($detailMinutes > 0) {
-            return $detailMinutes;
+            $totalLateMinutes = $detailMinutes;
+        } else {
+            $s = $this->parseTimeOnDate($log->attendance_date, $log->scheduled_check_in);
+            $a = $this->parseTimeOnDate($log->attendance_date, $log->check_in_time);
+
+            if ($s && $a) {
+                $totalLateMinutes = max(0, $s->diffInMinutes($a, false));
+            }
         }
 
-        $s = $this->parseTimeOnDate($log->attendance_date, $log->scheduled_check_in);
-        $a = $this->parseTimeOnDate($log->attendance_date, $log->check_in_time);
-
-        if (! $s || ! $a) {
+        if ($totalLateMinutes <= 0) {
             return 0;
         }
 
-        return max(0, $s->diffInMinutes($a, false));
+        $coveredPermissionMinutes = $this->getApprovedPermissionCoveredMinutes($log, 'late');
+
+        return max(0, $totalLateMinutes - $coveredPermissionMinutes);
     }
 
     private function getEarlyDepartureMinutes(AttendanceDailyLog $log): int
     {
         $detailMinutes = $this->sumDetailEarlyDepartureMinutes($log);
+        $totalEarlyMinutes = 0;
+
         if ($detailMinutes > 0) {
-            return $detailMinutes;
+            $totalEarlyMinutes = $detailMinutes;
+        } else {
+            $s = $this->parseTimeOnDate($log->attendance_date, $log->scheduled_check_out);
+            $a = $this->parseTimeOnDate($log->attendance_date, $log->check_out_time);
+
+            if ($s && $a) {
+                $totalEarlyMinutes = max(0, $a->diffInMinutes($s, false));
+            }
         }
 
-        $s = $this->parseTimeOnDate($log->attendance_date, $log->scheduled_check_out);
-        $a = $this->parseTimeOnDate($log->attendance_date, $log->check_out_time);
-
-        if (! $s || ! $a) {
+        if ($totalEarlyMinutes <= 0) {
             return 0;
         }
 
-        return max(0, $a->diffInMinutes($s, false));
+        $coveredPermissionMinutes = $this->getApprovedPermissionCoveredMinutes($log, 'early');
+
+        return max(0, $totalEarlyMinutes - $coveredPermissionMinutes);
+    }
+
+    private function getApprovedPermissionCoveredMinutes(AttendanceDailyLog $log, string $type): int
+    {
+        $permissions = \Athka\Attendance\Models\AttendancePermissionRequest::where('company_id', $log->saas_company_id)
+            ->where('employee_id', $log->employee_id)
+            ->where('permission_date', $log->attendance_date)
+            ->where('status', 'approved')
+            ->get();
+
+        if ($permissions->isEmpty()) {
+            return 0;
+        }
+
+        $coveredMinutes = 0;
+
+        foreach ($permissions as $perm) {
+            $permMinutes = (int) ($perm->minutes ?? 0);
+
+            if ($type === 'late') {
+                $schIn = $this->parseTimeOnDate($log->attendance_date, $log->scheduled_check_in);
+                $actIn = $this->parseTimeOnDate($log->attendance_date, $log->check_in_time);
+                $pFrom = $this->parseTimeOnDate($log->attendance_date, $perm->from_time);
+                $pTo   = $this->parseTimeOnDate($log->attendance_date, $perm->to_time);
+
+                if ($schIn && $actIn && $pFrom && $pTo) {
+                    $overlapStart = $schIn->gt($pFrom) ? $schIn : $pFrom;
+                    $overlapEnd   = $actIn->lt($pTo)   ? $actIn : $pTo;
+
+                    if ($overlapEnd->gt($overlapStart)) {
+                        $coveredMinutes += (int) $overlapStart->diffInMinutes($overlapEnd);
+                        continue;
+                    }
+                }
+            } elseif ($type === 'early') {
+                $actOut = $this->parseTimeOnDate($log->attendance_date, $log->check_out_time);
+                $schOut = $this->parseTimeOnDate($log->attendance_date, $log->scheduled_check_out);
+                $pFrom  = $this->parseTimeOnDate($log->attendance_date, $perm->from_time);
+                $pTo    = $this->parseTimeOnDate($log->attendance_date, $perm->to_time);
+
+                if ($schOut && $actOut && $pFrom && $pTo) {
+                    $overlapStart = $actOut->gt($pFrom) ? $actOut : $pFrom;
+                    $overlapEnd   = $schOut->lt($pTo)   ? $schOut : $pTo;
+
+                    if ($overlapEnd->gt($overlapStart)) {
+                        $coveredMinutes += (int) $overlapStart->diffInMinutes($overlapEnd);
+                        continue;
+                    }
+                }
+            }
+
+            $coveredMinutes += $permMinutes;
+        }
+
+        return $coveredMinutes;
     }
 
     private function resolvePenaltyStatus(AttendanceDailyLog $log): string

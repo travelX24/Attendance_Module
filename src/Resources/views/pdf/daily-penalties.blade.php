@@ -248,7 +248,7 @@
                 @endphp
                 @foreach($metaItems as $item)
                     <td style="text-align: center; vertical-align: top; border: 0; padding: 0 6px;">
-                        <div style="font-size: 8px; font-weight: 700; color: #334155; margin-bottom: 2px;">{{ $item['label'] }}:</div>
+                        <div style="font-size: 8px; font-weight: 700; color: #334155; margin-bottom: 2px;">{{ $item['label'] . ':' }}</div>
                         <div style="font-size: 8px; font-weight: 500; color: #64748b;">{{ $item['value'] }}</div>
                     </td>
                 @endforeach

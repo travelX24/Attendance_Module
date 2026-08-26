@@ -13,6 +13,17 @@
 
     <x-slot:content>
         <div class="space-y-6">
+            {{-- Top Restriction Warning Banner if user lacks permissions --}}
+            @if(!$canManageDaily)
+                <div class="flex items-center gap-3 p-3.5 bg-amber-50 rounded-xl border border-amber-200 text-amber-900 text-xs font-medium shadow-sm">
+                    <i class="fas fa-lock text-amber-600 text-base shrink-0"></i>
+                    <div>
+                        <span class="font-bold text-amber-950">{{ tr('Read-Only Mode') }}:</span>
+                        {{ tr('You do not have permission to edit attendance records. The fields are displayed in view-only mode.') }}
+                    </div>
+                </div>
+            @endif
+
             {{-- Employee Stats Summary --}}
             <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-4">
                  <div class="bg-gray-50 border border-gray-100 p-4 rounded-xl flex flex-col items-center justify-center gap-1 hover:bg-white hover:shadow-sm transition-all hover:border-[color:var(--accent-orange)]/30 group">
@@ -56,12 +67,34 @@
                         </thead>
                         <tbody class="divide-y divide-gray-100 bg-white">
                             @foreach($monthlyEditForm as $index => $day)
+                                @php
+                                    $dayDate = \Carbon\Carbon::parse($day['date']);
+                                    $isOlderThan7Days = $dayDate->diffInDays(now()) > 7;
+                                    $isHoliday = $day['status'] === 'holiday' || ($day['is_official_holiday'] ?? false);
+                                    $isDayOff = $day['status'] === 'day_off' || $day['is_weekend'];
+                                @endphp
                                 <tr class="group hover:bg-gray-50 transition-colors {{ $day['is_weekend'] ? 'bg-gray-50/40' : '' }}">
-                                    <!-- Date -->
+                                    <!-- Date & Restriction Badges -->
                                     <td class="px-4 py-2 whitespace-nowrap">
                                         <div class="flex flex-col">
-                                            <span class="font-bold text-gray-800">{{ \Carbon\Carbon::parse($day['date'])->translatedFormat('l') }}</span>
+                                            <span class="font-bold text-gray-800">{{ $dayDate->translatedFormat('l') }}</span>
                                             <span class="text-[10px] text-gray-400 group-hover:text-[color:var(--accent-orange)] transition-colors">{{ company_date($day['date']) }}</span>
+                                            
+                                            @if($isHoliday)
+                                                <span class="inline-flex items-center gap-1 text-[9px] font-bold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 mt-1 w-max" title="{{ tr('Cannot edit attendance: Official Holiday') }}">
+                                                    <i class="fas fa-umbrella-beach text-[9px]"></i> {{ tr('Official Holiday') }}: {{ $day['exception_name'] ?? tr('Holiday') }}
+                                                </span>
+                                            @elseif($isDayOff)
+                                                <span class="inline-flex items-center gap-1 text-[9px] font-bold text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200 mt-1 w-max">
+                                                    <i class="fas fa-bed text-[9px]"></i> {{ tr('Day Off / Weekend') }}
+                                                </span>
+                                            @endif
+
+                                            @if($isOlderThan7Days)
+                                                <span class="inline-flex items-center gap-1 text-[9px] font-bold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 mt-1 w-max" title="{{ tr('Editing period expired (older than 7 days)') }}">
+                                                    <i class="fas fa-clock text-[9px]"></i> {{ tr('Editing Period Expired (7 Days)') }}
+                                                </span>
+                                            @endif
                                         </div>
                                     </td>
                                     
