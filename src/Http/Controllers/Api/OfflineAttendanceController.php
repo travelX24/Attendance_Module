@@ -66,8 +66,9 @@ class OfflineAttendanceController extends Controller
                 $results[] = $result;
             } catch (\Throwable $e) {
                 Log::error('[OfflineAttendance] Error processing record', [
-                    'rec'   => $rec,
-                    'error' => $e->getMessage(),
+                    'correlation_id' => $request->header('X-Correlation-ID'),
+                    'rec'            => class_exists('\App\Support\LogSanitizer') ? \App\Support\LogSanitizer::clean($rec) : $rec,
+                    'error'          => $e->getMessage(),
                 ]);
                 $results[] = [
                     'ok'           => false,
