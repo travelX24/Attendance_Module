@@ -107,7 +107,7 @@
                                                    ($day['status'] == 'absent' ? 'text-[color:var(--error)] bg-[color:var(--error)]/10 border-[color:var(--error)]/25' : 
                                                    ($day['status'] == 'late' ? 'text-[color:var(--warning)] bg-[color:var(--warning)]/10 border-[color:var(--warning)]/25' : 
                                                    ($day['status'] == 'weekend' ? 'text-gray-400 bg-gray-50' : 'text-gray-700 bg-white'))) }}"
-                                                 @if(!$canManageDaily) disabled @endif>
+                                                 @if(!$canManageDaily || $isHoliday || $isOlderThan7Days) disabled @endif>
                                                 <option value="present">{{ tr('Present') }}</option>
                                                 <option value="late">{{ tr('Late') }}</option>
                                                 <option value="early_departure">{{ tr('Early Leave') }}</option>
@@ -150,9 +150,9 @@
                                                      {{-- Check In --}}
                                                      <div class="flex-1">
                                                          <input type="time" wire:model.defer="monthlyEditForm.{{ $index }}.periods.{{ $pIndex }}.check_in" 
-                                                              class="bg-white border text-gray-900 text-[10px] rounded-lg focus:ring-[color:var(--accent-orange)] focus:border-[color:var(--accent-orange)] block w-full py-1 px-1 font-mono text-center shadow-sm border-gray-200"
-                                                              placeholder="--:--"
-                                                              @if(!$canManageDaily) disabled @endif
+                                                             class="bg-white border text-gray-900 text-[10px] rounded-lg focus:ring-[color:var(--accent-orange)] focus:border-[color:var(--accent-orange)] block w-full py-1 px-1 font-mono text-center shadow-sm border-gray-200"
+                                                             placeholder="--:--"
+                                                             @if(!$canManageDaily || $isHoliday || $isOlderThan7Days) disabled @endif
                                                           >
                                                      </div>
                                                      {{-- divider --}}
@@ -160,14 +160,14 @@
                                                      {{-- Check Out --}}
                                                      <div class="flex-1">
                                                          <input type="time" wire:model.defer="monthlyEditForm.{{ $index }}.periods.{{ $pIndex }}.check_out" 
-                                                              class="bg-white border text-gray-900 text-[10px] rounded-lg focus:ring-[color:var(--accent-orange)] focus:border-[color:var(--accent-orange)] block w-full py-1 px-1 font-mono text-center shadow-sm border-gray-200"
-                                                              placeholder="--:--"
-                                                              @if(!$canManageDaily) disabled @endif
+                                                             class="bg-white border text-gray-900 text-[10px] rounded-lg focus:ring-[color:var(--accent-orange)] focus:border-[color:var(--accent-orange)] block w-full py-1 px-1 font-mono text-center shadow-sm border-gray-200"
+                                                             placeholder="--:--"
+                                                             @if(!$canManageDaily || $isHoliday || $isOlderThan7Days) disabled @endif
                                                           >
                                                      </div>
                                                      {{-- Remove Button --}}
                                                      @if(count($day['periods']) > 1)
-                                                         @if($canManageDaily)
+                                                         @if($canManageDaily && !$isHoliday && !$isOlderThan7Days)
                                                          <button type="button" wire:click="removeMonthlyPeriod({{ $index }}, {{ $pIndex }})" 
                                                              class="text-[color:var(--error)]/70 hover:text-[color:var(--error)] transition-colors p-0.5" title="{{ tr('Remove') }}">
                                                              <i class="fas fa-times-circle text-[10px]"></i>
@@ -177,14 +177,14 @@
                                                  </div>
                                              @endforeach
                                              {{-- Add Period Button --}}
+                                             @if($canManageDaily && !$isHoliday && !$isOlderThan7Days)
                                              <div class="p-1 flex justify-center">
-                                                 @if($canManageDaily)
                                                  <button type="button" wire:click="addMonthlyPeriod({{ $index }})" 
                                                      class="text-[9px] font-bold text-[color:var(--accent-orange)] hover:brightness-90 flex items-center gap-1 transition-colors px-2 py-0.5 rounded-full hover:bg-white border border-transparent hover:border-[color:var(--accent-orange)]/20">
                                                      <i class="fas fa-plus-circle"></i> {{ tr('Add') }}
                                                  </button>
-                                                 @endif
                                              </div>
+                                             @endif
                                          </div>
                                      </td>
 
@@ -203,7 +203,7 @@
                                             wire:model.defer="monthlyEditForm.{{ $index }}.notes" 
                                             placeholder="{{ tr('Add note...') }}" 
                                             class="bg-transparent border border-transparent text-gray-700 text-[11px] rounded transition-all focus:bg-white focus:border-[color:var(--accent-orange)] focus:ring-1 focus:ring-[color:var(--accent-orange)] block w-full py-1 px-2 hover:bg-gray-50 placeholder-gray-300"
-                                            @if(!$canManageDaily) disabled @endif
+                                            @if(!$canManageDaily || $isHoliday || $isOlderThan7Days) disabled @endif
                                         >
                                     </td>
                                 </tr>

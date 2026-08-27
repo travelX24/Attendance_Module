@@ -512,12 +512,27 @@ trait WithAttendanceEdits
 
         $companyId = auth()->user()->saas_company_id;
         
+        $updatedCount = 0;
+
         foreach ($this->monthlyEditForm as $row) {
              if (!$row['id']) continue;
              if (!$this->monthlyEditRowChanged($row)) continue;
 
+             $rowDate = Carbon::parse($row['date']);
+             $isOlderThan7Days = $rowDate->diffInDays(now()) > 7;
+             $isHoliday = ($row['status'] === 'holiday') || ($row['is_official_holiday'] ?? false);
+
+             if ($isHoliday || $isOlderThan7Days) {
+                 $reasonMsg = $isHoliday 
+                     ? tr('Cannot edit attendance on official holiday: ') . $row['date']
+                     : tr('Editing period expired (older than 7 days) for: ') . $row['date'];
+                 $this->dispatch('toast', ['type' => 'error', 'message' => $reasonMsg]);
+                 continue;
+             }
+
              $log = AttendanceDailyLog::forCompany($companyId)->with('details')->find($row['id']);
              if (!$log) continue;
+
 
              $before = $log->toArray();
              
@@ -570,11 +585,15 @@ trait WithAttendanceEdits
                 $log->toArray(),
                 ['reason' => $this->monthlyEditReason, 'bulk_sheet' => true]
              );
+
+             $updatedCount++;
         }
         
         $this->showMonthlyEditModal = false;
         $this->loadStats();
-        $this->dispatch('toast', ['type' => 'success', 'message' => tr('Monthly sheet updated successfully.')]);
+        if ($updatedCount > 0) {
+            $this->dispatch('toast', ['type' => 'success', 'message' => tr('Monthly sheet updated successfully.')]);
+        }
     }
 
     private function monthlyEditRowChanged(array $row): bool

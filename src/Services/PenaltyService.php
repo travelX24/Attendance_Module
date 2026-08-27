@@ -1004,7 +1004,6 @@ class PenaltyService
 
                     if ($overlapEnd->gt($overlapStart)) {
                         $coveredMinutes += (int) $overlapStart->diffInMinutes($overlapEnd);
-                        continue;
                     }
                 }
             } elseif ($type === 'early') {
@@ -1019,12 +1018,9 @@ class PenaltyService
 
                     if ($overlapEnd->gt($overlapStart)) {
                         $coveredMinutes += (int) $overlapStart->diffInMinutes($overlapEnd);
-                        continue;
                     }
                 }
             }
-
-            $coveredMinutes += $permMinutes;
         }
 
         return $coveredMinutes;
@@ -1133,7 +1129,11 @@ class PenaltyService
         if ($exceptionalDay) {
             $isHoliday = isset($exceptionalDay->is_holiday)
                 ? (bool) $exceptionalDay->is_holiday
-                : ((float) ($exceptionalDay->absence_multiplier ?? 1) <= 0 && (float) ($exceptionalDay->late_multiplier ?? 1) <= 0);
+                : (
+                    isset($exceptionalDay->absence_multiplier, $exceptionalDay->late_multiplier)
+                    && (float) $exceptionalDay->absence_multiplier <= 0
+                    && (float) $exceptionalDay->late_multiplier <= 0
+                );
 
             if ($isHoliday) {
                 return (bool) ($exceptionalDay->is_official_holiday ?? false)
