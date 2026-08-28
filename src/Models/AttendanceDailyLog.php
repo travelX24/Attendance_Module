@@ -296,19 +296,13 @@ class AttendanceDailyLog extends Model
         }
         
         if ($foundDetail) {
-            $matchedP = null;
-            $periods = $metrics['periods'] ?? [];
-            foreach ($periods as $pItem) {
-                if (isset($pItem['id']) && $pItem['id'] == $foundDetail->work_schedule_period_id) {
-                    $matchedP = (object)$pItem;
-                    break;
-                }
-            }
+            $periods = collect($metrics['periods'] ?? [])->values();
 
-            // Fallback to index-based if ID doesn't match
-            if (!$matchedP && isset($periods[$foundDetail->work_schedule_period_id - 1])) {
-                $matchedP = (object)$periods[$foundDetail->work_schedule_period_id - 1];
-            }
+            [$matchedP, $matchedPeriodIndex] = $this->resolveMetricPeriodForDetail(
+                $periods,
+                $foundDetail,
+                $logDateStr
+            );
 
             // Case 2: Multi-period or Single period with auto-checkout policy
             if ($matchedP && isset($matchedP->end_time)) {
@@ -320,15 +314,18 @@ class AttendanceDailyLog extends Model
 
                 // --- NEW: Cap auto-checkout at the start of the next period ---
                 $nextPeriodStart = null;
-                $foundCurrent = false;
-                foreach ($periods as $pItem) {
-                    if ($foundCurrent) {
-                        $nextPeriodStart = Carbon::parse($logDateStr . ' ' . $pItem['start_time']);
-                        if ($pItem['is_night_shift'] ?? false) $nextPeriodStart->addDay();
-                        break;
-                    }
-                    if (($pItem['id'] ?? null) == $foundDetail->work_schedule_period_id) {
-                        $foundCurrent = true;
+
+                if ($matchedPeriodIndex !== null) {
+                    $nextPeriod = $periods->get($matchedPeriodIndex + 1);
+
+                    if ($nextPeriod) {
+                        $nextPeriodStart = Carbon::parse(
+                            $logDateStr . ' ' . $nextPeriod['start_time']
+                        );
+
+                        if ($nextPeriod['is_night_shift'] ?? false) {
+                            $nextPeriodStart->addDay();
+                        }
                     }
                 }
 
@@ -373,16 +370,11 @@ class AttendanceDailyLog extends Model
         if (count($periods) > 0) {
             foreach ($details as $detail) {
                 if ($detail->work_schedule_period_id) {
-                    $matchedP = null;
-                    foreach ($periods as $pItem) {
-                        if (isset($pItem['id']) && $pItem['id'] == $detail->work_schedule_period_id) {
-                            $matchedP = (object)$pItem;
-                            break;
-                        }
-                    }
-                    if (!$matchedP && isset($periods[$detail->work_schedule_period_id - 1])) {
-                        $matchedP = (object)$periods[$detail->work_schedule_period_id - 1];
-                    }
+                    [$matchedP] = $this->resolveMetricPeriodForDetail(
+                        $periods,
+                        $detail,
+                        $logDateStr
+                    );
                     
                     if ($matchedP) {
                         // Check if late for this period
@@ -430,6 +422,111 @@ class AttendanceDailyLog extends Model
         
         $this->attendance_status = $newStatus;
     }
+
+
+    /**
+     * Resolve the effective schedule period for an attendance detail.
+     *
+     * Normal days can be matched by the stored work_schedule_period_id.
+     * Schedule exceptions use their own database IDs, so on exception days
+     * we safely fall back to the only period or to the period containing
+     * the employee's actual check-in time.
+     *
+     * @return array{0: ?object, 1: ?int}
+     */
+    private function resolveMetricPeriodForDetail(
+        $periods,
+        $detail,
+        string $logDateStr
+    ): array {
+        $periods = collect($periods)->values();
+
+        if ($periods->isEmpty()) {
+            return [null, null];
+        }
+
+        $storedPeriodId = (int) ($detail->work_schedule_period_id ?? 0);
+
+        // Normal schedule: exact database ID match.
+        if ($storedPeriodId > 0) {
+            foreach ($periods as $index => $period) {
+                $period = is_array($period)
+                    ? $period
+                    : (array) $period;
+
+                if (
+                    isset($period['id'])
+                    && (int) $period['id'] === $storedPeriodId
+                ) {
+                    return [(object) $period, (int) $index];
+                }
+            }
+        }
+
+        // A daily/weekly exception with one effective period.
+        if ($periods->count() === 1) {
+            $period = $periods->first();
+            $period = is_array($period)
+                ? $period
+                : (array) $period;
+
+            return [(object) $period, 0];
+        }
+
+        // Multi-period exception: resolve by actual check-in time.
+        $checkInHm = $this->formatTimeHm($detail->check_in_time ?? null);
+
+        if ($checkInHm) {
+            $actualCheckIn = $this->parseLocalizedCarbon(
+                $logDateStr . ' ' . $checkInHm
+            );
+
+            foreach ($periods as $index => $period) {
+                $period = is_array($period)
+                    ? $period
+                    : (array) $period;
+
+                if (
+                    empty($period['start_time'])
+                    || empty($period['end_time'])
+                ) {
+                    continue;
+                }
+
+                $periodStart = $this->parseLocalizedCarbon(
+                    $logDateStr . ' ' . $period['start_time']
+                );
+
+                $periodEnd = $this->parseLocalizedCarbon(
+                    $logDateStr . ' ' . $period['end_time']
+                );
+
+                if (! $periodStart || ! $periodEnd || ! $actualCheckIn) {
+                    continue;
+                }
+
+                $isNightShift = (bool) ($period['is_night_shift'] ?? false);
+
+                if ($isNightShift || $periodEnd->lt($periodStart)) {
+                    $periodEnd->addDay();
+
+                    if ($actualCheckIn->lt($periodStart)) {
+                        $actualCheckIn = $actualCheckIn->copy()->addDay();
+                    }
+                }
+
+                if (
+                    $actualCheckIn->gte($periodStart)
+                    && $actualCheckIn->lte($periodEnd)
+                ) {
+                    return [(object) $period, (int) $index];
+                }
+            }
+        }
+
+        return [null, null];
+    }
+
 
     public function formatTimeHm($value): ?string
     {
