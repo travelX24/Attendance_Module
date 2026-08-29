@@ -385,6 +385,25 @@ trait WithAttendanceEdits
               ->get();
 
          $this->monthlyEditForm = [];
+
+         // Single source of truth for monthly attendance:
+         // employee effective schedule + exceptions + holidays
+         // + approved leaves + missions + permissions.
+         $workScheduleService = app(
+             \Athka\SystemSettings\Services\WorkScheduleService::class
+         );
+
+         $scheduleHolidays = $workScheduleService->getHolidays(
+             $companyId,
+             $start->toDateString(),
+             $end->toDateString()
+         );
+
+         $employeeRequests = $workScheduleService->getEmployeeRequests(
+             (int) $employee->id,
+             $start->toDateString(),
+             $end->toDateString()
+         );
          
          // Iterate through each day in range
          $current = $start->copy();
@@ -402,55 +421,100 @@ trait WithAttendanceEdits
                       default => tr('Exception'),
                   } : ($compEx instanceof AttendanceExceptionalDay ? $compEx->name : ($compEx ? ($compEx->template?->name ?? tr('Holiday')) : null));
 
-                  $isWeekend = in_array($current->dayOfWeek, [\Carbon\Carbon::FRIDAY, \Carbon\Carbon::SATURDAY]);
+                  $ws = $workScheduleService->getEffectiveSchedule(
+                       $companyId,
+                       $employee,
+                       $dateStr
+                   );
 
-                  // Fetch Schedule periods for this day
-                  $schedPeriods = [];
-                  $dayName = strtolower($current->format('l'));
+                   $metrics = $workScheduleService->getMetricsForDate(
+                       $dateStr,
+                       $ws,
+                       $scheduleHolidays,
+                       $employee,
+                       $employeeRequests
+                   );
 
-                  // Only fetch schedule if it's NOT an "Off Day" exception
-                  $isOffDay = ($ex && in_array($ex->exception_type, ['off_day', 'day_off'], true)) || ($compEx);
+                   $effectiveStatus = (string) (
+                       $metrics['status'] ?? 'no_schedule'
+                   );
 
-                  if (!$isOffDay) {
-                      $ws = app(\Athka\SystemSettings\Services\WorkScheduleService::class)->getEffectiveSchedule($companyId, $employee, $current->toDateString());
+                   // A day is off ONLY when the employee's effective
+                   // schedule says it is off. Weekday names are irrelevant.
+                   $isScheduleDayOff = $effectiveStatus === 'off';
 
-                      if ($ws) {
-                          if (in_array($dayName, is_array($ws->work_days) ? $ws->work_days : [])) {
-                              foreach ($ws->periods as $p) {
-                                  $schedPeriods[] = [
-                                      'start' => $p->start_time ? company_time($p->start_time) : '--:--',
-                                      'end' => $p->end_time ? company_time($p->end_time) : '--:--',
-                                  ];
-                              }
-                          }
-                      }
-                  }
+                   $schedPeriods = collect(
+                       $metrics['periods'] ?? []
+                   )->map(function ($period) {
+                       return [
+                           'start' => !empty($period['start_time'])
+                               ? company_time($period['start_time'])
+                               : '--:--',
 
-                  // Default status for no-work days
-                  $dayOffStatus = 'absent';
-                  if ($ex && in_array($ex->exception_type, ['off_day', 'day_off'], true)) {
-                      $dayOffStatus = 'day_off';
-                  } elseif ($compEx) {
-                      $dayOffStatus = 'holiday';
-                  } elseif ($isWeekend || empty($schedPeriods)) {
-                      $defaultHolidayStatus = (auth()->user()->saas_company_id == 1) ? 'holiday' : 'day_off'; // Consistency
-                      $dayOffStatus = 'day_off'; 
-                      // If it's a weekend or no schedule, it's a Day Off/Holiday
-                      $dayOffStatus = 'day_off';
-                  }
+                           'end' => !empty($period['end_time'])
+                               ? company_time($period['end_time'])
+                               : '--:--',
+
+                           'is_leave' => (bool) (
+                               $period['is_leave'] ?? false
+                           ),
+
+                           'leave_name' =>
+                               $period['leave_name'] ?? null,
+                       ];
+                   })->values()->all();
+
+                   // Preserve meaningful names returned by the engine.
+                   if (!$exceptionName) {
+                       $exceptionName = match ($effectiveStatus) {
+                           'holiday', 'mission' =>
+                               $metrics['holiday_name'] ?? null,
+
+                           'on_leave' =>
+                               $metrics['leave_name'] ?? null,
+
+                           default => null,
+                       };
+                   }
+
+                   $isException = $isException || in_array(
+                       $effectiveStatus,
+                       ['holiday', 'on_leave', 'mission'],
+                       true
+                   );
+
+                   $dayOffStatus = match ($effectiveStatus) {
+                       'off'         => 'day_off',
+                       'holiday'     => 'holiday',
+                       'on_leave'    => 'on_leave',
+                       'mission'     => 'mission',
+                       'no_schedule' => 'no_schedule',
+                       default       => 'absent',
+                   };
+
 
                   if ($log) {
                       $displayStatus = $log->attendance_status;
                       
                       // If it's an exception day but log says absent, force it to show exception status
-                      if ($displayStatus === 'absent' && $isException && empty($log->check_in_time)) {
-                           $displayStatus = ($compEx) ? 'holiday' : (($ex && in_array($ex->exception_type, ['off_day', 'day_off'], true)) ? 'day_off' : 'absent');
-                      }
+                      if (
+                           $displayStatus === 'absent'
+                           && empty($log->check_in_time)
+                       ) {
+                           $displayStatus = match ($effectiveStatus) {
+                               'off'         => 'day_off',
+                               'holiday'     => 'holiday',
+                               'on_leave'    => 'on_leave',
+                               'mission'     => 'mission',
+                               'no_schedule' => 'no_schedule',
+                               default       => $displayStatus,
+                           };
+                       }
 
                       $day = [
                           'id' => $log->id, 
                           'date' => $dateStr,
-                          'is_weekend' => $isWeekend,
+                          'is_day_off' => $isScheduleDayOff,
                           'status' => $displayStatus,
                           'scheduled_periods' => $schedPeriods,
                           'periods' => $log->details->isNotEmpty() ? $log->details->map(fn($d) => [
@@ -472,7 +536,7 @@ trait WithAttendanceEdits
                       $day = [
                           'id' => null, 
                           'date' => $dateStr,
-                          'is_weekend' => $isWeekend,
+                          'is_day_off' => $isScheduleDayOff,
                           'status' => $dayOffStatus, 
                           'scheduled_periods' => $schedPeriods,
                           'periods' => [['id' => null, 'check_in' => '', 'check_out' => '']], 
