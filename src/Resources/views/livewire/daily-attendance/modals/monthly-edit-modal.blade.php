@@ -71,9 +71,9 @@
                                     $dayDate = \Carbon\Carbon::parse($day['date']);
                                     $isOlderThan7Days = $dayDate->diffInDays(now()) > 7;
                                     $isHoliday = $day['status'] === 'holiday' || ($day['is_official_holiday'] ?? false);
-                                    $isDayOff = $day['status'] === 'day_off' || $day['is_weekend'];
+                                    $isDayOff = $day['status'] === 'day_off' || ($day['is_day_off'] ?? false);
                                 @endphp
-                                <tr class="group hover:bg-gray-50 transition-colors {{ $day['is_weekend'] ? 'bg-gray-50/40' : '' }}">
+                                <tr class="group hover:bg-gray-50 transition-colors {{ ($day['is_day_off'] ?? false) ? 'bg-gray-50/40' : '' }}">
                                     <!-- Date & Restriction Badges -->
                                     <td class="px-4 py-2 whitespace-nowrap">
                                         <div class="flex flex-col">
@@ -86,7 +86,7 @@
                                                 </span>
                                             @elseif($isDayOff)
                                                 <span class="inline-flex items-center gap-1 text-[9px] font-bold text-gray-600 bg-gray-100 px-1.5 py-0.5 rounded border border-gray-200 mt-1 w-max">
-                                                    <i class="fas fa-bed text-[9px]"></i> {{ tr('Day Off / Weekend') }}
+                                                    <i class="fas fa-bed text-[9px]"></i> {{ tr('Day Off') }}
                                                 </span>
                                             @endif
 
