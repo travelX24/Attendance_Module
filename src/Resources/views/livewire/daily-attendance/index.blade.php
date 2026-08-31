@@ -162,6 +162,7 @@
                                 ['value' => 'on_leave', 'label' => tr('On Leave')],
                                 ['value' => 'early_departure', 'label' => tr('Early Departure')],
                                 ['value' => 'auto_checkout', 'label' => tr('Auto Checkout')],
+                            ['value' => 'day_off', 'label' => tr('Day Off')],
                             ]"
                             width="full"
                             :defer="false"

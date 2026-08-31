@@ -229,10 +229,24 @@ trait WithAttendanceFilters
 
         // ==================== SUMMARY VIEW (Grouped by Employee) ====================
         if ($this->view_mode === 'summary') {
+            $summaryScheduleStart = $this->date_from ?: now()->startOfMonth()->toDateString();
+            $summaryScheduleEnd = $this->date_to ?: now()->endOfMonth()->toDateString();
             $employeeQuery = Employee::withoutGlobalScope('active_only')
                 ->forCompany($companyId)
                 ->with('branch')
                 ->when($this->status !== 'all', fn($q) => $q->where('status', (string)$this->status));
+
+            $employeeQuery->whereExists(function ($scheduleQ) use ($companyId, $summaryScheduleStart, $summaryScheduleEnd) {
+                $scheduleQ->selectRaw('1')
+                    ->from('employee_work_schedules as scheduled_ews')
+                    ->whereColumn('scheduled_ews.employee_id', 'employees.id')
+                    ->where('scheduled_ews.saas_company_id', $companyId)
+                    ->whereDate('scheduled_ews.start_date', '<=', $summaryScheduleEnd)
+                    ->where(function ($rangeQ) use ($summaryScheduleStart) {
+                        $rangeQ->whereNull('scheduled_ews.end_date')
+                            ->orWhereDate('scheduled_ews.end_date', '>=', $summaryScheduleStart);
+                    });
+            });
 
             // Data scoping.
             $employeeQuery = $this->applyDataScoping($employeeQuery, 'attendance.daily.view', 'attendance.daily.view-subordinates', '');
@@ -433,6 +447,18 @@ trait WithAttendanceFilters
 
         // Data scoping.
         $query = $this->applyDataScoping($query, 'attendance.daily.view', 'attendance.daily.view-subordinates');
+
+        $query->whereExists(function ($scheduleQ) use ($companyId) {
+            $scheduleQ->selectRaw('1')
+                ->from('employee_work_schedules as scheduled_ews')
+                ->whereColumn('scheduled_ews.employee_id', 'attendance_daily_logs.employee_id')
+                ->where('scheduled_ews.saas_company_id', $companyId)
+                ->whereColumn('scheduled_ews.start_date', '<=', 'attendance_daily_logs.attendance_date')
+                ->where(function ($rangeQ) {
+                    $rangeQ->whereNull('scheduled_ews.end_date')
+                        ->orWhereColumn('scheduled_ews.end_date', '>=', 'attendance_daily_logs.attendance_date');
+                });
+        });
 
         $allowed = $this->allowedBranchIds();
         if (!empty($allowed)) {

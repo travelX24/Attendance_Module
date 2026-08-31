@@ -120,6 +120,18 @@ class Index extends Component
         // Data scoping (Admin vs Subordinates)
         $query = $this->applyDataScoping($query, 'attendance.daily.view', 'attendance.daily.view-subordinates');
 
+        $query->whereExists(function ($scheduleQ) use ($companyId) {
+            $scheduleQ->selectRaw('1')
+                ->from('employee_work_schedules as scheduled_ews')
+                ->whereColumn('scheduled_ews.employee_id', 'attendance_daily_logs.employee_id')
+                ->where('scheduled_ews.saas_company_id', $companyId)
+                ->whereColumn('scheduled_ews.start_date', '<=', 'attendance_daily_logs.attendance_date')
+                ->where(function ($rangeQ) {
+                    $rangeQ->whereNull('scheduled_ews.end_date')
+                        ->orWhereColumn('scheduled_ews.end_date', '>=', 'attendance_daily_logs.attendance_date');
+                });
+        });
+
         // Allowed branches scope
         $allowed = $this->allowedBranchIds();
         if (!empty($allowed)) {
@@ -190,6 +202,18 @@ class Index extends Component
 
         // Data scoping
         $pendingQ = $this->applyDataScoping($pendingQ, 'attendance.daily.view', 'attendance.daily.view-subordinates');
+
+        $pendingQ->whereExists(function ($scheduleQ) use ($companyId) {
+            $scheduleQ->selectRaw('1')
+                ->from('employee_work_schedules as scheduled_ews')
+                ->whereColumn('scheduled_ews.employee_id', 'attendance_daily_logs.employee_id')
+                ->where('scheduled_ews.saas_company_id', $companyId)
+                ->whereColumn('scheduled_ews.start_date', '<=', 'attendance_daily_logs.attendance_date')
+                ->where(function ($rangeQ) {
+                    $rangeQ->whereNull('scheduled_ews.end_date')
+                        ->orWhereColumn('scheduled_ews.end_date', '>=', 'attendance_daily_logs.attendance_date');
+                });
+        });
 
         if (!empty($allowed)) {
             $pendingQ->whereHas('employee', fn ($q) => $q->whereIn('branch_id', $allowed));

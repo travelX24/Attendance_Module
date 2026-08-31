@@ -806,7 +806,7 @@ trait WithScheduleAssignments
 
     $companyId = $this->getCompanyId();
 
-        $empQ = Employee::forCompany($companyId)->whereKey($employeeId);
+        $empQ = Employee::withoutGlobalScope('active_only')->forCompany($companyId)->whereKey($employeeId);
 
         $locationCol = $this->resolveEmployeeLocationColumn();
         if ($locationCol && !empty($this->allowedLocationIds)) {
@@ -888,7 +888,7 @@ public function generateSchedulePreview(): void
 private function buildSchedulePreview($employeeOrId, int $companyId, Carbon $from, Carbon $to): array
 {
     $employeeId = is_object($employeeOrId) ? $employeeOrId->id : (int) $employeeOrId;
-    $employeeObj = is_object($employeeOrId) ? $employeeOrId : Employee::find($employeeId);
+    $employeeObj = is_object($employeeOrId) ? $employeeOrId : Employee::withoutGlobalScope('active_only')->forCompany($companyId)->find($employeeId);
 
     $assignments = EmployeeWorkSchedule::query()
         ->where('employee_id', $employeeId)

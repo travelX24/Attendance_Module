@@ -191,38 +191,248 @@ class AttendanceDailyLog extends Model
 
     public function calculateCompliance(): void
     {
-        if ((float)$this->scheduled_hours <= 0) {
-            $this->compliance_percentage = 100;
+        if (
+            in_array($this->attendance_status, ['absent', 'day_off', 'holiday'], true)
+            || (float) $this->scheduled_hours <= 0
+        ) {
+            $this->compliance_percentage = 0;
             return;
         }
 
-        $compliancePoints = 0;
-        $totalScheduledMinutes = (float)$this->scheduled_hours * 60;
-        $lateMinutes = 0;
-        $earlyMinutes = 0;
-        
         $dateCarbon = $this->parseLocalizedCarbon($this->attendance_date);
-        $dateStr = $dateCarbon ? $dateCarbon->toDateString() : now()->toDateString();
+        $dateStr = $dateCarbon
+            ? $dateCarbon->toDateString()
+            : now()->toDateString();
 
-        if ($this->scheduled_check_in && $this->check_in_time) {
-            $sIn = $this->parseLocalizedCarbon($dateStr . " " . $this->formatTimeHm($this->scheduled_check_in));
-            $aIn = $this->parseLocalizedCarbon($dateStr . " " . $this->formatTimeHm($this->check_in_time));
-            if ($aIn && $sIn && $aIn->gt($sIn)) {
-                $lateMinutes = $aIn->diffInMinutes($sIn);
+        $periods = collect($this->tempMetrics['periods'] ?? [])->values();
+
+        // If metrics were not already prepared by syncWithSchedule(),
+        // resolve them using the effective schedule for this attendance date.
+        if ($periods->isEmpty()) {
+            try {
+                $scheduleService = app(\Athka\SystemSettings\Services\WorkScheduleService::class);
+
+                $employee = $this->employee;
+
+                $effectiveSchedule = $this->preFetchedSchedule
+                    ?? $scheduleService->getEffectiveSchedule(
+                        $this->saas_company_id,
+                        $employee,
+                        $dateStr
+                    );
+
+                $holidays = $this->preFetchedHolidays
+                    ?? $scheduleService->getHolidays(
+                        $this->saas_company_id,
+                        $dateStr,
+                        $dateStr
+                    );
+
+                $metrics = $scheduleService->getMetricsForDate(
+                    $dateStr,
+                    $effectiveSchedule,
+                    $holidays,
+                    $employee,
+                    $this->preFetchedRequests ?? []
+                );
+
+                $this->tempMetrics = $metrics;
+                $periods = collect($metrics['periods'] ?? [])->values();
+            } catch (\Throwable $e) {
+                // Legacy/fallback records can still be calculated below.
             }
         }
 
-        if ($this->scheduled_check_out && $this->check_out_time) {
-            $sOut = $this->parseLocalizedCarbon($dateStr . " " . $this->formatTimeHm($this->scheduled_check_out));
-            $aOut = $this->parseLocalizedCarbon($dateStr . " " . $this->formatTimeHm($this->check_out_time));
-            if ($aOut && $sOut && $aOut->lt($sOut)) {
-                $earlyMinutes = $sOut->diffInMinutes($aOut);
+        $makeInterval = function ($from, $to, bool $nightShift = false) use ($dateStr): ?array {
+            $fromHm = $this->formatTimeHm($from);
+            $toHm = $this->formatTimeHm($to);
+
+            if (! $fromHm || ! $toHm) {
+                return null;
+            }
+
+            $start = $this->parseLocalizedCarbon($dateStr . ' ' . $fromHm);
+            $end = $this->parseLocalizedCarbon($dateStr . ' ' . $toHm);
+
+            if (! $start || ! $end) {
+                return null;
+            }
+
+            if ($nightShift || $end->lt($start)) {
+                $end = $end->copy()->addDay();
+            }
+
+            return [$start, $end];
+        };
+
+        // Build actual attendance intervals.
+        $actualIntervals = collect();
+
+        $details = $this->relationLoaded('details')
+            ? $this->details
+            : $this->details()->get();
+
+        foreach ($details as $detail) {
+            if (! $detail->check_in_time || ! $detail->check_out_time) {
+                continue;
+            }
+
+            $interval = $makeInterval(
+                $detail->check_in_time,
+                $detail->check_out_time
+            );
+
+            if ($interval) {
+                $actualIntervals->push($interval);
             }
         }
 
-        $workedMinutes = $totalScheduledMinutes - $lateMinutes - $earlyMinutes;
-        $this->compliance_percentage = $totalScheduledMinutes > 0 ? round(($workedMinutes / $totalScheduledMinutes) * 100, 2) : 0;
-        if ($this->compliance_percentage < 0) $this->compliance_percentage = 0;
+        // Legacy records may not have details.
+        if (
+            $actualIntervals->isEmpty()
+            && $this->check_in_time
+            && $this->check_out_time
+        ) {
+            $interval = $makeInterval(
+                $this->check_in_time,
+                $this->check_out_time
+            );
+
+            if ($interval) {
+                $actualIntervals->push($interval);
+            }
+        }
+
+        if ($actualIntervals->isEmpty()) {
+            $this->compliance_percentage = 0;
+            return;
+        }
+
+        $scheduledMinutes = 0.0;
+        $coveredMinutes = 0.0;
+
+        if ($periods->isNotEmpty()) {
+            foreach ($periods as $period) {
+                $period = is_array($period)
+                    ? $period
+                    : (array) $period;
+
+                if (
+                    empty($period['start_time'])
+                    || empty($period['end_time'])
+                ) {
+                    continue;
+                }
+
+                // An approved partial-leave period is not required attendance.
+                if (! empty($period['is_leave'])) {
+                    continue;
+                }
+
+                $periodInterval = $makeInterval(
+                    $period['start_time'],
+                    $period['end_time'],
+                    (bool) ($period['is_night_shift'] ?? false)
+                );
+
+                if (! $periodInterval) {
+                    continue;
+                }
+
+                [$periodStart, $periodEnd] = $periodInterval;
+
+                $periodMinutes = $periodStart->diffInMinutes(
+                    $periodEnd,
+                    true
+                );
+
+                $scheduledMinutes += $periodMinutes;
+
+                $overlaps = [];
+
+                foreach ($actualIntervals as [$actualStart, $actualEnd]) {
+                    // Align attendance crossing midnight with a night period.
+                    if (
+                        $periodEnd->isNextDay($periodStart)
+                        && $actualStart->lt($periodStart)
+                    ) {
+                        $actualStart = $actualStart->copy()->addDay();
+                        $actualEnd = $actualEnd->copy()->addDay();
+                    }
+
+                    $overlapStart = $actualStart->gt($periodStart)
+                        ? $actualStart->copy()
+                        : $periodStart->copy();
+
+                    $overlapEnd = $actualEnd->lt($periodEnd)
+                        ? $actualEnd->copy()
+                        : $periodEnd->copy();
+
+                    if ($overlapEnd->gt($overlapStart)) {
+                        $overlaps[] = [$overlapStart, $overlapEnd];
+                    }
+                }
+
+                // Merge overlaps so duplicate/overlapping details cannot
+                // count the same scheduled minute more than once.
+                usort(
+                    $overlaps,
+                    fn ($a, $b) => $a[0]->getTimestamp() <=> $b[0]->getTimestamp()
+                );
+
+                $merged = [];
+
+                foreach ($overlaps as $segment) {
+                    if (empty($merged)) {
+                        $merged[] = $segment;
+                        continue;
+                    }
+
+                    $lastIndex = count($merged) - 1;
+
+                    if ($segment[0]->lte($merged[$lastIndex][1])) {
+                        if ($segment[1]->gt($merged[$lastIndex][1])) {
+                            $merged[$lastIndex][1] = $segment[1];
+                        }
+                    } else {
+                        $merged[] = $segment;
+                    }
+                }
+
+                foreach ($merged as [$from, $to]) {
+                    $coveredMinutes += $from->diffInMinutes($to, true);
+                }
+            }
+        }
+
+        // Fallback for legacy records where period definitions are unavailable.
+        if ($scheduledMinutes <= 0) {
+            $scheduledMinutes = (float) $this->scheduled_hours * 60;
+
+            foreach ($actualIntervals as [$from, $to]) {
+                $coveredMinutes += $from->diffInMinutes($to, true);
+            }
+        }
+
+        if ($scheduledMinutes <= 0) {
+            $this->compliance_percentage = 0;
+            return;
+        }
+
+        $coveredMinutes = max(
+            0,
+            min($scheduledMinutes, $coveredMinutes)
+        );
+
+        $this->compliance_percentage = round(
+            ($coveredMinutes / $scheduledMinutes) * 100,
+            2
+        );
+
+        $this->compliance_percentage = max(
+            0,
+            min(100, $this->compliance_percentage)
+        );
     }
 
     public function calculateActualHours(): void
@@ -235,7 +445,7 @@ class AttendanceDailyLog extends Model
                     $in = $this->parseLocalizedCarbon($detail->check_in_time);
                     $out = $this->parseLocalizedCarbon($detail->check_out_time);
                     if ($in && $out) {
-                        $totalMinutes += $out->diffInMinutes($in);
+                        $totalMinutes += $out->diffInMinutes($in, true);
                     }
                 }
             }
@@ -245,7 +455,7 @@ class AttendanceDailyLog extends Model
 
         $checkIn = $this->parseLocalizedCarbon($this->check_in_time);
         $checkOut = $this->parseLocalizedCarbon($this->check_out_time);
-        $this->actual_hours = ($checkIn && $checkOut) ? round($checkOut->diffInMinutes($checkIn) / 60, 2) : 0;
+        $this->actual_hours = ($checkIn && $checkOut) ? round($checkOut->diffInMinutes($checkIn, true) / 60, 2) : 0;
     }
 
     public function calculateStatus(): void

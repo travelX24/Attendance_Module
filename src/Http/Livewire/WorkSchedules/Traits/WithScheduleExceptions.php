@@ -272,7 +272,7 @@ trait WithScheduleExceptions
         $this->requireAttendanceAny(['attendance.schedules.view', 'attendance.schedules.view-subordinates']);
         $this->resetModalFlags();
         $companyId = $this->getCompanyId();
-        $emp = Employee::forCompany($companyId)->findOrFail($employeeId);
+        $emp = Employee::withoutGlobalScope('active_only')->forCompany($companyId)->findOrFail($employeeId);
         $this->historyEmployeeName = app()->isLocale('ar') ? ($emp->name_ar ?: $emp->name_en) : ($emp->name_en ?: $emp->name_ar);
         $this->historyList = AttendanceAuditLog::where('saas_company_id', $companyId)
             ->where('employee_id', $employeeId)
