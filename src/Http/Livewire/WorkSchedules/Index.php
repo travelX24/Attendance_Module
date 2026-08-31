@@ -357,9 +357,19 @@ class Index extends Component
         }
 
         $contractTypes = [];
+        $contractFilterTypes = [];
         $contractCol = $this->resolveEmployeeContractTypeColumn();
         if ($contractCol) {
             $contractTypes = Employee::withoutGlobalScope('active_only')->forCompany($companyId)->when($this->status !== 'all', fn($q) => $q->where('status', $this->status))->whereNotNull($contractCol)->distinct()->pluck($contractCol)->filter()->values()->all();
+
+            $contractFilterTypes = Employee::withoutGlobalScope('active_only')
+                ->forCompany($companyId)
+                ->whereNotNull($contractCol)
+                ->distinct()
+                ->pluck($contractCol)
+                ->filter()
+                ->values()
+                ->all();
         }
 
         $employees = $query->paginate(10);
@@ -421,6 +431,7 @@ class Index extends Component
             'jobTitles'      => $jobTitles,
             'locations'      => $locations,
             'contractTypes'  => $contractTypes,
+            'contractFilterTypes' => $contractFilterTypes,
             'summaryDays'    => $summaryDays,
             'summaryData'    => $summaryData,
         ])->layout('layouts.company-admin');

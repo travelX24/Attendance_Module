@@ -296,7 +296,7 @@
                         model="contract_type"
                         :label="tr('Contract Type')"
                         :placeholder="tr('All Types')"
-                        :options="array_merge([['value' => 'all', 'label' => tr('All')]], array_map(fn($t) => ['value' => (string)$t, 'label' => tr($t)], $contractTypes))"
+                        :options="array_merge([['value' => 'all', 'label' => tr('All')]], array_map(fn($t) => ['value' => (string)$t, 'label' => tr($t)], $contractFilterTypes))"
                         width="full"
                         :defer="false"
                         :applyOnChange="true"
