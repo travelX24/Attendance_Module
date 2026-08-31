@@ -885,7 +885,10 @@ class PenaltyService
 
     private function hasApprovedPermissionForViolation(AttendanceDailyLog $log, string $violationType): bool
     {
-        if ($violationType === 'absent' && ! $this->hasAnyActualAttendance($log)) {
+        if ($violationType === 'absent') {
+            // Permission-covered minutes are already deducted before a late/early
+            // violation is converted to absence. Do not waive the remaining
+            // converted violation again because of the same approved permission.
             return false;
         }
 
