@@ -16,6 +16,8 @@ use Carbon\Carbon;
 class PenaltyService
 {
     private array $skipReasons = [];
+    private array $employeeGroupCache = [];
+    private array $attendanceWarnings = [];
     /**
      * Run penalty calculation for one specific day.
      *
@@ -34,6 +36,8 @@ class PenaltyService
     public function calculateForRange($dateFrom, $dateTo, $companyId, array $employeeIds = []): array
     {
         $this->skipReasons = [];
+        $this->employeeGroupCache = [];
+        $this->attendanceWarnings = [];
 
         DB::disableQueryLog();
 
@@ -72,6 +76,7 @@ class PenaltyService
             'processed' => $processed,
             'created' => $createdOrUpdated,
             'skipped' => $this->skipReasons,
+            'warnings' => $this->attendanceWarnings,
         ];
     }
 
@@ -140,6 +145,28 @@ class PenaltyService
     }
 
     /**
+     * Resolve the employee group once per calculation run.
+     *
+     * The lookup itself is unchanged; only repeated identical queries are avoided.
+     */
+    private function resolveEmployeeGroup(int $employeeId): ?object
+    {
+        if (array_key_exists($employeeId, $this->employeeGroupCache)) {
+            return $this->employeeGroupCache[$employeeId];
+        }
+
+        return $this->employeeGroupCache[$employeeId] = DB::table('employee_group_members')
+            ->join('employee_groups', 'employee_group_members.group_id', '=', 'employee_groups.id')
+            ->where('employee_group_members.employee_id', $employeeId)
+            ->select(
+                'employee_groups.applied_policy_id',
+                'employee_groups.grace_source',
+                'employee_groups.grace_setting_id'
+            )
+            ->first();
+    }
+
+    /**
      * @return bool true if any penalty was created/updated
      */
     public function calculatePenaltyForLog(AttendanceDailyLog $log): bool
@@ -157,15 +184,7 @@ class PenaltyService
             return false;
         }
 
-        $group = DB::table('employee_group_members')
-            ->join('employee_groups', 'employee_group_members.group_id', '=', 'employee_groups.id')
-            ->where('employee_group_members.employee_id', $employee->id)
-            ->select(
-                'employee_groups.applied_policy_id',
-                'employee_groups.grace_source',
-                'employee_groups.grace_setting_id'
-            )
-            ->first();
+        $group = $this->resolveEmployeeGroup((int) $employee->id);
 
         $policyId = $group
             ? (int) $group->applied_policy_id
@@ -178,7 +197,15 @@ class PenaltyService
         $lateMinutes = $this->getLateMinutes($log);
         $earlyMinutes = $this->getEarlyDepartureMinutes($log);
 
-        if ((string) $log->attendance_status === 'absent') {
+        $forcedAbsenceReason = $this->forcedAbsenceReasonForInvalidAttendance(
+            $log,
+            $policyId
+        );
+
+        if ($forcedAbsenceReason !== null) {
+            $targetViolationTypes = ['absent'];
+            $this->markAttendanceWarning($forcedAbsenceReason);
+        } elseif ((string) $log->attendance_status === 'absent') {
             $targetViolationTypes = ['absent'];
         } elseif ((string) $log->attendance_status === 'auto_checkout') {
             $grace = $this->resolveCompanyGraceSetting(
@@ -1133,6 +1160,223 @@ class PenaltyService
         return $total;
     }
 
+
+    /**
+     * Detect legacy/external attendance that must be treated as absence
+     * during penalty calculation.
+     *
+     * This does not invent a new 60-minute value. The allowed threshold
+     * comes from the active UnexcusedAbsencePolicy.
+     */
+    private function forcedAbsenceReasonForInvalidAttendance(
+        AttendanceDailyLog $log,
+        int $policyId
+    ): ?string {
+        $bounds = $this->resolveAttendanceBoundsForPenalty($log);
+
+        if ($bounds === null) {
+            return null;
+        }
+
+        $actualIn = $bounds['actual_in'];
+        $actualOut = $bounds['actual_out'];
+        $scheduledEnd = $bounds['scheduled_end'];
+
+        if (
+            ! $actualIn instanceof Carbon
+            || ! $scheduledEnd instanceof Carbon
+        ) {
+            return null;
+        }
+
+        $threshold = $this->resolveAbsenceLateThreshold(
+            (int) $log->saas_company_id,
+            $policyId
+        );
+
+        return $this->resolveForcedAbsenceReason(
+            $actualIn,
+            $actualOut,
+            $scheduledEnd,
+            $threshold
+        );
+    }
+
+    /**
+     * Executable business rule used after attendance timestamps have been
+     * normalized, including legitimate overnight schedules.
+     */
+    private function resolveForcedAbsenceReason(
+        \DateTimeInterface $actualIn,
+        ?\DateTimeInterface $actualOut,
+        \DateTimeInterface $scheduledEnd,
+        int $threshold
+    ): ?string {
+        if (
+            $actualOut
+            && $actualIn->getTimestamp() > $actualOut->getTimestamp()
+        ) {
+            return 'invalid_attendance_order';
+        }
+
+        if ($threshold <= 0) {
+            return null;
+        }
+
+        $absenceBoundary = (clone $scheduledEnd)->modify(
+            "+{$threshold} minutes"
+        );
+
+        if (
+            $actualIn->getTimestamp()
+            > $absenceBoundary->getTimestamp()
+        ) {
+            return 'attendance_after_schedule_end';
+        }
+
+        return null;
+    }
+    /**
+     * @return array{
+     *   scheduled_start:Carbon,
+     *   scheduled_end:Carbon,
+     *   actual_in:Carbon,
+     *   actual_out:?Carbon
+     * }|null
+     */
+    private function resolveAttendanceBoundsForPenalty(
+        AttendanceDailyLog $log
+    ): ?array {
+        $scheduledStart = $this->parseTimeOnDate(
+            $log->attendance_date,
+            $log->scheduled_check_in
+        );
+
+        $scheduledEnd = $this->parseTimeOnDate(
+            $log->attendance_date,
+            $log->scheduled_check_out
+        );
+
+        $actualIn = $this->parseTimeOnDate(
+            $log->attendance_date,
+            $log->check_in_time
+        );
+
+        $actualOut = $this->parseTimeOnDate(
+            $log->attendance_date,
+            $log->check_out_time
+        );
+
+        /*
+         * Legacy fallback when parent fields are incomplete.
+         * Only use one unambiguous real work schedule period.
+         */
+        if (! $scheduledStart || ! $scheduledEnd || ! $actualIn) {
+            $details = DB::table('attendance_daily_details')
+                ->where('daily_log_id', $log->id)
+                ->whereNotNull('check_in_time')
+                ->orderBy('id')
+                ->get();
+
+            $periodIds = $details
+                ->pluck('work_schedule_period_id')
+                ->filter()
+                ->unique()
+                ->values();
+
+            if ($periodIds->count() === 1) {
+                $periodId = (int) $periodIds->first();
+
+                $period = DB::table('work_schedule_periods')
+                    ->where('id', $periodId)
+                    ->first();
+
+                $detail = $details->firstWhere(
+                    'work_schedule_period_id',
+                    $periodId
+                );
+
+                if ($period && $detail) {
+                    $scheduledStart ??= $this->parseTimeOnDate(
+                        $log->attendance_date,
+                        $period->start_time
+                    );
+
+                    $scheduledEnd ??= $this->parseTimeOnDate(
+                        $log->attendance_date,
+                        $period->end_time
+                    );
+
+                    $actualIn ??= $this->parseTimeOnDate(
+                        $log->attendance_date,
+                        $detail->check_in_time
+                    );
+
+                    $actualOut ??= $this->parseTimeOnDate(
+                        $log->attendance_date,
+                        $detail->check_out_time
+                    );
+                }
+            }
+        }
+
+        if (! $scheduledStart || ! $scheduledEnd || ! $actualIn) {
+            return null;
+        }
+
+        /*
+         * Preserve legitimate overnight schedules.
+         */
+        $isNightShift = $scheduledEnd->lt($scheduledStart);
+
+        if ($isNightShift) {
+            $scheduledEnd->addDay();
+
+            if ($actualIn->lt($scheduledStart)) {
+                $actualIn->addDay();
+            }
+
+            if ($actualOut && $actualOut->lt($scheduledStart)) {
+                $actualOut->addDay();
+            }
+        }
+
+        return [
+            'scheduled_start' => $scheduledStart,
+            'scheduled_end' => $scheduledEnd,
+            'actual_in' => $actualIn,
+            'actual_out' => $actualOut,
+        ];
+    }
+
+    /**
+     * Resolve the configured absence threshold using the same policy scope
+     * already used by late/early absence conversion.
+     */
+    private function resolveAbsenceLateThreshold(
+        int $companyId,
+        int $policyId
+    ): int {
+        return (int) UnexcusedAbsencePolicy::query()
+            ->where('saas_company_id', $companyId)
+            ->where(function ($query) use ($policyId) {
+                $query->where('policy_id', $policyId)
+                    ->orWhereNull('policy_id');
+            })
+            ->where('is_active', true)
+            ->where(function ($query) {
+                $query->where('is_enabled', true)
+                    ->orWhereNull('is_enabled');
+            })
+            ->where('late_minutes', '>', 0)
+            ->min('late_minutes');
+    }
+
+    private function markAttendanceWarning(string $reason): void
+    {
+        $this->attendanceWarnings[$reason] =
+            ($this->attendanceWarnings[$reason] ?? 0) + 1;
+    }
     private function calendarPenaltySkipReason(AttendanceDailyLog $log): ?string
     {
         $employee = $log->employee;
