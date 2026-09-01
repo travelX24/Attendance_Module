@@ -16,7 +16,7 @@ trait WithAttendanceEdits
         'periods' => [], // Dynamic periods: [['check_in_time' => '', 'check_out_time' => '']]
         'reason' => '',
     ];
-    
+
     public $editHistory = [];
 
     public $editAttachment = null;
@@ -65,7 +65,7 @@ trait WithAttendanceEdits
         $this->editingEmployeeName = $log->employee->name_ar ?? $log->employee->name_en;
         $this->editingEmployeeId = $log->employee->employee_no;
         $this->editingDate = company_date($log->attendance_date);
-        
+
         // Fetch Schedule structure using the service to account for exceptions
         $companyId = auth()->user()->saas_company_id;
         $date = Carbon::parse($log->attendance_date);
@@ -106,13 +106,16 @@ trait WithAttendanceEdits
 
                 // Initialize with EMPTY values by default
                 $this->editForm['periods'][] = [
-                    'check_in_time' => '', 
+                    'check_in_time' => '',
                     'check_out_time' => '',
-                    'scheduled_in' => $sIn,   
-                    'scheduled_out' => $sOut, 
+                    'work_schedule_period_id' => isset($p->id) && $p->id
+                        ? (int) $p->id
+                        : null,
+                    'scheduled_in' => $sIn,
+                    'scheduled_out' => $sOut,
                 ];
             }
-            
+
             // Now populate values from existing log data
             // We prioritize structured check_attempts, otherwise we pull from the detailed pulses table            // Map discovered punches to the period structure
             $punches = [];
@@ -120,6 +123,9 @@ trait WithAttendanceEdits
             $punches = $log->details()->orderBy('check_in_time', 'asc')->get()->map(fn($d) => [
                 'check_in_time' => $d->check_in_time ? Carbon::parse($d->check_in_time)->format('H:i') : '',
                 'check_out_time' => $d->check_out_time ? Carbon::parse($d->check_out_time)->format('H:i') : '',
+                'work_schedule_period_id' => $d->work_schedule_period_id
+                    ? (int) $d->work_schedule_period_id
+                    : null,
             ])->toArray();
 
             // Fallback to main log if details are empty
@@ -135,11 +141,17 @@ trait WithAttendanceEdits
                 if (isset($this->editForm['periods'][$i])) {
                     $this->editForm['periods'][$i]['check_in_time'] = $punch['check_in_time'] ?? '';
                     $this->editForm['periods'][$i]['check_out_time'] = $punch['check_out_time'] ?? '';
+
+                    if (! empty($punch['work_schedule_period_id'])) {
+                        $this->editForm['periods'][$i]['work_schedule_period_id']
+                            = (int) $punch['work_schedule_period_id'];
+                    }
                 } else {
                     // Extra punch record beyond schedule structure, add a new row
                     $this->editForm['periods'][] = [
                         'check_in_time' => $punch['check_in_time'] ?? '',
                         'check_out_time' => $punch['check_out_time'] ?? '',
+                        'work_schedule_period_id' => $punch['work_schedule_period_id'] ?? null,
                         'scheduled_in' => null,
                         'scheduled_out' => null,
                     ];
@@ -154,7 +166,7 @@ trait WithAttendanceEdits
                 'scheduled_in' => null,
                 'scheduled_out' => null,
             ];
-            
+
             $this->editForm['periods'] = [$defaultPeriod];
         }
 
@@ -163,7 +175,7 @@ trait WithAttendanceEdits
 
         // Initialize reason with the most recent one if it exists to show continuity
         $this->editForm['reason'] = count($this->editHistory) > 0 ? $this->editHistory[0]['reason'] : '';
-        
+
         $this->showEditModal = true;
     }
 
@@ -224,9 +236,11 @@ trait WithAttendanceEdits
         $this->requireAttendanceAny('attendance.daily.manage');
         $this->validate([
             'editForm.periods.*.check_in_time' => 'nullable|date_format:H:i',
-            'editForm.periods.*.check_out_time' => 'nullable|date_format:H:i|after:editForm.periods.*.check_in_time',
+            'editForm.periods.*.check_out_time' => 'nullable|date_format:H:i',
             'editForm.reason' => 'required|string|min:3|max:500',
         ]);
+
+        $this->validateSingleEditCheckoutIntervals();
 
         $companyId = auth()->user()->saas_company_id;
         $log = AttendanceDailyLog::forCompany($companyId)->findOrFail($this->editingLogId);
@@ -242,12 +256,12 @@ trait WithAttendanceEdits
         foreach ($this->editForm['periods'] as $p) {
             $in = $p['check_in_time'];
             $out = $p['check_out_time'];
-            
+
             if ($in || $out) {
                  $validPeriods[] = $p;
                  if ($in && (!$firstIn || $in < $firstIn)) $firstIn = $in;
                  if ($out && (!$lastOut || $out > $lastOut)) $lastOut = $out;
-                 
+
                  if ($in && $out) {
                      $start = Carbon::parse($in);
                      $end = Carbon::parse($out);
@@ -260,10 +274,10 @@ trait WithAttendanceEdits
         $dateStr = $log->attendance_date->toDateString();
         $log->check_in_time = $firstIn ? Carbon::parse($dateStr . ' ' . $firstIn) : null;
         $log->check_out_time = $lastOut ? Carbon::parse($dateStr . ' ' . $lastOut) : null;
-        
+
         // Save structured periods in check_attempts (or meta_data if preferred, check_attempts seems standardized for multi-punch)
         $log->check_attempts = $validPeriods;
-        
+
         $log->is_edited = true;
         // Recalculate based on new totals
         $log->actual_hours = round($totalActualMinutes / 60, 2);
@@ -273,6 +287,7 @@ trait WithAttendanceEdits
         $log->details()->delete();
         foreach ($validPeriods as $p) {
             $log->details()->create([
+                'work_schedule_period_id' => $p['work_schedule_period_id'] ?? null,
                 'check_in_time' => $p['check_in_time'] ?: null,
                 'check_out_time' => $p['check_out_time'] ?: null,
                 'attendance_status' => $log->attendance_status, // or match individual period status if we had it
@@ -329,19 +344,19 @@ trait WithAttendanceEdits
                 $empQ->whereIn('branch_id', $allowed);
             }
 
-            $employee = $empQ->findOrFail($employeeId);         
+            $employee = $empQ->findOrFail($employeeId);
          $this->editingEmployeeName = $employee->name_ar ?? $employee->name_en;
          $this->editingEmployeeId = $employee->employee_no; // For display
-         
+
          // Determine range based on filters, defaulting to current month if filter is partial or empty
          $start = $this->date_from ? Carbon::parse($this->date_from) : now()->startOfMonth();
          $end = $this->date_to ? Carbon::parse($this->date_to) : now()->endOfMonth();
-         
+
          // Cap range to 31 days to avoid performance issues if user selected a huge range
          if ($end->diffInDays($start) > 31) {
              $end = $start->copy()->addDays(31);
          }
-         
+
          $this->editingMonth = company_date($start, 'MMMM yyyy') . ($start->month != $end->month ? ' - ' . company_date($end, 'MMMM yyyy') : '');
 
          // Fetch existing logs
@@ -404,7 +419,7 @@ trait WithAttendanceEdits
              $start->toDateString(),
              $end->toDateString()
          );
-         
+
          // Iterate through each day in range
          $current = $start->copy();
          while ($current->lte($end)) {
@@ -447,7 +462,23 @@ trait WithAttendanceEdits
                        $metrics['periods'] ?? []
                    )->map(function ($period) {
                        return [
-                           'start' => !empty($period['start_time'])
+                           'id' => ! empty($period['id'])
+                                ? (int) $period['id']
+                                : null,
+
+                            'start_raw' => ! empty($period['start_time'])
+                                ? substr((string) $period['start_time'], 0, 5)
+                                : null,
+
+                            'end_raw' => ! empty($period['end_time'])
+                                ? substr((string) $period['end_time'], 0, 5)
+                                : null,
+
+                            'is_night_shift' => (bool) (
+                                $period['is_night_shift'] ?? false
+                            ),
+
+                            'start' => !empty($period['start_time'])
                                ? company_time($period['start_time'])
                                : '--:--',
 
@@ -495,7 +526,7 @@ trait WithAttendanceEdits
 
                   if ($log) {
                       $displayStatus = $log->attendance_status;
-                      
+
                       // If it's an exception day but log says absent, force it to show exception status
                       if (
                            $displayStatus === 'absent'
@@ -510,37 +541,72 @@ trait WithAttendanceEdits
                                default       => $displayStatus,
                            };
                        }
+                         $schedHours = (float) ($log->scheduled_hours ?? 0);
+                       if ($schedHours <= 0 && !empty($schedPeriods)) {
+                           $schedHours = (float) collect($schedPeriods)->sum(function($p) use ($dateStr) {
+                               if (!empty($p['start_raw']) && !empty($p['end_raw'])) {
+                                   $start = Carbon::parse($dateStr . ' ' . $p['start_raw']);
+                                   $end = Carbon::parse($dateStr . ' ' . $p['end_raw']);
+                                   if (!empty($p['is_night_shift']) || $end->lt($start)) {
+                                       $end->addDay();
+                                   }
+                                   return round($start->diffInMinutes($end, true) / 60, 2);
+                               }
+                               return 0;
+                           });
+                       }
 
                       $day = [
-                          'id' => $log->id, 
+                          'id' => $log->id,
                           'date' => $dateStr,
                           'is_day_off' => $isScheduleDayOff,
                           'status' => $displayStatus,
                           'scheduled_periods' => $schedPeriods,
                           'periods' => $log->details->isNotEmpty() ? $log->details->map(fn($d) => [
                               'id' => $d->id,
+                              'work_schedule_period_id' => $d->work_schedule_period_id
+                                  ? (int) $d->work_schedule_period_id
+                                  : null,
                               'check_in' => $d->check_in_time ? Carbon::parse($d->check_in_time)->format('H:i') : '',
                               'check_out' => $d->check_out_time ? Carbon::parse($d->check_out_time)->format('H:i') : '',
                           ])->toArray() : [[
                               'id' => null,
+                              'work_schedule_period_id' => null,
                               'check_in' => $log->check_in_time ? Carbon::parse($log->check_in_time)->format('H:i') : '',
                               'check_out' => $log->check_out_time ? Carbon::parse($log->check_out_time)->format('H:i') : '',
                           ]],
-                          'scheduled_hours' => $log->scheduled_hours,
-                          'actual_hours' => $log->actual_hours,
+                          'scheduled_hours' => $schedHours,
+                          'actual_hours' => (float) ($log->actual_hours ?? 0),
                           'notes' => $log->meta_data['notes'] ?? '',
                           'is_exception' => $isException,
                           'exception_name' => $exceptionName,
                       ];
                   } else {
+                       $schedHours = (float) collect($schedPeriods)->sum(function($p) use ($dateStr) {
+                           if (!empty($p['start_raw']) && !empty($p['end_raw'])) {
+                               $start = Carbon::parse($dateStr . ' ' . $p['start_raw']);
+                               $end = Carbon::parse($dateStr . ' ' . $p['end_raw']);
+                               if (!empty($p['is_night_shift']) || $end->lt($start)) {
+                                   $end->addDay();
+                               }
+                               return round($start->diffInMinutes($end, true) / 60, 2);
+                           }
+                           return 0;
+                       });
+
                       $day = [
-                          'id' => null, 
+                          'id' => null,
                           'date' => $dateStr,
                           'is_day_off' => $isScheduleDayOff,
-                          'status' => $dayOffStatus, 
+                          'status' => $dayOffStatus,
                           'scheduled_periods' => $schedPeriods,
-                          'periods' => [['id' => null, 'check_in' => '', 'check_out' => '']], 
-                          'scheduled_hours' => 0,
+                          'periods' => [[
+                              'id' => null,
+                              'work_schedule_period_id' => null,
+                              'check_in' => '',
+                              'check_out' => '',
+                          ]],
+                          'scheduled_hours' => $schedHours,
                           'actual_hours' => 0,
                           'notes' => '',
                           'is_exception' => $isException,
@@ -554,13 +620,13 @@ trait WithAttendanceEdits
                          $day['exception_name'] = $compEx->template?->name ?? 'Holiday';
                          $day['status'] = 'holiday';
                    }
-                  
+
                   $day['_original'] = $this->monthlyEditSnapshot($day);
                   $this->monthlyEditForm[] = $day;
-             
+
              $current->addDay();
          }
-         
+
          $this->monthlyEditReason = ''; // Initialize monthly reason
          $this->showMonthlyEditModal = true;
     }
@@ -571,11 +637,14 @@ trait WithAttendanceEdits
         $this->validate([
             'monthlyEditReason' => 'required|string|min:3',
             'monthlyEditForm.*.periods.*.check_in' => 'nullable|date_format:H:i',
-            'monthlyEditForm.*.periods.*.check_out' => 'nullable|date_format:H:i|after:monthlyEditForm.*.periods.*.check_in',
+            'monthlyEditForm.*.periods.*.check_out' => 'nullable|date_format:H:i',
         ]);
 
+
+        $this->validateMonthlyEditCheckoutIntervals();
+
         $companyId = auth()->user()->saas_company_id;
-        
+
         $updatedCount = 0;
 
         foreach ($this->monthlyEditForm as $row) {
@@ -587,7 +656,7 @@ trait WithAttendanceEdits
              $isHoliday = ($row['status'] === 'holiday') || ($row['is_official_holiday'] ?? false);
 
              if ($isHoliday || $isOlderThan7Days) {
-                 $reasonMsg = $isHoliday 
+                 $reasonMsg = $isHoliday
                      ? tr('Cannot edit attendance on official holiday: ') . $row['date']
                      : tr('Editing period expired (older than 7 days) for: ') . $row['date'];
                  $this->dispatch('toast', ['type' => 'error', 'message' => $reasonMsg]);
@@ -599,14 +668,27 @@ trait WithAttendanceEdits
 
 
              $before = $log->toArray();
-             
+
              // Process periods
              $firstIn = null;
              $lastOut = null;
              $validPeriodsData = [];
 
-             foreach ($row['periods'] as $p) {
+             foreach ($row['periods'] as $periodIndex => $p) {
                  if ($p['check_in'] || $p['check_out']) {
+                     if (
+                         empty($p['work_schedule_period_id'])
+                         && empty($row['is_exception'])
+                     ) {
+                         $candidatePeriodId = (int) (
+                             $row['scheduled_periods'][$periodIndex]['id'] ?? 0
+                         );
+
+                         if ($candidatePeriodId > 0) {
+                             $p['work_schedule_period_id'] = $candidatePeriodId;
+                         }
+                     }
+
                      $validPeriodsData[] = $p;
                      if ($p['check_in'] && (!$firstIn || $p['check_in'] < $firstIn)) $firstIn = $p['check_in'];
                      if ($p['check_out'] && (!$lastOut || $p['check_out'] > $lastOut)) $lastOut = $p['check_out'];
@@ -616,7 +698,7 @@ trait WithAttendanceEdits
              // Update main log
              $log->check_in_time = $firstIn ? Carbon::parse($row['date'] . ' ' . $firstIn) : null;
              $log->check_out_time = $lastOut ? Carbon::parse($row['date'] . ' ' . $lastOut) : null;
-             
+
              $log->attendance_status = $row['status'];
              $meta = $log->meta_data ?? [];
              $meta['notes'] = $row['notes'];
@@ -628,6 +710,7 @@ trait WithAttendanceEdits
              $log->details()->delete();
              foreach ($validPeriodsData as $p) {
                  $log->details()->create([
+                     'work_schedule_period_id' => $p['work_schedule_period_id'] ?? null,
                      'check_in_time' => $p['check_in'] ?: null,
                      'check_out_time' => $p['check_out'] ?: null,
                      'attendance_status' => $log->attendance_status,
@@ -652,7 +735,7 @@ trait WithAttendanceEdits
 
              $updatedCount++;
         }
-        
+
         $this->showMonthlyEditModal = false;
         $this->loadStats();
         if ($updatedCount > 0) {
@@ -695,7 +778,12 @@ trait WithAttendanceEdits
     public function addMonthlyPeriod($dayIndex)
     {
         $this->requireAttendanceAny('attendance.daily.manage');
-        $this->monthlyEditForm[$dayIndex]['periods'][] = ['id' => null, 'check_in' => '', 'check_out' => ''];
+        $this->monthlyEditForm[$dayIndex]['periods'][] = [
+            'id' => null,
+            'work_schedule_period_id' => null,
+            'check_in' => '',
+            'check_out' => '',
+        ];
     }
 
     public function removeMonthlyPeriod($dayIndex, $periodIndex)
@@ -720,12 +808,12 @@ trait WithAttendanceEdits
             if ($applyOn === 'everyone') return true;
 
             $include = is_array($ce->include) ? $ce->include : (json_decode($ce->include, true) ?: []);
-            
+
             if ($applyOn === 'employees' || $applyOn === 'absence') {
                 $targetIds = $include['employees'] ?? [];
                 if (in_array((string)$employee->id, $targetIds)) return true;
             }
-            
+
             if ($applyOn === 'departments') {
                 $targetIds = $include['departments'] ?? [];
                 if (in_array((string)$employee->department_id, $targetIds)) return true;
@@ -752,5 +840,292 @@ trait WithAttendanceEdits
         }
 
         return null;
+    }
+    /**
+     * Validate manual web checkout using the same business rule used by
+     * employee attendance checkout:
+     *
+     * - 60 minutes or more after check-in is allowed.
+     * - Before 60 minutes, checkout is allowed only when the linked work
+     *   schedule period has already reached its scheduled end.
+     */
+    private function validateSingleEditCheckoutIntervals(): void
+    {
+        $attendanceService = app(
+            \Athka\SystemSettings\Services\AttendanceService::class
+        );
+
+        $errors = [];
+
+        foreach (($this->editForm['periods'] ?? []) as $index => $period) {
+            $checkIn = trim((string) ($period['check_in_time'] ?? ''));
+            $checkOut = trim((string) ($period['check_out_time'] ?? ''));
+
+            if ($checkIn === '' || $checkOut === '') {
+                continue;
+            }
+
+            $actualStart = Carbon::parse($checkIn);
+            $actualEnd = Carbon::parse($checkOut);
+
+            $scheduledIn = trim((string) ($period['scheduled_in'] ?? ''));
+            $scheduledOut = trim((string) ($period['scheduled_out'] ?? ''));
+
+            $hasScheduledTimes = $scheduledIn !== ''
+                && $scheduledIn !== '--:--'
+                && $scheduledOut !== ''
+                && $scheduledOut !== '--:--';
+
+            $isNightPeriod = false;
+
+            if ($hasScheduledTimes) {
+                $scheduledStartTime = Carbon::parse($scheduledIn);
+                $scheduledEndTime = Carbon::parse($scheduledOut);
+
+                $isNightPeriod = $scheduledEndTime->lt($scheduledStartTime);
+            }
+
+            /*
+             * An earlier clock time is considered next-day only for a real
+             * overnight schedule. This prevents arbitrary reversed manual
+             * attendance times from being accepted as a 20+ hour session.
+             */
+            if ($actualEnd->lt($actualStart) && ! $isNightPeriod) {
+                $errors["editForm.periods.{$index}.check_out_time"]
+                    = str_starts_with((string) app()->getLocale(), 'ar')
+                        ? 'لا يمكن أن يكون وقت الحضور بعد وقت الانصراف.'
+                        : 'Check-in time cannot be after check-out time.';
+
+                continue;
+            }
+
+            $elapsedMinutes = $attendanceService->minutesBetween(
+                $checkIn,
+                $checkOut
+            );
+
+            if ($elapsedMinutes >= 60) {
+                continue;
+            }
+
+            /*
+             * Match mobile/server semantics:
+             * reaching period end is an exception only when the punch is
+             * actually linked to a work_schedule_period_id.
+             */
+            $periodId = (int) (
+                $period['work_schedule_period_id'] ?? 0
+            );
+
+            if ($periodId > 0 && $hasScheduledTimes) {
+                $requiredMinutes = $attendanceService->minutesBetween(
+                    $checkIn,
+                    $scheduledOut
+                );
+
+                if ($elapsedMinutes >= $requiredMinutes) {
+                    continue;
+                }
+            }
+
+            $errors["editForm.periods.{$index}.check_out_time"]
+                = str_starts_with((string) app()->getLocale(), 'ar')
+                    ? 'لا يمكنك تسجيل الانصراف إلا بعد مرور ساعة كاملة من وقت الحضور، أو عند بلوغ نهاية فترة العمل.'
+                    : 'You cannot check out until one hour has passed since check-in, or the linked work period has ended.';
+        }
+
+        if ($errors !== []) {
+            throw \Illuminate\Validation\ValidationException::withMessages(
+                $errors
+            );
+        }
+    }
+    /**
+     * Validate monthly attendance edits using the employee checkout rule.
+     *
+     * - 60+ minutes after check-in is allowed.
+     * - Before 60 minutes, checkout is allowed only after the linked normal
+     *   work-schedule period reaches its end.
+     * - Crossing midnight is accepted only for an actual night period.
+     */
+    private function validateMonthlyEditCheckoutIntervals(): void
+    {
+        $attendanceService = app(
+            \Athka\SystemSettings\Services\AttendanceService::class
+        );
+
+        $errors = [];
+
+        foreach ($this->monthlyEditForm as $dayIndex => $row) {
+            if (empty($row['id'])) {
+                continue;
+            }
+
+            if (! $this->monthlyEditRowChanged($row)) {
+                continue;
+            }
+
+            $scheduledPeriods = $row['scheduled_periods'] ?? [];
+
+            foreach (($row['periods'] ?? []) as $periodIndex => $period) {
+                $checkIn = trim((string) (
+                    $period['check_in'] ?? ''
+                ));
+
+                $checkOut = trim((string) (
+                    $period['check_out'] ?? ''
+                ));
+
+                if ($checkIn === '' || $checkOut === '') {
+                    continue;
+                }
+
+                $scheduledByIndex =
+                    $scheduledPeriods[$periodIndex] ?? null;
+
+                $periodId = (int) (
+                    $period['work_schedule_period_id'] ?? 0
+                );
+
+                /*
+                 * Old web-edited normal records may have lost their ID.
+                 * Recover it using the corresponding normal schedule period.
+                 *
+                 * Exception-day IDs are intentionally not treated as
+                 * work_schedule_period IDs.
+                 */
+                if (
+                    $periodId <= 0
+                    && empty($row['is_exception'])
+                    && is_array($scheduledByIndex)
+                ) {
+                    $periodId = (int) (
+                        $scheduledByIndex['id'] ?? 0
+                    );
+                }
+
+                $linkedScheduledPeriod = null;
+
+                if (
+                    $periodId > 0
+                    && empty($row['is_exception'])
+                ) {
+                    foreach ($scheduledPeriods as $scheduledPeriod) {
+                        if (
+                            (int) ($scheduledPeriod['id'] ?? 0)
+                            === $periodId
+                        ) {
+                            $linkedScheduledPeriod = $scheduledPeriod;
+                            break;
+                        }
+                    }
+                }
+
+                /*
+                 * We may still use the effective schedule period to determine
+                 * whether this is genuinely an overnight shift.
+                 */
+                $nightReference = $linkedScheduledPeriod
+                    ?? $scheduledByIndex;
+
+                $isNightPeriod = false;
+
+                if (is_array($nightReference)) {
+                    $scheduledStart = trim((string) (
+                        $nightReference['start_raw'] ?? ''
+                    ));
+
+                    $scheduledEnd = trim((string) (
+                        $nightReference['end_raw'] ?? ''
+                    ));
+
+                    $isNightPeriod = (bool) (
+                        $nightReference['is_night_shift'] ?? false
+                    );
+
+                    if (
+                        ! $isNightPeriod
+                        && $scheduledStart !== ''
+                        && $scheduledEnd !== ''
+                    ) {
+                        $isNightPeriod =
+                            strcmp($scheduledEnd, $scheduledStart) < 0;
+                    }
+                }
+
+                $actualStart = Carbon::parse($checkIn);
+                $actualEnd = Carbon::parse($checkOut);
+
+                /*
+                 * Do not turn an arbitrary reversed manual time into a
+                 * next-day checkout unless this is actually a night shift.
+                 */
+                if (
+                    $actualEnd->lt($actualStart)
+                    && ! $isNightPeriod
+                ) {
+                    $errors[
+                        "monthlyEditForm.{$dayIndex}.periods.{$periodIndex}.check_out"
+                    ] = str_starts_with(
+                        (string) app()->getLocale(),
+                        'ar'
+                    )
+                        ? 'لا يمكن أن يكون وقت الحضور بعد وقت الانصراف.'
+                        : 'Check-in time cannot be after check-out time.';
+
+                    continue;
+                }
+
+                $elapsedMinutes = $attendanceService->minutesBetween(
+                    $checkIn,
+                    $checkOut
+                );
+
+                /*
+                 * Main rule: one full hour has passed.
+                 */
+                if ($elapsedMinutes >= 60) {
+                    continue;
+                }
+
+                /*
+                 * Same exception used by employee checkout:
+                 * before one hour is allowed only when this punch is linked
+                 * to a real work_schedule_period and its end was reached.
+                 */
+                if ($linkedScheduledPeriod !== null) {
+                    $scheduledOut = trim((string) (
+                        $linkedScheduledPeriod['end_raw'] ?? ''
+                    ));
+
+                    if ($scheduledOut !== '') {
+                        $requiredMinutes =
+                            $attendanceService->minutesBetween(
+                                $checkIn,
+                                $scheduledOut
+                            );
+
+                        if ($elapsedMinutes >= $requiredMinutes) {
+                            continue;
+                        }
+                    }
+                }
+
+                $errors[
+                    "monthlyEditForm.{$dayIndex}.periods.{$periodIndex}.check_out"
+                ] = str_starts_with(
+                    (string) app()->getLocale(),
+                    'ar'
+                )
+                    ? 'لا يمكنك تسجيل الانصراف إلا بعد مرور ساعة كاملة من وقت الحضور، أو عند بلوغ نهاية فترة العمل.'
+                    : 'You cannot check out until one hour has passed since check-in, or the linked work period has ended.';
+            }
+        }
+
+        if ($errors !== []) {
+            throw \Illuminate\Validation\ValidationException::withMessages(
+                $errors
+            );
+        }
     }
 }

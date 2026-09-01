@@ -11,6 +11,7 @@ class AttendanceDailyDetail extends Model
 
     protected $fillable = [
         'daily_log_id',
+        'work_schedule_period_id',
         'check_in_time',
         'check_out_time',
         'attendance_status',
