@@ -362,14 +362,28 @@ class Index extends Component
         if ($contractCol) {
             $contractTypes = Employee::withoutGlobalScope('active_only')->forCompany($companyId)->when($this->status !== 'all', fn($q) => $q->where('status', $this->status))->whereNotNull($contractCol)->distinct()->pluck($contractCol)->filter()->values()->all();
 
-            $contractFilterTypes = Employee::withoutGlobalScope('active_only')
+            $systemContractTypes = [
+                'permanent',
+                'temporary',
+                'probation',
+                'contractor',
+                'freelancer',
+            ];
+
+            $existingContractTypes = Employee::withoutGlobalScope('active_only')
                 ->forCompany($companyId)
                 ->whereNotNull($contractCol)
                 ->distinct()
                 ->pluck($contractCol)
                 ->filter()
+                ->map(fn ($type) => strtolower(trim((string) $type)))
                 ->values()
                 ->all();
+
+            $contractFilterTypes = array_values(array_unique(array_merge(
+                $systemContractTypes,
+                $existingContractTypes
+            )));
         }
 
         $employees = $query->paginate(10);
