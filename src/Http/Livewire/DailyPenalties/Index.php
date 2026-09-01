@@ -568,6 +568,9 @@ if (! $dateFrom || ! $dateTo) {
 
             $createdCount = (int) ($res['created'] ?? 0);
             $skippedReasons = $this->formatSkippedReasons($res['skipped'] ?? []);
+            $attendanceWarningMessage = $this->formatAttendanceWarnings(
+                $res['warnings'] ?? []
+            );
             $calendarSkipMessage = $this->calendarSkipMessage($companyId, $dateFrom, $dateTo, $employeeIds, $createdCount);
             $toastType = $createdCount > 0 ? 'success' : 'info';
             $toastMessage = $message
@@ -592,6 +595,10 @@ if (! $dateFrom || ! $dateTo) {
                 $toastMessage .= ' | ' . tr('Skipped:') . ' ' . $skippedReasons;
             }
 
+            if ($attendanceWarningMessage !== '') {
+                $toastMessage .= ' | ' . $attendanceWarningMessage;
+            }
+
             $this->dispatch('toast', [
                 'type' => $toastType,
                 'message' => $toastMessage,
@@ -608,6 +615,39 @@ if (! $dateFrom || ! $dateTo) {
         }
     }
 
+
+    private function formatAttendanceWarnings(array $warnings): string
+    {
+        $messages = [];
+
+        $invalidOrder = (int) (
+            $warnings['invalid_attendance_order'] ?? 0
+        );
+
+        if ($invalidOrder > 0) {
+            $messages[] = str_starts_with(
+                (string) app()->getLocale(),
+                'ar'
+            )
+                ? "وقت الحضور بعد وقت الانصراف؛ تم اعتبار الموظف غائبًا عند حساب الجزاء. ({$invalidOrder})"
+                : "Check-in is after check-out; the employee was treated as absent for penalty calculation. ({$invalidOrder})";
+        }
+
+        $afterSchedule = (int) (
+            $warnings['attendance_after_schedule_end'] ?? 0
+        );
+
+        if ($afterSchedule > 0) {
+            $messages[] = str_starts_with(
+                (string) app()->getLocale(),
+                'ar'
+            )
+                ? "لا يمكن تسجيل الحضور بعد انتهاء الجدول وتجاوز حد الغياب المسموح؛ تم اعتبار الموظف غائبًا. ({$afterSchedule})"
+                : "Check-in exceeded the allowed absence threshold after the schedule ended; the employee was treated as absent. ({$afterSchedule})";
+        }
+
+        return implode(' | ', $messages);
+    }
     private function getCalculationEmployeeIds(int $companyId): array
     {
         $query = Employee::withoutGlobalScope('active_only')->forCompany($companyId);
