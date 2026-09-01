@@ -1392,15 +1392,10 @@ class PenaltyService
         $exceptionalDay = $scheduleService->getExceptionalDay((int) $log->saas_company_id, $dateStr, $employee);
 
         if ($exceptionalDay) {
-            $isHoliday = isset($exceptionalDay->is_holiday)
-                ? (bool) $exceptionalDay->is_holiday
-                : (
-                    isset($exceptionalDay->absence_multiplier, $exceptionalDay->late_multiplier)
-                    && (float) $exceptionalDay->absence_multiplier <= 0
-                    && (float) $exceptionalDay->late_multiplier <= 0
-                );
+            $isOfficialHoliday = (bool) ($exceptionalDay->is_official_holiday ?? false)
+                || (bool) ($exceptionalDay->is_holiday ?? false);
 
-            if ($isHoliday) {
+            if ($isOfficialHoliday) {
                 return (bool) ($exceptionalDay->is_official_holiday ?? false)
                     ? 'official_holiday'
                     : 'exceptional_day';
@@ -1485,13 +1480,23 @@ class PenaltyService
             return 1.0;
         }
 
-        $multiplier = match ($violationType) {
-            'absent' => $exceptionalDay->absence_multiplier ?? 1,
-            'delay', 'early_departure', 'auto_checkout' => $exceptionalDay->late_multiplier ?? 1,
-            default => 1,
-        };
+        $applyOn = (string) ($exceptionalDay->apply_on ?? 'absence');
 
-        return max(0.0, (float) $multiplier);
+        if ($violationType === 'absent') {
+            if ($applyOn === 'absence' || $applyOn === 'all') {
+                return max(0.0, (float) ($exceptionalDay->absence_multiplier ?? 0.0));
+            }
+            return 1.0;
+        }
+
+        if (in_array($violationType, ['delay', 'early_departure', 'auto_checkout'], true)) {
+            if ($applyOn === 'late' || $applyOn === 'all') {
+                return max(0.0, (float) ($exceptionalDay->late_multiplier ?? 0.0));
+            }
+            return 1.0;
+        }
+
+        return 1.0;
     }
 
     private function markSkipped(string $reason): void
