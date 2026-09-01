@@ -41,9 +41,9 @@
                  <div class="bg-gray-50 border border-gray-100 p-4 rounded-xl flex flex-col items-center justify-center gap-1 hover:bg-white hover:shadow-sm transition-all hover:border-[color:var(--accent-orange)]/30 group">
                     <span class="text-[10px] font-bold text-gray-400 uppercase tracking-widest block group-hover:text-[color:var(--accent-orange)]">{{ tr('Compliance') }}</span>
                     @php
-                        $sched = collect($monthlyEditForm)->sum('scheduled_hours');
-                        $act = collect($monthlyEditForm)->sum('actual_hours');
-                        $comp = $sched > 0 ? round(($act / $sched) * 100, 1) : 100;
+                        $sched = (float) collect($monthlyEditForm)->sum('scheduled_hours');
+                        $act = (float) collect($monthlyEditForm)->sum('actual_hours');
+                        $comp = $sched > 0 ? min(100, round(($act / $sched) * 100, 1)) : 0;
                         $compCssVar = $comp >= 90 ? '--success' : ($comp >= 70 ? '--warning' : '--error');
                     @endphp
                     <span class="text-2xl font-black" style="color: var({{ $compCssVar }});">{{ $comp }}%</span>
@@ -164,6 +164,11 @@
                                                              placeholder="--:--"
                                                              @if(!$canManageDaily || $isHoliday || $isOlderThan7Days) disabled @endif
                                                           >
+                                                          @error("monthlyEditForm.$index.periods.$pIndex.check_out")
+                                                              <span class="text-[color:var(--error)] text-[9px] mt-1 block leading-tight">
+                                                                  {{ \Athka\AuthKit\Support\UiMsg::toText($message) ?? $message }}
+                                                              </span>
+                                                          @enderror
                                                      </div>
                                                      {{-- Remove Button --}}
                                                      @if(count($day['periods']) > 1)
