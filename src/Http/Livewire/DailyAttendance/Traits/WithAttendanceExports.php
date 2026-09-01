@@ -8,8 +8,21 @@ use App\Services\ExcelExportService;
 
 trait WithAttendanceExports
 {
-   private function applyExportFilters($query)
+    private function applyExportFilters($query)
     {
+        $companyId = auth()->user()->saas_company_id;
+        $query->whereExists(function ($scheduleQ) use ($companyId) {
+            $scheduleQ->selectRaw('1')
+                ->from('employee_work_schedules as scheduled_ews')
+                ->whereColumn('scheduled_ews.employee_id', 'attendance_daily_logs.employee_id')
+                ->where('scheduled_ews.saas_company_id', $companyId)
+                ->whereColumn('scheduled_ews.start_date', '<=', 'attendance_daily_logs.attendance_date')
+                ->where(function ($rangeQ) {
+                    $rangeQ->whereNull('scheduled_ews.end_date')
+                        ->orWhereColumn('scheduled_ews.end_date', '>=', 'attendance_daily_logs.attendance_date');
+                });
+        });
+
         $allowed = $this->allowedBranchIds();
         if (!empty($allowed)) {
             $query->whereHas('employee', fn ($q) => $q->withoutGlobalScope('active_only')->whereIn('branch_id', $allowed));
@@ -97,7 +110,7 @@ trait WithAttendanceExports
         $query = $this->applyExportFilters($query);
         $logs = $query->orderByDesc('attendance_date')->get();
 
-        // âœ… Reshape Arabic text for PDF
+        // ✅ Reshape Arabic text for PDF
         $logs->each(function($log) {
             $log->pdf_name = $this->pdfReshape($log->employee->name_ar ?? $log->employee->name_en ?? '-');
             $log->pdf_schedule = $this->pdfReshape($log->workSchedule?->name ?? '-');
@@ -126,5 +139,3 @@ trait WithAttendanceExports
         return $text;
     }
 }
-
-
