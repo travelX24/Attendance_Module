@@ -554,6 +554,24 @@ class PenaltyService
     }
 
     /**
+     * Resolve the company attendance grace settings used by auto-checkout.
+     * Fall back to the global default when the company has no own record.
+     */
+    private function resolveCompanyGraceSetting(int $companyId): ?AttendanceGraceSetting
+    {
+        $graceSetting = AttendanceGraceSetting::query()
+            ->where('saas_company_id', $companyId)
+            ->orderBy('id')
+            ->first();
+
+        if (! $graceSetting) {
+            $graceSetting = AttendanceGraceSetting::globalDefault()->first();
+        }
+
+        return $graceSetting;
+    }
+
+    /**
      * The Basic Settings screen stores the shared monthly allowance for late
      * arrival and early departure in late_grace_minutes. A group may override
      * it through its own attendance grace record.
