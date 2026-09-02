@@ -287,7 +287,7 @@ trait WithRequestApprovals
                 if ($this->rejectType === 'leave' && (bool) ($row->is_exception ?? false)) {
                     $type = 'leave_exceptions';
                 } else {
-                    $type = $this->rejectType === 'cut_leave' ? 'leaves' : $this->rejectType . 's';
+                    $type = $this->rejectType === 'cut_leave' ? 'leave_cut' : $this->rejectType . 's';
                 }
                 
                 $rejectReq = new \Illuminate\Http\Request();
@@ -385,7 +385,7 @@ trait WithRequestApprovals
         // Ã¢Å“â€¦ NEW: Integrate with ApprovalInbox sequence
         try {
             $controller = app(\Athka\SystemSettings\Http\Controllers\Api\Employee\ApprovalInboxController::class);
-            $resp = $controller->approve(new \Illuminate\Http\Request(), 'leaves', $id);
+            $resp = $controller->approve(new \Illuminate\Http\Request(), 'leave_cut', $id);
             $content = json_decode($resp->getContent(), true);
             
             if (!($content['ok'] ?? false)) {
@@ -460,6 +460,18 @@ trait WithRequestApprovals
                             'requested_by' => auth()->id(),
                             'requested_at' => now(),
                         ]);
+
+                        $approvalService = app(\Athka\SystemSettings\Services\Approvals\ApprovalService::class);
+                        $leaveSource = $approvalService->getRequestSource('leaves');
+
+                        if ($leaveSource) {
+                            $approvalService->ensureTasksForRequest(
+                                $leaveSource,
+                                $new,
+                                (int) $this->companyId
+                            );
+                        }
+
                         $newLeaveId = $new->id;
                     }
                 }

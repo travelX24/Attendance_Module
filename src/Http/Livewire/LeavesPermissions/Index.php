@@ -196,7 +196,8 @@ class Index extends Component
         if (!$this->currentRequest) return;
 
         $approvableType = match($type) {
-            'leave', 'cut' => 'leaves',
+            'leave' => 'leaves',
+            'cut' => 'leave_cut',
             'permission' => 'permissions',
             'mission' => 'missions',
             default => 'leaves'
@@ -495,8 +496,7 @@ class Index extends Component
 
         $this->applyDateRangeOverlapFilter($q, 'original_start_date', 'original_end_date');
         $this->applyEmployeeFilters($q);
-        $this->applyApprovalTaskFilter($q, 'leaves'); // assuming cut uses leaves type for approvals? Or maybe cut needs its own. 
-        // Wait, cut usually follows similar sequence. But let's check cut type.
+        $this->applyApprovalTaskFilter($q, 'leave_cut');
 
         return $q->orderByDesc('id')->paginate($this->perPage, ['*'], 'cutPage');
     }
@@ -628,24 +628,32 @@ class Index extends Component
 
     public function getApprovedLeavesForCutProperty()
     {
+        $leaveTable = (new AttendanceLeaveRequest())->getTable();
+        $cutTable = (new AttendanceLeaveCutRequest())->getTable();
+
         $q = AttendanceLeaveRequest::query()
             ->with(['employee' => fn ($employee) => $employee->withoutGlobalScope('active_only'), 'policy'])
             ->where('company_id', $this->companyId)
             ->where('status', 'approved')
-            ->whereNull('salary_processed_at');
+            ->whereNull('salary_processed_at')
+            ->whereColumn($leaveTable . '.start_date', '<', $leaveTable . '.end_date')
+            ->whereNotExists(function ($sub) use ($leaveTable, $cutTable) {
+                $sub->select(DB::raw(1))
+                    ->from($cutTable . ' as pending_cut')
+                    ->whereColumn('pending_cut.original_leave_request_id', $leaveTable . '.id')
+                    ->where('pending_cut.company_id', $this->companyId)
+                    ->where('pending_cut.status', 'pending');
+            });
 
-        // Ã¢Å“â€¦ Data scoping
-        $q = $this->applyDataScoping($q, 'attendance.leaves.view', 'attendance.leaves.view-subordinates');
+        // Keep security/data scoping, but do not inherit unrelated page filters.
+        // The Cut Leave modal must show every eligible approved leave the user can access.
+        $q = $this->applyDataScoping(
+            $q,
+            'attendance.leaves.view',
+            'attendance.leaves.view-subordinates'
+        );
 
-        if ($this->selectedYearId) $q->where('policy_year_id', (int) $this->selectedYearId);
-
-        $this->applyEmployeeFilters($q);
-
-        if ($this->status !== 'all') {
-            $q->whereHas('employee', fn($qq) => $qq->withoutGlobalScope('active_only')->where('status', (string)$this->status));
-        }
-
-        return $q->orderByDesc('id')->limit(50)->get();
+        return $q->orderByDesc('id')->get();
     }
 
     protected function logAction(string $type, int $subjectId, string $action, array $meta = [], ?int $employeeId = null): void

@@ -1532,10 +1532,11 @@ trait WithLeaveRequests
             $this->leaveRequestsValidationAttributes()
         );
 
-      $allowed = $this->lpAllowedBranchIdsSafe();
+        $allowed = $this->lpAllowedBranchIdsSafe();
         $branchCol = $this->employeeBranchColumn ?: $this->detectEmployeeBranchColumn();
 
         $original = AttendanceLeaveRequest::query()
+            ->with(['employee' => fn ($employee) => $employee->withoutGlobalScope('active_only')])
             ->where('company_id', $this->companyId)
             ->when($branchCol && !empty($allowed), function ($q) use ($branchCol, $allowed) {
                 $q->whereHas('employee', fn ($e) => $e->whereIn($branchCol, $allowed));
@@ -1557,36 +1558,115 @@ trait WithLeaveRequests
 
         $cutEnd = Carbon::parse($data['cut_new_end_date'])->startOfDay();
 
-        // ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â²ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã¢â‚¬Â ÃƒÂ¢Ã¢â€šÂ¬Ã¢â€žÂ¢ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã¢â‚¬Â¹ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â  ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¯ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â®ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â¯ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â© ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã¢â‚¬Â¹ÃƒÂ¢Ã¢â€šÂ¬Ã‚Â ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â£ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¡ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¦ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â  ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€¦Ã‚Â¾ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã‚Â¢ÃƒÂ¢Ã¢â‚¬Å¡Ã‚Â¬Ãƒâ€šÃ‚Â¡ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â§ÃƒÆ’Ã†â€™ÃƒÂ¢Ã¢â‚¬Å¾Ã‚Â¢ÃƒÆ’Ã¢â‚¬Â¦Ãƒâ€šÃ‚Â ÃƒÆ’Ã†â€™Ãƒâ€¹Ã…â€œÃƒÆ’Ã¢â‚¬Å¡Ãƒâ€šÃ‚Â©
         if ($cutEnd->lt($origStart) || $cutEnd->gte($origEnd)) {
             session()->flash('error', tr('Invalid cut end date.'));
             return;
         }
 
-        AttendanceLeaveCutRequest::create([
-            'company_id' => $this->companyId,
+        $hasPendingCut = AttendanceLeaveCutRequest::query()
+            ->where('company_id', $this->companyId)
+            ->where('original_leave_request_id', (int) $original->id)
+            ->where('status', 'pending')
+            ->exists();
+
+        if ($hasPendingCut) {
+            $this->addError(
+                'cut_leave_request_id',
+                tr('There is already a pending cut request for this leave.')
+            );
+            return;
+        }
+
+        $employee = $original->employee
+            ?: Employee::withoutGlobalScope('active_only')->find((int) $original->employee_id);
+
+        if (!$employee) {
+            $this->addError('cut_leave_request_id', tr('Employee not found.'));
+            return;
+        }
+
+        // A cut request needs its own workflow.
+        if (!$this->ensureLeaveApprovalWorkflow($employee, 'leave_cut', 'cut_leave_request_id')) {
+            return;
+        }
+
+        // The postponed part becomes a new normal leave request after final cut approval,
+        // therefore that future request must also have a resolvable leave workflow.
+        if (!$this->ensureLeaveApprovalWorkflow($employee, 'leaves', 'cut_leave_request_id')) {
+            return;
+        }
+
+        try {
+            $cut = DB::transaction(function () use ($original, $origStart, $origEnd, $cutEnd, $data) {
+                $cut = AttendanceLeaveCutRequest::create([
+                    'company_id' => $this->companyId,
+                    'original_leave_request_id' => (int) $original->id,
+                    'employee_id' => (int) $original->employee_id,
+                    'leave_policy_id' => (int) $original->leave_policy_id,
+                    'policy_year_id' => (int) $original->policy_year_id,
+                    'original_start_date' => $origStart->toDateString(),
+                    'original_end_date' => $origEnd->toDateString(),
+                    'cut_end_date' => $cutEnd->toDateString(),
+                    'postponed_start_date' => $cutEnd->copy()->addDay()->toDateString(),
+                    'postponed_end_date' => $origEnd->toDateString(),
+                    'reason' => $data['cut_reason'] ?? null,
+                    'status' => 'pending',
+                    'requested_by' => auth()->id(),
+                    'requested_at' => now(),
+                ]);
+
+                $approvalService = app(\Athka\SystemSettings\Services\Approvals\ApprovalService::class);
+                $src = $approvalService->getRequestSource('leave_cut');
+
+                if (!$src) {
+                    throw new \RuntimeException('Leave cut approval source is not configured.');
+                }
+
+                $approvalService->ensureTasksForRequest($src, $cut, (int) $this->companyId);
+
+                $hasApprovalTask = \Athka\SystemSettings\Models\ApprovalTask::query()
+                    ->where('company_id', $this->companyId)
+                    ->where('approvable_type', 'leave_cut')
+                    ->where('approvable_id', (int) $cut->id)
+                    ->exists();
+
+                if (!$hasApprovalTask) {
+                    throw new \RuntimeException('No approval task could be created for the leave cut request.');
+                }
+
+                return $cut;
+            });
+        } catch (\Throwable $e) {
+            \Log::error('Leave Cut Request Creation Error: ' . $e->getMessage(), [
+                'company_id' => $this->companyId,
+                'original_leave_request_id' => (int) $original->id,
+            ]);
+
+            $this->addError(
+                'cut_leave_request_id',
+                tr('Cannot submit request, please contact administration to review the approval workflow.')
+            );
+            return;
+        }
+
+        $this->logAction('leave_cut', (int) $cut->id, 'created', [
             'original_leave_request_id' => (int) $original->id,
-            'employee_id' => (int) $original->employee_id,
-            'leave_policy_id' => (int) $original->leave_policy_id,
-            'policy_year_id' => (int) $original->policy_year_id,
-            'original_start_date' => $origStart->toDateString(),
-            'original_end_date'   => $origEnd->toDateString(),
-            'cut_end_date'        => $cutEnd->toDateString(),
-            'postponed_start_date'=> $cutEnd->copy()->addDay()->toDateString(),
-            'postponed_end_date'  => $origEnd->toDateString(),
-            'reason' => $data['cut_reason'] ?? null,
-            'status' => 'pending',
-            'requested_by' => auth()->id(),
-            'requested_at' => now(),
-        ]);
+            'cut_end_date' => $cutEnd->toDateString(),
+            'postponed_start_date' => $cutEnd->copy()->addDay()->toDateString(),
+            'postponed_end_date' => $origEnd->toDateString(),
+            'approval_operation' => 'leave_cut',
+        ], (int) $original->employee_id);
 
         session()->flash('success', tr('Saved successfully'));
         $this->dispatch('toast', [
-            'type'    => 'success',
-            'title'   => tr('Success'),
+            'type' => 'success',
+            'title' => tr('Success'),
             'message' => tr('Saved successfully'),
         ]);
+
+        $this->dispatch('leave-request-updated');
         $this->closeCutLeave();
+        $this->resetPage('cutPage');
     }
 
 

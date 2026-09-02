@@ -7,6 +7,7 @@ use Athka\Employees\Models\Employee;
 use Athka\SystemSettings\Models\LeavePolicy;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class AttendanceLeaveCutRequest extends Model
 {
@@ -61,6 +62,13 @@ class AttendanceLeaveCutRequest extends Model
     public function originalLeave(): BelongsTo
     {
         return $this->belongsTo(AttendanceLeaveRequest::class, 'original_leave_request_id');
+    }
+
+    public function approvalTasks(): HasMany
+    {
+        return $this->hasMany(\Athka\SystemSettings\Models\ApprovalTask::class, 'approvable_id')
+            ->where('approvable_type', 'leave_cut')
+            ->orderBy('position');
     }
 }
 
