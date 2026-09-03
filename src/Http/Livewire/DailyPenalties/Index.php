@@ -1318,15 +1318,14 @@ if (! $dateFrom || ! $dateTo) {
             return false;
         }
 
-        if (isset($exceptionalDay->is_holiday)) {
-            return (bool) $exceptionalDay->is_holiday;
+        if ((bool) ($exceptionalDay->is_official_holiday ?? false)) {
+            return true;
         }
 
-        $absenceMultiplier = (float) ($exceptionalDay->absence_multiplier ?? 1);
-        $lateMultiplier = (float) ($exceptionalDay->late_multiplier ?? 1);
-
-        return $absenceMultiplier <= 0 || $lateMultiplier <= 0;
+        return (bool) ($exceptionalDay->is_holiday ?? false)
+            && empty($exceptionalDay->apply_on);
     }
+
     public function openExemptionModal($id)
     {
         $this->requireAttendanceAny('attendance.penalties.waive');

@@ -10,6 +10,7 @@ use Athka\SystemSettings\Models\AttendancePenaltyPolicy;
 use Athka\SystemSettings\Models\AttendanceGraceSetting;
 use Athka\SystemSettings\Models\UnexcusedAbsencePolicy;
 use Athka\SystemSettings\Services\WorkScheduleService;
+use Athka\SystemSettings\Services\ExceptionalDayService;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -1392,11 +1393,12 @@ class PenaltyService
         $exceptionalDay = $scheduleService->getExceptionalDay((int) $log->saas_company_id, $dateStr, $employee);
 
         if ($exceptionalDay) {
-            $isOfficialHoliday = (bool) ($exceptionalDay->is_official_holiday ?? false)
-                || (bool) ($exceptionalDay->is_holiday ?? false);
+            $isOfficialHoliday = (bool) ($exceptionalDay->is_official_holiday ?? false);
+            $isLegacyCalendarHoliday = (bool) ($exceptionalDay->is_holiday ?? false)
+                && empty($exceptionalDay->apply_on);
 
-            if ($isOfficialHoliday) {
-                return (bool) ($exceptionalDay->is_official_holiday ?? false)
+            if ($isOfficialHoliday || $isLegacyCalendarHoliday) {
+                return $isOfficialHoliday
                     ? 'official_holiday'
                     : 'exceptional_day';
             }
@@ -1462,10 +1464,23 @@ class PenaltyService
             ->exists();
     }
 
-    private function exceptionalDayMultiplierForViolation(AttendanceDailyLog $log, string $violationType): float
-    {
-        $employee = $log->employee;
-        if (! $employee) {
+    private function exceptionalDayMultiplierForViolation(
+        AttendanceDailyLog $log,
+        string $violationType
+    ): float {
+        $applyOn = match ($violationType) {
+            'absent' => 'absence',
+            'delay' => 'late',
+            default => null,
+        };
+
+        if ($applyOn === null) {
+            return 1.0;
+        }
+
+        $employeeId = (int) $log->employee_id;
+
+        if ($employeeId <= 0) {
             return 1.0;
         }
 
@@ -1473,31 +1488,23 @@ class PenaltyService
             ? Carbon::instance($log->attendance_date)->toDateString()
             : Carbon::parse($log->attendance_date)->toDateString();
 
-        $exceptionalDay = app(WorkScheduleService::class)
-            ->getExceptionalDay((int) $log->saas_company_id, $dateStr, $employee);
+        $exceptionalDay = app(ExceptionalDayService::class)
+            ->findApplicableForEmployeeViolation(
+                (int) $log->saas_company_id,
+                $dateStr,
+                $employeeId,
+                $applyOn
+            );
 
         if (! $exceptionalDay) {
             return 1.0;
         }
 
-        $applyOn = (string) ($exceptionalDay->apply_on ?? 'absence');
-
-        if ($violationType === 'absent') {
-            if ($applyOn === 'absence' || $applyOn === 'all') {
-                return max(0.0, (float) ($exceptionalDay->absence_multiplier ?? 0.0));
-            }
-            return 1.0;
-        }
-
-        if (in_array($violationType, ['delay', 'early_departure', 'auto_checkout'], true)) {
-            if ($applyOn === 'late' || $applyOn === 'all') {
-                return max(0.0, (float) ($exceptionalDay->late_multiplier ?? 0.0));
-            }
-            return 1.0;
-        }
-
-        return 1.0;
+        return $applyOn === 'absence'
+            ? max(0.0, (float) ($exceptionalDay->absence_multiplier ?? 1.0))
+            : max(0.0, (float) ($exceptionalDay->late_multiplier ?? 1.0));
     }
+
 
     private function markSkipped(string $reason): void
     {
