@@ -12,6 +12,7 @@ use Athka\Attendance\Models\AttendanceLeaveRequest;
 use Athka\Attendance\Models\AttendanceLeaveCutRequest;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -1563,6 +1564,7 @@ trait WithLeaveRequests
             return;
         }
 
+        // Keep legacy pending requests from colliding with the new direct-cut flow.
         $hasPendingCut = AttendanceLeaveCutRequest::query()
             ->where('company_id', $this->companyId)
             ->where('original_leave_request_id', (int) $original->id)
@@ -1585,20 +1587,36 @@ trait WithLeaveRequests
             return;
         }
 
-        // A cut request needs its own workflow.
-        if (!$this->ensureLeaveApprovalWorkflow($employee, 'leave_cut', 'cut_leave_request_id')) {
-            return;
-        }
+        $policyCompanyCol = $this->leavePoliciesCompanyColumn();
+        $policy = LeavePolicy::query()
+            ->when($policyCompanyCol, fn ($q) => $q->where($policyCompanyCol, $this->companyId))
+            ->findOrFail((int) $original->leave_policy_id);
 
-        // The postponed part becomes a new normal leave request after final cut approval,
-        // therefore that future request must also have a resolvable leave workflow.
-        if (!$this->ensureLeaveApprovalWorkflow($employee, 'leaves', 'cut_leave_request_id')) {
-            return;
-        }
+        $oldRequestedDays = (float) $original->requested_days;
+        $newRequestedDays = $this->computeRequestedDaysForEmployee(
+            $policy,
+            $origStart,
+            $cutEnd,
+            $employee
+        );
+        $returnedDays = max(0.0, $oldRequestedDays - $newRequestedDays);
+
+        $actorUserId = auth()->id();
 
         try {
-            $cut = DB::transaction(function () use ($original, $origStart, $origEnd, $cutEnd, $data) {
-                $cut = AttendanceLeaveCutRequest::create([
+            DB::transaction(function () use (
+                $original,
+                $origStart,
+                $origEnd,
+                $cutEnd,
+                $newRequestedDays,
+                $oldRequestedDays,
+                $returnedDays,
+                $data,
+                $actorUserId
+            ) {
+                // Keep an approved audit row so Previous Cut Requests remains complete.
+                $cutAudit = AttendanceLeaveCutRequest::create([
                     'company_id' => $this->companyId,
                     'original_leave_request_id' => (int) $original->id,
                     'employee_id' => (int) $original->employee_id,
@@ -1607,55 +1625,104 @@ trait WithLeaveRequests
                     'original_start_date' => $origStart->toDateString(),
                     'original_end_date' => $origEnd->toDateString(),
                     'cut_end_date' => $cutEnd->toDateString(),
-                    'postponed_start_date' => $cutEnd->copy()->addDay()->toDateString(),
-                    'postponed_end_date' => $origEnd->toDateString(),
+                    'postponed_start_date' => null,
+                    'postponed_end_date' => null,
                     'reason' => $data['cut_reason'] ?? null,
-                    'status' => 'pending',
-                    'requested_by' => auth()->id(),
+                    'status' => 'approved',
+                    'requested_by' => $actorUserId,
                     'requested_at' => now(),
+                    'approved_by' => $actorUserId,
+                    'approved_at' => now(),
+                    'new_leave_request_id' => null,
                 ]);
 
-                $approvalService = app(\Athka\SystemSettings\Services\Approvals\ApprovalService::class);
-                $src = $approvalService->getRequestSource('leave_cut');
+                // Direct cut: shorten the approved leave immediately.
+                $original->update([
+                    'end_date' => $cutEnd->toDateString(),
+                    'requested_days' => $newRequestedDays,
+                ]);
 
-                if (!$src) {
-                    throw new \RuntimeException('Leave cut approval source is not configured.');
+                // Days after the cut are no longer leave days.
+                // Past dates can be recalculated as actual attendance/absence,
+                // while today/future placeholders must be released instead of
+                // being marked absent before the workday happens.
+                $returnStart = $cutEnd->copy()->addDay()->startOfDay();
+                $today = now()->startOfDay();
+                $pastEnd = $origEnd->copy()->min($today->copy()->subDay());
+
+                if ($returnStart->lte($pastEnd)) {
+                    $this->removeAttendanceLogSyncInRange(
+                        (int) $original->employee_id,
+                        $returnStart,
+                        $pastEnd
+                    );
                 }
 
-                $approvalService->ensureTasksForRequest($src, $cut, (int) $this->companyId);
+                $currentOrFutureStart = $returnStart->copy()->max($today);
+                if ($currentOrFutureStart->lte($origEnd)) {
+                    $checkedInLogs = \Athka\Attendance\Models\AttendanceDailyLog::query()
+                        ->where('saas_company_id', $this->companyId)
+                        ->where('employee_id', (int) $original->employee_id)
+                        ->whereBetween(
+                            'attendance_date',
+                            [$currentOrFutureStart->toDateString(), $origEnd->toDateString()]
+                        )
+                        ->where('attendance_status', 'on_leave')
+                        ->whereNotNull('check_in_time')
+                        ->get();
 
-                $hasApprovalTask = \Athka\SystemSettings\Models\ApprovalTask::query()
-                    ->where('company_id', $this->companyId)
-                    ->where('approvable_type', 'leave_cut')
-                    ->where('approvable_id', (int) $cut->id)
-                    ->exists();
+                    foreach ($checkedInLogs as $attendanceLog) {
+                        $attendanceLog->calculateStatus();
+                        $attendanceLog->save();
+                    }
 
-                if (!$hasApprovalTask) {
-                    throw new \RuntimeException('No approval task could be created for the leave cut request.');
+                    \Athka\Attendance\Models\AttendanceDailyLog::query()
+                        ->where('saas_company_id', $this->companyId)
+                        ->where('employee_id', (int) $original->employee_id)
+                        ->whereBetween(
+                            'attendance_date',
+                            [$currentOrFutureStart->toDateString(), $origEnd->toDateString()]
+                        )
+                        ->where('attendance_status', 'on_leave')
+                        ->whereNull('check_in_time')
+                        ->delete();
                 }
 
-                return $cut;
+                // Return the unused days to the same leave policy/year balance immediately.
+                $this->recalculateBalance(
+                    $this->companyId,
+                    (int) $original->employee_id,
+                    (int) $original->leave_policy_id,
+                    (int) $original->policy_year_id
+                );
+
+                // Activity audit complements the approved cut-history row.
+                $this->logAction('leave_cut', (int) $cutAudit->id, 'approved', [
+                    'original_end_date' => $origEnd->toDateString(),
+                    'cut_end_date' => $cutEnd->toDateString(),
+                    'old_requested_days' => $oldRequestedDays,
+                    'new_requested_days' => $newRequestedDays,
+                    'returned_days' => $returnedDays,
+                    'reason' => $data['cut_reason'] ?? null,
+                    'direct_cut' => true,
+                ], (int) $original->employee_id);
             });
         } catch (\Throwable $e) {
-            \Log::error('Leave Cut Request Creation Error: ' . $e->getMessage(), [
+            \Log::error('Direct Leave Cut Error: ' . $e->getMessage(), [
                 'company_id' => $this->companyId,
                 'original_leave_request_id' => (int) $original->id,
             ]);
 
-            $this->addError(
-                'cut_leave_request_id',
-                tr('Cannot submit request, please contact administration to review the approval workflow.')
-            );
+            $this->addError('cut_leave_request_id', tr('Unable to cut leave. Please try again.'));
             return;
         }
 
-        $this->logAction('leave_cut', (int) $cut->id, 'created', [
-            'original_leave_request_id' => (int) $original->id,
-            'cut_end_date' => $cutEnd->toDateString(),
-            'postponed_start_date' => $cutEnd->copy()->addDay()->toDateString(),
-            'postponed_end_date' => $origEnd->toDateString(),
-            'approval_operation' => 'leave_cut',
-        ], (int) $original->employee_id);
+        // Mobile home leave counters are cached for 30 seconds; clear the default current-month key now.
+        $statsFrom = now()->startOfMonth()->toDateString();
+        $statsTo = now()->toDateString();
+        Cache::forget(
+            "mobile_api:home_stats:v4:{$this->companyId}:{$original->employee_id}:{$statsFrom}:{$statsTo}"
+        );
 
         session()->flash('success', tr('Saved successfully'));
         $this->dispatch('toast', [
@@ -1668,7 +1735,6 @@ trait WithLeaveRequests
         $this->closeCutLeave();
         $this->resetPage('cutPage');
     }
-
 
     protected function computeRequestedDays(LeavePolicy $policy, Carbon $start, Carbon $end): float
     {
