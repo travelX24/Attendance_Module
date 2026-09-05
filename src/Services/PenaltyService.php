@@ -1471,6 +1471,7 @@ class PenaltyService
         $applyOn = match ($violationType) {
             'absent' => 'absence',
             'delay' => 'late',
+            'early_departure' => 'early_departure',
             default => null,
         };
 
@@ -1500,11 +1501,16 @@ class PenaltyService
             return 1.0;
         }
 
-        return $applyOn === 'absence'
-            ? max(0.0, (float) ($exceptionalDay->absence_multiplier ?? 1.0))
-            : max(0.0, (float) ($exceptionalDay->late_multiplier ?? 1.0));
+        return match ($applyOn) {
+            'absence' => max(0.0, (float) $exceptionalDay->absence_multiplier),
+            'late' => max(0.0, (float) $exceptionalDay->late_multiplier),
+            'early_departure' => max(
+                0.0,
+                (float) ($exceptionalDay->early_departure_multiplier ?? 1.0)
+            ),
+            default => 1.0,
+        };
     }
-
 
     private function markSkipped(string $reason): void
     {
